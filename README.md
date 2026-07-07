@@ -130,7 +130,7 @@ Five interconnected n8n workflows covering the complete email lifecycle:
 | `Email Sending Automation` | Sends outbound emails based on workflow triggers |
 | `Email To Interested` | Automated follow-up sequence for interested leads |
 | `Email To Manager` | Escalation notifications with context to managers |
-| `Global Error Handler` | Catches errors across all workflows and sends alert emails |
+| `Global Error Handler` *(in `workflows/shared/`)* | Catches errors across **all** workflows system-wide and sends alert emails |
 
 ---
 
@@ -178,12 +178,13 @@ marblebee/
 │   │   ├── AI Product Title & Description Generator.json
 │   │   ├── Shopify Merge product sync Pipeline.json
 │   │   └── wall_coverings_classifier_workflow.json
+│   ├── shared/
+│   │   └── Global Error Handler.json           # System-wide — covers ALL workflows
 │   ├── email-automation/
 │   │   ├── Email Receiving Automation.json
 │   │   ├── Email Sending Automation.json
 │   │   ├── Email To Interested.json
-│   │   ├── Email To Manager.json
-│   │   └── Global Error Handler.json
+│   │   └── Email To Manager.json
 │   └── pinterest/
 │       ├── pinterest_prepare_workflow.json
 │       ├── pinterest_publish_workflow.json
