@@ -1,0 +1,135 @@
+{
+  "name": "Email Warmup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {"triggerAtHour": 9},
+            {"triggerAtHour": 15}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1200, 400],
+      "id": "wu001-0001-0001-0001-000000000001",
+      "name": "Daily 9AM + 3PM Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {"__rl": true,"value": "1S69M8TCZotX7AtdlS1kdF5pXederZUW7xmJ4nc8rkEY","mode": "id"},
+        "sheetName": {"__rl": true,"value": "Test","mode": "list","cachedResultName": "Test"},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-960, 400],
+      "id": "wu001-0002-0002-0002-000000000002",
+      "name": "Load Warmup Contacts (Test tab)",
+      "retryOnFail": true,
+      "credentials": {"googleSheetsOAuth2Api": {"id": "rKfNzy77xzsMahH6","name": "Template_control"}}
+    },
+    {
+      "parameters": {
+        "documentId": {"__rl": true,"value": "1xFj2iKhr69spqHxUqp2kVhBirzaaJYeVtMCEFqE_ZQg","mode": "id"},
+        "sheetName": {"__rl": true,"value": "gid=0","mode": "list","cachedResultName": "Sheet1"},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-960, 600],
+      "id": "wu001-0003-0003-0003-000000000003",
+      "name": "Load Warmup Templates",
+      "retryOnFail": true,
+      "credentials": {"googleSheetsOAuth2Api": {"id": "rKfNzy77xzsMahH6","name": "Template_control"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Round-robin distribute: 13 workspaces, 10 templates, cap at 125\n// Contacts assigned to workspace by index % 13, template by index % 10\n\nconst WORKSPACES = ['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12','W13'];\nconst TEMPLATES  = ['T01','T02','T03','T04','T05','T06','T07','T08','T09','T10'];\n\nconst contacts = $items('Load Warmup Contacts (Test tab)');\nconst templates = $items('Load Warmup Templates');\n\n// Build template lookup map by template code\nconst tplMap = {};\nfor (const t of templates) {\n  const code = (t.json.template || t.json.code || '').trim().toUpperCase();\n  if (code) tplMap[code] = t.json;\n}\n\nconst eligible = contacts\n  .filter(c => c.json.email && c.json.email.includes('@'))\n  .slice(0, 125);\n\nconst PRODUCT_IMAGES = [\n  'https://marblebee.com/images/product1.jpg',\n  'https://marblebee.com/images/product2.jpg',\n  'https://marblebee.com/images/product3.jpg'\n];\n\nreturn eligible.map((item, idx) => {\n  const ws = WORKSPACES[idx % WORKSPACES.length];\n  const tplCode = TEMPLATES[idx % TEMPLATES.length];\n  const tpl = tplMap[tplCode] || {};\n\n  let body = (tpl.body || '').replace(/\\{\\{\\s*name\\s*\\}\\}/gi, item.json.name || 'there');\n\n  // Optionally insert random product image after Terry Gao signature\n  const imgUrl = PRODUCT_IMAGES[idx % PRODUCT_IMAGES.length];\n  if (body.includes('Terry Gao')) {\n    body = body.replace(\n      /(<br\\s*\\/?>)?\\s*Terry Gao/i,\n      `$&<br><img src=\"${imgUrl}\" alt=\"Marblebee Product\" style=\"max-width:400px\" />`\n    );\n  }\n\n  return {\n    json: {\n      ...item.json,\n      workspace: ws,\n      template: tplCode,\n      email_body: body,\n      email_subject: tpl.subject || 'Warm regards from Marblebee'\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 400],
+      "id": "wu001-0004-0004-0004-000000000004",
+      "name": "Assign Workspace & Template (Round-Robin)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W1","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W2","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W3","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W4","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W5","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W6","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W7","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W8","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W9","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W10","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W11","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W12","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},"conditions": [{"leftValue": "={{ $json.workspace }}","rightValue": "W13","operator": {"type": "string","operation": "equals"}}],"combinator": "and"}}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-480, 400],
+      "id": "wu001-0005-0005-0005-000000000005",
+      "name": "Route to Workspace (W1-W13)"
+    },
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, -800],"id": "wu001-0006-0006-0006-000000000006","name": "Warmup Send W1 (Support007)","webhookId": "wu-w1","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "Uf7TgPsxu74qDj1A","name": "support007"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, -608],"id": "wu001-0007-0007-0007-000000000007","name": "Warmup Send W2 (Support012)","webhookId": "wu-w2","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "98ygOHP2Wr0m58NC","name": "Support012"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, -416],"id": "wu001-0008-0008-0008-000000000008","name": "Warmup Send W3 (Terry CC)","webhookId": "wu-w3","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "tctQgk0QivsN8TSx","name": "terry_marblebee_cc"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, -224],"id": "wu001-0009-0009-0009-000000000009","name": "Warmup Send W4 (Jack Mama)","webhookId": "wu-w4","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "ilmsvYfW0qq6qVae","name": "jackmamamarble"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, -32],"id": "wu001-0010-0010-0010-000000000010","name": "Warmup Send W5 (Luna Mama)","webhookId": "wu-w5","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "8mWXIiuvW16Wm9qz","name": "LunaMamamarble"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 160],"id": "wu001-0011-0011-0011-000000000011","name": "Warmup Send W6 (Jack NewHome)","webhookId": "wu-w6","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "ZLrcUVdjfpzxCW10","name": "Jack_Newhomestone"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 352],"id": "wu001-0012-0012-0012-000000000012","name": "Warmup Send W7 (Terry Live)","webhookId": "wu-w7","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "w8NLQoblB5vWujaQ","name": "Terry_Marblebee_Live"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 544],"id": "wu001-0013-0013-0013-000000000013","name": "Warmup Send W8 (Terry CFD)","webhookId": "wu-w8","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "A0WAZ2HE5shhndiy","name": "Terry_Marblebee_cfd"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 736],"id": "wu001-0014-0014-0014-000000000014","name": "Warmup Send W9 (Terry Site)","webhookId": "wu-w9","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "sEfHEMcxINrWYHAx","name": "terry_Marblebee_Site"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 928],"id": "wu001-0015-0015-0015-000000000015","name": "Warmup Send W10 (Emily NewHome)","webhookId": "wu-w10","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "8ZB5D0yYrYpY9ZE4","name": "emily_Newhomestone"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 1120],"id": "wu001-0016-0016-0016-000000000016","name": "Warmup Send W11","webhookId": "wu-w11","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "W11CredId","name": "W11_Gmail"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 1312],"id": "wu001-0017-0017-0017-000000000017","name": "Warmup Send W12","webhookId": "wu-w12","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "W12CredId","name": "W12_Gmail"}}},
+    {"parameters": {"sendTo": "={{ $json.email }}","subject": "={{ $json.email_subject }}","message": "={{ $json.email_body }}","options": {"appendAttribution": false}},"type": "n8n-nodes-base.gmail","typeVersion": 2.1,"position": [-240, 1504],"id": "wu001-0018-0018-0018-000000000018","name": "Warmup Send W13","webhookId": "wu-w13","retryOnFail": true,"credentials": {"gmailOAuth2": {"id": "W13CredId","name": "W13_Gmail"}}}
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 9AM + 3PM Trigger": {"main": [[{"node": "Load Warmup Contacts (Test tab)","type": "main","index": 0},{"node": "Load Warmup Templates","type": "main","index": 0}]]},
+    "Load Warmup Contacts (Test tab)": {"main": [[{"node": "Assign Workspace & Template (Round-Robin)","type": "main","index": 0}]]},
+    "Load Warmup Templates": {"main": [[{"node": "Assign Workspace & Template (Round-Robin)","type": "main","index": 0}]]},
+    "Assign Workspace & Template (Round-Robin)": {"main": [[{"node": "Route to Workspace (W1-W13)","type": "main","index": 0}]]},
+    "Route to Workspace (W1-W13)": {"main": [
+      [{"node": "Warmup Send W1 (Support007)","type": "main","index": 0}],
+      [{"node": "Warmup Send W2 (Support012)","type": "main","index": 0}],
+      [{"node": "Warmup Send W3 (Terry CC)","type": "main","index": 0}],
+      [{"node": "Warmup Send W4 (Jack Mama)","type": "main","index": 0}],
+      [{"node": "Warmup Send W5 (Luna Mama)","type": "main","index": 0}],
+      [{"node": "Warmup Send W6 (Jack NewHome)","type": "main","index": 0}],
+      [{"node": "Warmup Send W7 (Terry Live)","type": "main","index": 0}],
+      [{"node": "Warmup Send W8 (Terry CFD)","type": "main","index": 0}],
+      [{"node": "Warmup Send W9 (Terry Site)","type": "main","index": 0}],
+      [{"node": "Warmup Send W10 (Emily NewHome)","type": "main","index": 0}],
+      [{"node": "Warmup Send W11","type": "main","index": 0}],
+      [{"node": "Warmup Send W12","type": "main","index": 0}],
+      [{"node": "Warmup Send W13","type": "main","index": 0}]
+    ]}
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "nETo8yQdCbRv52pK"
+  },
+  "versionId": "warmup-v1-0000-0000-000000000000",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "Tid7tSZlny3hzy0a",
+  "tags": []
+}

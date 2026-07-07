@@ -3,180 +3,69 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "triggerAtHour": 9
-            }
-          ]
-        }
+        "rule": {"interval": [{"triggerAtHour": 9}]}
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        48,
-        112
-      ],
-      "id": "cd2ccd4e-4bb6-4042-929c-5217b1330eb3",
+      "position": [-240, 208],
+      "id": "4ff6f737-dbff-48db-94af-529c8701f6fc",
       "name": "Daily 9AM Trigger"
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "Sheet1",
-          "mode": "name"
-        },
+        "documentId": {"__rl": true,"value": "1cu6cH_-BqvKnvYvSYbFcQkq7BKOe4ttOCHoO0CWuFDc","mode": "id"},
+        "sheetName": {"__rl": true,"value": 61642018,"mode": "list","cachedResultName": "Automation","cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cu6cH_-BqvKnvYvSYbFcQkq7BKOe4ttOCHoO0CWuFDc/edit#gid=61642018"},
         "options": {}
       },
-      "id": "8f520e2f-43f7-44d6-85ba-a3a3ef9d61d9",
+      "id": "de76f2e1-63d7-43d2-a261-03aabe7036bd",
       "name": "Read Pending Emails from Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 3,
-      "position": [
-        288,
-        112
-      ],
+      "position": [0, 208],
       "retryOnFail": true,
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "4M23Lwl8AJ2nkq7t",
-          "name": "Google Sheets"
-        }
-      }
+      "credentials": {"googleSheetsOAuth2Api": {"id": "rKfNzy77xzsMahH6","name": "Template_control"}}
     },
     {
       "parameters": {
-        "jsCode": "// Step 1: Filter valid rows (Status empty or PENDING), limit to 500\nconst filtered = items\n  .filter(item => {\n    const status = (item.json.Status || \"\").trim().toLowerCase();\n    return status === \"\" || status === \"pending\";\n  })\n  .slice(0, 500)\n  .map(item => {\n    return {\n      json: {\n        ...item.json,\n        scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()\n      }\n    };\n  });\n\n// Step 2: Count totals by type\nconst counts = {};\nfor (const row of filtered) {\n  const type = (row.json.type || row.json.Type || \"Unknown\").toLowerCase();\n  counts[type] = (counts[type] || 0) + 1;\n}\n\n// Step 3: Return both data sets\nreturn [\n  {\n    json: {\n      rows: filtered.map(r => r.json),   // enriched rows\n      total_emails: filtered.length,\n      breakdown: counts,\n      type: \"manager\"\n    }\n  }\n];\n"
+        "jsCode": "const filtered = items\n  .filter(item => {\n    const status = (item.json.status || item.json.Status || \"\").trim().toLowerCase();\n    const isValidStatus = status === \"\" || status === \"pending\";\n    const hasEmail = item.json.email;\n    const hasType = item.json.type || item.json.Type;\n    return isValidStatus && hasEmail && hasType;\n  })\n  .slice(0, 500)\n  .map(item => ({\n    json: {\n      ...item.json,\n      scheduled_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()\n    }\n  }));\n\nconst counts = {};\nfor (const row of filtered) {\n  const type = (row.json.type || row.json.Type || \"Unknown\").toLowerCase();\n  counts[type] = (counts[type] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    rows: filtered.map(r => r.json),\n    total_emails: filtered.length,\n    breakdown: counts,\n    type: \"manager\"\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        496,
-        112
-      ],
-      "id": "0cc43b97-04ef-4207-8a35-4032ad3c23db",
+      "position": [208, 208],
+      "id": "eeb98b1d-8c76-4cdd-aa92-ef9822a3183a",
       "name": "Filter Pending & Mark Updated"
     },
     {
       "parameters": {
-        "jsCode": "// n8n Function node — fills the template in items[0].json.body\nconst input = (items[0] && items[0].json) ? items[0].json : {};\n\n// Safety defaults\nconst bodyTemplate = input.body || '';\nconst breakdown = input.breakdown || {};\nconst total = input.total_emails || 0;\n\n// 1) Build table rows from breakdown\nlet rows = '';\nfor (const [type, count] of Object.entries(breakdown)) {\n  rows += `\n    <tr>\n      <td style=\"border: 1px solid #ccc; padding: 8px;\">${type}</td>\n      <td style=\"border: 1px solid #ccc; padding: 8px; text-align: center;\">${count}</td>\n    </tr>`;\n}\n\n// 2) Replace the for...endfor block (works across newlines)\nconst loopRegex = /\\{%\\s*for[\\s\\S]*?\\{%\\s*endfor\\s*%\\}/g;\nlet filled = bodyTemplate.replace(loopRegex, rows);\n\n// 3) Replace specific placeholders (total_emails etc.)\nfilled = filled.replace(/{{\\s*total_emails\\s*}}/g, String(total));\n\n// 4) Replace any other simple {{ key }} placeholders from the input object\n//    (skips 'type' and 'count' which are intended for the loop)\nfilled = filled.replace(/{{\\s*([a-zA-Z0-9_]+)\\s*}}/g, (_, key) => {\n  if (key === 'type' || key === 'count') return '';\n  if (Object.prototype.hasOwnProperty.call(input, key)) return String(input[key] ?? '');\n  return '';\n});\n\n// Return filled body (preserving other fields)\nreturn [\n  {\n    json: {\n      ...input,\n      body: filled\n    }\n  }\n];\n"
+        "jsCode": "const input = (items[0] && items[0].json) ? items[0].json : {};\nconst bodyTemplate = input.body || '';\nconst breakdown = input.breakdown || {};\nconst total = input.total_emails || 0;\n\nlet rows = '';\nfor (const [type, count] of Object.entries(breakdown)) {\n  rows += `\\n    <tr>\\n      <td style=\"border: 1px solid #ccc; padding: 8px;\">${type}</td>\\n      <td style=\"border: 1px solid #ccc; padding: 8px; text-align: center;\">${count}</td>\\n    </tr>`;\n}\n\nconst loopRegex = /\\{%\\s*for[\\s\\S]*?\\{%\\s*endfor\\s*%\\}/g;\nlet filled = bodyTemplate.replace(loopRegex, rows);\nfilled = filled.replace(/{{\\s*total_emails\\s*}}/g, String(total));\nfilled = filled.replace(/{{\\s*([a-zA-Z0-9_]+)\\s*}}/g, (_, key) => {\n  if (key === 'type' || key === 'count') return '';\n  if (Object.prototype.hasOwnProperty.call(input, key)) return String(input[key] ?? '');\n  return '';\n});\n\nreturn [{ json: { ...input, body: filled } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1072,
-        -80
-      ],
-      "id": "9cd9ef95-bb17-4ae7-b2a4-2775d918dd96",
+      "position": [784, 16],
+      "id": "d98b9dc0-e21d-48cb-b2ef-6c08025426d0",
       "name": "Prepare Summary Email"
     },
     {
-      "parameters": {
-        "mode": "chooseBranch",
-        "useDataOfInput": 2
-      },
+      "parameters": {"mode": "chooseBranch","useDataOfInput": 2},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
-      "position": [
-        1664,
-        96
-      ],
-      "id": "97502c46-2453-41ad-9473-9ce8b8313628",
+      "position": [1376, 192],
+      "id": "6a563804-3447-48f8-be23-b3ac1a779b20",
       "name": "Merge Updates & Summary"
     },
     {
       "parameters": {
         "operation": "update",
-        "documentId": {
-          "__rl": true,
-          "value": "1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA/edit#gid=0"
-        },
+        "documentId": {"__rl": true,"value": "1cu6cH_-BqvKnvYvSYbFcQkq7BKOe4ttOCHoO0CWuFDc","mode": "id"},
+        "sheetName": {"__rl": true,"value": 61642018,"mode": "list","cachedResultName": "Automation","cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cu6cH_-BqvKnvYvSYbFcQkq7BKOe4ttOCHoO0CWuFDc/edit#gid=61642018"},
         "columns": {
           "mappingMode": "defineBelow",
-          "value": {
-            "row_number": "={{ $json.row_number }}",
-            "scheduled_at": "={{ $json.scheduled_at }}",
-            "status": "Scheduled"
-          },
-          "matchingColumns": [
-            "row_number"
-          ],
+          "value": {"row_number": "={{ $json.row_number }}","scheduled_at": "={{ $json.scheduled_at }}","status": "Scheduled"},
+          "matchingColumns": ["row_number"],
           "schema": [
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "name",
-              "displayName": "name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "type",
-              "displayName": "type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "scheduled_at",
-              "displayName": "scheduled_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "row_number",
-              "displayName": "row_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "readOnly": true,
-              "removed": false
-            }
+            {"id": "status","displayName": "status","required": false,"defaultMatch": false,"display": true,"type": "string","canBeUsedToMatch": true},
+            {"id": "scheduled_at","displayName": "scheduled_at","required": false,"defaultMatch": false,"display": true,"type": "string","canBeUsedToMatch": true},
+            {"id": "row_number","displayName": "row_number","required": false,"defaultMatch": false,"display": true,"type": "number","canBeUsedToMatch": true,"readOnly": true,"removed": false}
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
@@ -185,86 +74,43 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [
-        1888,
-        96
-      ],
-      "id": "647d3c27-e1d8-4549-8010-8b8cea16fc4f",
+      "position": [1600, 192],
+      "id": "c16ac73c-2cbb-4c56-8f69-bd3b814daca2",
       "name": "Update Status in Sheet",
       "retryOnFail": true,
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "4M23Lwl8AJ2nkq7t",
-          "name": "Google Sheets"
-        }
-      }
+      "credentials": {"googleSheetsOAuth2Api": {"id": "rKfNzy77xzsMahH6","name": "Template_control"}}
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1rO6V63_uxtCNSH-bYGDNca6-rYiUhLXq9PhkfdflzcU",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rO6V63_uxtCNSH-bYGDNca6-rYiUhLXq9PhkfdflzcU/edit#gid=0"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "type",
-              "lookupValue": "manager"
-            }
-          ]
-        },
+        "documentId": {"__rl": true,"value": "1xFj2iKhr69spqHxUqp2kVhBirzaaJYeVtMCEFqE_ZQg","mode": "id"},
+        "sheetName": {"__rl": true,"value": "gid=0","mode": "list","cachedResultName": "Sheet1","cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xFj2iKhr69spqHxUqp2kVhBirzaaJYeVtMCEFqE_ZQg/edit#gid=0"},
+        "filtersUI": {"values": [{"lookupColumn": "type","lookupValue": "manager"}]},
         "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [
-        288,
-        -96
-      ],
-      "id": "fdf5b047-faf6-4272-8932-6cf27dd10132",
+      "position": [0, 0],
+      "id": "285a7e90-ef44-4b0d-a2c4-3653643d9fa1",
       "name": "Get Manager Template",
       "retryOnFail": true,
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "4M23Lwl8AJ2nkq7t",
-          "name": "Google Sheets"
-        }
-      }
+      "credentials": {"googleSheetsOAuth2Api": {"id": "rKfNzy77xzsMahH6","name": "Template_control"}}
     },
     {
       "parameters": {
-        "jsCode": "// Take first item (since your input is an array with 1 object)\nconst rows = items[0].json.rows;\n\n// Return each row as an item\nreturn rows.map(r => ({ json: r }));\n"
+        "jsCode": "const rows = items[0].json.rows;\nreturn rows.map(r => ({ json: r }));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1072,
-        112
-      ],
-      "id": "449a28f1-3a4f-4c9d-a28c-3f4218a7fb86",
+      "position": [784, 208],
+      "id": "7b7c6f54-2767-434b-bbcb-a158064db109",
       "name": "Code"
     },
     {
-      "parameters": {
-        "mode": "combine",
-        "fieldsToMatchString": "type",
-        "options": {}
-      },
+      "parameters": {"mode": "combine","fieldsToMatchString": "type","options": {}},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
-      "position": [
-        832,
-        -80
-      ],
-      "id": "18173492-c27b-464d-a859-3e0217353520",
+      "position": [544, 16],
+      "id": "0441fd1a-5207-4ad5-9ef6-3863b12d791d",
       "name": "Combine Template and Data"
     },
     {
@@ -272,156 +118,61 @@
         "sendTo": "={{ $json.to }}",
         "subject": "={{ $json.subject }}",
         "message": "={{ $json.body }}",
-        "options": {
-          "appendAttribution": false
-        }
+        "options": {"appendAttribution": false}
       },
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [
-        1312,
-        -80
-      ],
-      "id": "6744e8a9-4794-498c-aa04-d12f03ecabab",
+      "position": [1024, 16],
+      "id": "f561c389-930a-46f2-80f4-76a78cf56dad",
       "name": "Send Mail to Manager",
       "webhookId": "fd777eb0-20e8-4a59-8088-478e21e4dab2",
       "retryOnFail": true,
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "D2acViITg9VwQHFX",
-          "name": "Gmail account"
-        }
-      }
+      "credentials": {"gmailOAuth2": {"id": "jbTR2ymRE79iaKwC","name": "Lunaruiz715"}}
     }
   ],
-  "pinData": {},
-  "connections": {
-    "Daily 9AM Trigger": {
-      "main": [
-        [
-          {
-            "node": "Read Pending Emails from Sheet",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Get Manager Template",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read Pending Emails from Sheet": {
-      "main": [
-        [
-          {
-            "node": "Filter Pending & Mark Updated",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter Pending & Mark Updated": {
-      "main": [
-        [
-          {
-            "node": "Combine Template and Data",
-            "type": "main",
-            "index": 1
-          },
-          {
-            "node": "Code",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Summary Email": {
-      "main": [
-        [
-          {
-            "node": "Send Mail to Manager",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Updates & Summary": {
-      "main": [
-        [
-          {
-            "node": "Update Status in Sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Status in Sheet": {
-      "main": [
-        []
-      ]
-    },
-    "Get Manager Template": {
-      "main": [
-        [
-          {
-            "node": "Combine Template and Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code": {
-      "main": [
-        [
-          {
-            "node": "Merge Updates & Summary",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Combine Template and Data": {
-      "main": [
-        [
-          {
-            "node": "Prepare Summary Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Mail to Manager": {
-      "main": [
-        [
-          {
-            "node": "Merge Updates & Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+  "pinData": {
+    "Daily 9AM Trigger": [
+      {
+        "json": {
+          "timestamp": "2025-10-27T09:00:19.008-04:00",
+          "Readable date": "October 27th 2025, 9:00:19 am",
+          "Readable time": "9:00:19 am",
+          "Day of week": "Monday",
+          "Year": "2025",
+          "Month": "October",
+          "Day of month": "27",
+          "Hour": "09",
+          "Minute": "00",
+          "Second": "19",
+          "Timezone": "America/New_York (UTC-04:00)"
+        }
+      }
+    ]
   },
-  "active": true,
+  "connections": {
+    "Daily 9AM Trigger": {"main": [[{"node": "Read Pending Emails from Sheet","type": "main","index": 0},{"node": "Get Manager Template","type": "main","index": 0}]]},
+    "Read Pending Emails from Sheet": {"main": [[{"node": "Filter Pending & Mark Updated","type": "main","index": 0}]]},
+    "Filter Pending & Mark Updated": {"main": [[{"node": "Combine Template and Data","type": "main","index": 1},{"node": "Code","type": "main","index": 0}]]},
+    "Prepare Summary Email": {"main": [[{"node": "Send Mail to Manager","type": "main","index": 0}]]},
+    "Merge Updates & Summary": {"main": [[{"node": "Update Status in Sheet","type": "main","index": 0}]]},
+    "Get Manager Template": {"main": [[{"node": "Combine Template and Data","type": "main","index": 0}]]},
+    "Code": {"main": [[{"node": "Merge Updates & Summary","type": "main","index": 1}]]},
+    "Combine Template and Data": {"main": [[{"node": "Prepare Summary Email","type": "main","index": 0}]]},
+    "Send Mail to Manager": {"main": [[{"node": "Merge Updates & Summary","type": "main","index": 0}]]}
+  },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
+    "binaryMode": "separate",
     "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": "lCKzp9palLBEIxbr"
+    "errorWorkflow": "nETo8yQdCbRv52pK"
   },
-  "versionId": "dcc7faaa-f4c0-4af9-bdd7-4e3c3be622e5",
+  "versionId": "424f3dd3-4b2f-4cbc-8710-a055c0909791",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "af7f26490923ca2d0aa357dde67168def30bf4f82b066a76121648e16bf3dd89"
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
-  "id": "fkuoMNOEoNo6E474",
+  "nodeGroups": [],
+  "id": "OUM3PaNVulXfev1Z",
   "tags": []
 }
