@@ -17,6 +17,9 @@ houzz-scraper/data/
 Email Automation/
 Pinterest/
 
+# Local working files
+marblebee_workflows.csv
+
 # OS
 .DS_Store
 Thumbs.db
