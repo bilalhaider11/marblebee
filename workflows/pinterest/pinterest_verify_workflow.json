@@ -1,0 +1,271 @@
+{
+  "name": "Pinterest WF3 - Verify Published",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest – Workflow 3: Verify published pins (daily)\n\nReads rows where **Status = Scheduled** (with a Tailwind Post ID), calls Tailwind **Get Post**, and when the post is **published** (status = sent), writes the real **Pinterest URL** into **Pin URL** and sets **Status = Published** + actual **Pinned Time**.\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials; accountId in Set Config.",
+        "height": 300,
+        "width": 420
+      },
+      "id": "sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "n-trig",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "accountId",
+              "type": "string",
+              "value": "919328"
+            },
+            {
+              "id": "a2",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "a3",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Pinterest Pins",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getpins",
+      "name": "Get Pins",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        560,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).trim().toLowerCase(); }\nconst out = [];\nfor (const p of pins) {\n  if (norm(p['Status']) !== 'scheduled') continue;\n  const postId = (p['Tailwind Post ID']==null?'':String(p['Tailwind Post ID'])).trim();\n  if (!postId) continue;\n  out.push({ json: { rowPinId: p['Pin ID'], postId } });\n}\nreturn out;\n"
+      },
+      "id": "n-sel",
+      "name": "Select Scheduled",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api-v1.tailwind.ai/v1/accounts/{{ $('Set Config').first().json.accountId }}/posts/{{ $json.postId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "n-get",
+      "name": "Get Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        200
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "TAILWIND_CRED_ID",
+          "name": "Tailwind App"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const responses = $input.all();\nconst sel = $('Select Scheduled').all();\nfunction pick(r){ const o = Array.isArray(r)?(r[0]||{}):r; return (o && o.data && (o.data.post || o.data)) || (o && o.post) || o || {}; }\nfunction toIso(ts){ if(ts==null||ts==='') return ''; let n=Number(ts); if(isNaN(n)) return ''; if(n < 1e12) n=n*1000; const dt=DateTime.fromMillis(n).toUTC(); return dt.isValid ? dt.toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : ''; }\nconst out = [];\nfor (let i=0;i<responses.length;i++){\n  const post = pick(responses[i].json || {});\n  const rowPinId = (sel[i] && sel[i].json.rowPinId) || '';\n  if (!rowPinId) continue;\n  const status = (post.status||'').toString().toLowerCase();\n  const pinId = post.pinId || '';\n  if (pinId && (status === 'sent' || status === '')) {\n    out.push({ json: {\n      'Pin ID': rowPinId,\n      'Status': 'Published',\n      'Pin URL': 'https://www.pinterest.com/pin/' + pinId + '/',\n      'Pinned Time': toIso(post.sentAt) || toIso(post.sendAt)\n    } });\n  }\n}\nreturn out;\n"
+      },
+      "id": "n-build",
+      "name": "Build Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Pinterest Pins",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Pin ID"
+          ],
+          "value": {
+            "Pin ID": "={{ $json['Pin ID'] }}",
+            "Status": "={{ $json['Status'] }}",
+            "Pin URL": "={{ $json['Pin URL'] }}",
+            "Pinned Time": "={{ $json['Pinned Time'] }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "n-upd",
+      "name": "Update Pin Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1360,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Pins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins": {
+      "main": [
+        [
+          {
+            "node": "Select Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Scheduled": {
+      "main": [
+        [
+          {
+            "node": "Get Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Post": {
+      "main": [
+        [
+          {
+            "node": "Build Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update": {
+      "main": [
+        [
+          {
+            "node": "Update Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

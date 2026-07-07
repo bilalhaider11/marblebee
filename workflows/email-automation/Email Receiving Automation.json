@@ -1,0 +1,1450 @@
+{
+  "name": "Email Receiving Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2144,
+        32
+      ],
+      "id": "c05e04ab-a7d2-41ed-9630-26218ba0423a",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "57381659-54a1-4eb2-b073-792d0da8d1f7"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "416caf40-db9a-4dc0-8765-2e494a213a4b",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e0aa4455-bdf5-4b1d-8e16-eb46ed3c8020",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "46cc6e8c-c841-4017-8dcc-fc3cb30168d5",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "271cab9d-6cac-4809-a573-5f9c6036cf65",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W5",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "679fe7b3-2caa-4412-bade-a9b06105d353",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "831ceb6c-65f6-4b72-b7cd-1273396bbc14",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W7",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c331b414-4dd8-45b3-857f-f09b6f4bb9a7",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W8",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bf03cd96-6584-4b68-a374-367d8d3733b5",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W9",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "460b00c1-5cbd-43ed-8609-3d8d85c5bb9c",
+                    "leftValue": "={{ $json.workspace }}",
+                    "rightValue": "W10",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1360,
+        -96
+      ],
+      "id": "2ced3af9-015d-493f-a78c-0dfc48350b19",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: keep only rows with ThreadID\nconst withThread = items.filter(i => i.json.thread_id && i.json.thread_id.trim() !== '' && i.json.replied.toLowerCase() !== 'yes');\n\n// Step 2: group by Workspace_Used\nconst groups = {};\nwithThread.forEach(i => {\n  const row = i.json;\n  const ws = row.workspace_used || 'UNKNOWN';\n\n  if (!groups[ws]) {\n    groups[ws] = [];\n  }\n  groups[ws].push(row);\n});\n\n// Step 3: return grouped result in n8n format\nreturn Object.entries(groups).map(([workspace, rows]) => ({\n  json: {\n    workspace,\n    emails: rows\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1632,
+        32
+      ],
+      "id": "13817d0d-7d9a-4432-ac6f-a2bebf475846",
+      "name": "Group by Workspace"
+    },
+    {
+      "parameters": {
+        "numberInputs": 10
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -320,
+        0
+      ],
+      "id": "4702be86-b252-4bca-8d53-79bd9a1d77d5",
+      "name": "Merge Email Threads"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const thread = item.json;\n  const messages = thread.messages || [];\n\n  // Only replies (exclude first message with SENT label)\n  const replies = messages.filter(m => \n    !(m.labels || []).some(l => l.id === 'SENT')\n  );\n\n  return replies.map(reply => {\n    const snippet = reply.snippet || '';\n    const fromField = reply.From || '';\n\n    let from_name = '';\n    let from_email = fromField;\n\n    // Extract \"Name <email>\"\n    const matchNameEmail = fromField.match(/^(.*)<(.+)>$/);\n    if (matchNameEmail) {\n      from_name = matchNameEmail[1].trim().replace(/(^\"|\"$)/g, '');\n      from_email = matchNameEmail[2].trim();\n    }\n\n    // ✅ Extract before \"On ... wrote:\"\n    const replyMatch = snippet.match(/^(.*?)(?:On\\s[A-Za-z]{3},|\\sOn\\s\\w{3}\\s\\d{1,2},)/s);\n    let actual_reply = replyMatch ? replyMatch[1].trim() : snippet.trim();\n\n    // ✅ Post-cleaning:\n    // - remove trailing \"----\" or \"---\"\n    // - collapse multiple spaces/dashes\n    actual_reply = actual_reply\n      .replace(/[-]{2,}$/g, '')   // strip trailing multiple dashes\n      .replace(/\\s+[-]+\\s*$/g, '')// strip space+dash at end\n      .trim();\n\n    // Remove common signature markers\n    actual_reply = actual_reply.replace(/^[-\\s]+$/g, '');\n\n    // Lowercase/no check for interest flag\n    const interested = !/^(no$|not interested)$/i.test(actual_reply);\n\n    return {\n      json: {\n        from_name,\n        from_email,\n        actual_reply,\n        interested,\n        thread_id: reply.threadId,\n      }\n    };\n  });\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        128
+      ],
+      "id": "fbdf2c4f-d731-4b19-a5c7-99409f0aef4b",
+      "name": "Extract Reply Info"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "719818a6-b4c7-47e4-a04e-8382ae4805d9",
+              "leftValue": "={{ $json.interested }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        128
+      ],
+      "id": "c5fa77a6-e3b3-4552-a9c9-c1379349a9af",
+      "name": "Check Interest"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.from_email }}",
+            "replied": "yes",
+            "status": "REPLIED"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_sent_date",
+              "displayName": "last_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "templates_sent",
+              "displayName": "templates_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "workspace_used",
+              "displayName": "workspace_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "replied",
+              "displayName": "replied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "thread_id",
+              "displayName": "thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        704,
+        -112
+      ],
+      "id": "78b9c4bf-cf29-4642-b44d-c0cac3c4d3e6",
+      "name": "Update Google Sheet to Mark Record Replied",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.from_name }}",
+            "email": "={{ $json.from_email }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "scheduled_at",
+              "displayName": "scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        112
+      ],
+      "id": "c890ad28-bbae-4b2b-b3cc-f953f3d809f0",
+      "name": "Append Leads Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "email",
+              "lookupValue": "={{ $json.from_email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        336
+      ],
+      "id": "47fa64a4-02a0-46de-b5ba-d9555d88aaa9",
+      "name": "Get record from the sheet 2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        -752
+      ],
+      "id": "c3fd9dce-9b12-4f07-af91-d57f326bdbe8",
+      "name": "Split Emails for W1"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        -752
+      ],
+      "id": "9937cae7-d4c0-4b90-b0df-b9277564d70d",
+      "name": "Get Gmail Thread for W1",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1888,
+        32
+      ],
+      "id": "1442c202-9c10-4f48-a22c-d18e82e89480",
+      "name": "Get records to check for replied",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "clear": "specificRows",
+        "startIndex": "={{ $json.row_number }}"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        336
+      ],
+      "id": "871a412a-0eeb-4e91-af97-5a24f37dbe39",
+      "name": "Clear Record From Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        -368
+      ],
+      "id": "b4f795af-a537-45a7-9096-1355b9f33d68",
+      "name": "Split Emails for W3"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        -368
+      ],
+      "id": "92845f38-a012-4698-9511-a620f69e3684",
+      "name": "Get Gmail Thread for W3",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        -176
+      ],
+      "id": "2a97fbb2-8373-47c7-a30b-8527ad4f7d9c",
+      "name": "Split Emails for W4"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        -176
+      ],
+      "id": "1362590b-193d-4161-8322-01fd597273ae",
+      "name": "Get Gmail Thread for W4",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        16
+      ],
+      "id": "e64f002b-5024-49a2-8996-353c19102519",
+      "name": "Split Emails for W5"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        16
+      ],
+      "id": "9353d2a9-555a-4469-972a-a7e744a71d50",
+      "name": "Get Gmail Thread for W5",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        208
+      ],
+      "id": "7370e0df-b27f-49e3-bb62-0fc0e9b0ad28",
+      "name": "Split Emails for W6"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        208
+      ],
+      "id": "18e81abd-ecd4-46a9-96b9-dc3f8a065ac3",
+      "name": "Get Gmail Thread for W6",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        -560
+      ],
+      "id": "69b5d41b-cc6f-4ea0-81df-debdbc99569c",
+      "name": "Split Emails for W2"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        -560
+      ],
+      "id": "7a072004-371a-426a-aaaa-099daaa4859d",
+      "name": "Get Gmail Thread for W2",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        976
+      ],
+      "id": "a9aad7d1-942b-44eb-9602-12b75748a8c6",
+      "name": "Split Emails for W10"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        976
+      ],
+      "id": "feee797e-48fb-4a7d-a233-9889e18f5357",
+      "name": "Get Gmail Thread for W10",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        784
+      ],
+      "id": "a0a5aaae-0567-479c-a3e4-d808e12ac11c",
+      "name": "Split Emails for W9"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        784
+      ],
+      "id": "dc99fad2-75be-46c9-a5ba-786de4901184",
+      "name": "Get Gmail Thread for W9",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        592
+      ],
+      "id": "87902006-6353-42de-a634-1259465289ba",
+      "name": "Split Emails for W8"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        592
+      ],
+      "id": "6103f681-9603-49b4-bd3f-3465aaa0cb6f",
+      "name": "Get Gmail Thread for W8",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const emails = item.json.emails || [];\n  return emails.map(e => ({\n    json: { thread_id: e.thread_id, email: e.email }\n  }));\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        400
+      ],
+      "id": "d2c7639f-b50f-4502-ac86-eb46cddc7988",
+      "name": "Split Emails for W7"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.thread_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        400
+      ],
+      "id": "98482021-2841-4a8d-818b-17706d21c3c1",
+      "name": "Get Gmail Thread for W7",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get records to check for replied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Split Emails for W1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W9",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Emails for W10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group by Workspace": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Email Threads": {
+      "main": [
+        [
+          {
+            "node": "Extract Reply Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Reply Info": {
+      "main": [
+        [
+          {
+            "node": "Check Interest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Interest": {
+      "main": [
+        [
+          {
+            "node": "Append Leads Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Google Sheet to Mark Record Replied",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get record from the sheet 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get record from the sheet 2": {
+      "main": [
+        [
+          {
+            "node": "Clear Record From Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W1": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W1": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get records to check for replied": {
+      "main": [
+        [
+          {
+            "node": "Group by Workspace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W3": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W4": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W5": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W6": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W6": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Split Emails for W2": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W10": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W9": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W8": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emails for W7": {
+      "main": [
+        [
+          {
+            "node": "Get Gmail Thread for W7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W2": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W3": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W4": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W5": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W7": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W8": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W9": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 8
+          }
+        ]
+      ]
+    },
+    "Get Gmail Thread for W10": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Threads",
+            "type": "main",
+            "index": 9
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "lCKzp9palLBEIxbr"
+  },
+  "versionId": "ccfbaef5-5754-43b7-a45e-0b34377e5e38",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af7f26490923ca2d0aa357dde67168def30bf4f82b066a76121648e16bf3dd89"
+  },
+  "id": "qJgMB1TWqX0QYMBV",
+  "tags": []
+}

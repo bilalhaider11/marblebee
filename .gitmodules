@@ -1,0 +1,3 @@
+[submodule "houzz-scraper"]
+	path = houzz-scraper
+	url = https://github.com/bilalhaider11/houzz_scrapper.git

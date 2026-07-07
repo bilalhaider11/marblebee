@@ -1,0 +1,1565 @@
+{
+  "name": "Email Sending Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2192,
+        1152
+      ],
+      "id": "4309b7d5-d7ff-48a4-acab-1ce534d596a4",
+      "name": "Fetch Contacts from Sheet",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1VE2aOSuNZZkyeJcH76fQJ6mLAr3JokZmLq8ROa7shDs",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2016,
+        928
+      ],
+      "id": "f2c85ad5-b8e0-4791-8b3d-491456d05c99",
+      "name": "Fetch Email Templates",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date();\nconst month = today.getMonth();\nconst year = today.getFullYear();\n\n// Available templates\nconst templates = [\n  \"T01\",\"T02\",\"T03\",\"T04\",\"T05\",\n  \"T06\",\"T07\",\"T08\",\"T09\",\"T10\"\n];\n\n// Available workspaces\nconst workspaces = [\"W1\",\"W2\", \"W3\", \"W4\", \"W5\",\n                    \"W6\",\"W7\", \"W8\", \"W9\", \"W10\"];\n\nlet count = 0;\n\n// Filter eligible rows\nconst filteredEligible = items.filter(i => {\n  const row = i.json;\n\n  // Skip if no email\n  if (!row.email) return false;\n\n  // Skip if replied = \"no\"\n  if (row.replied && row.replied.toLowerCase() === 'no') return false;\n\n  // Already sent this month?\n  if (row.last_sent_date) {\n    const d = new Date(row.last_sent_date);\n    if (d.getMonth() === month && d.getFullYear() === year) {\n      return false;\n    }\n  }\n  \n  // Limit to 125\n  if (count >= 125) return false;\n  count++;\n  \n  // Assign random workspace\n  row.workspace_used = workspaces[Math.floor(Math.random() * workspaces.length)];\n\n  // Assign random template excluding already sent ones\n  const usedTemplates = row.templates_sent ? row.templates_sent.split(\",\").map(t => t.trim()) : [];\n  const availableTemplates = templates.filter(t => !usedTemplates.includes(t));\n  \n  let chosenTemplate;\n  if (availableTemplates.length > 0) {\n    chosenTemplate = availableTemplates[Math.floor(Math.random() * availableTemplates.length)];\n  } else {\n    // fallback if all templates used\n    chosenTemplate = templates[Math.floor(Math.random() * templates.length)];\n  }\n\n  row.template_id = chosenTemplate;\n\n  return true;\n});\n\nreturn filteredEligible.map(i => ({ json: i.json }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1840,
+        1152
+      ],
+      "id": "440e860f-122d-44a9-86f2-1bcfc0582e68",
+      "name": "Filter Eligible Contacts",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "template_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1472,
+        944
+      ],
+      "id": "b99e2e19-b6b6-4f56-a0fa-9cf3e2aa3777",
+      "name": "Join Contacts with Templates"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split input items into images vs contacts (Shopify CDN treated as images)\nconst { images, contacts } = items.reduce(\n  (acc, { json }) => {\n    if (json.url?.includes('cdn.shopify.com')) {\n      acc.images.push(json);\n    } else {\n      acc.contacts.push(json);\n    }\n    return acc;\n  },\n  { images: [], contacts: [] }\n);\n\n// Utility: pick ONE random element\nconst getRandomItem = arr => arr[Math.floor(Math.random() * arr.length)];\n\nreturn contacts.map(item => {\n  const subject = item.subject || \"\";\n  let body = item.body?.replace(/{{name}}/gi, item.name || \"\") || \"\";\n\n  // Append this template to sent list\n  const prevSent = item.templates_sent ? item.templates_sent.split(',').filter(Boolean) : [];\n  prevSent.push(item.template_id);\n  console.log({item}, item.image, images.length)\n  // ✅ Add a random image only if \"image\" flag is true\n  if (item.image && images.length > 0) {\n    const {url, name} = getRandomItem(images);\n\n    const imageHtml = `\n      <div style=\"margin-top:20px;\">\n        <img src=\"${url}\" \n             alt=\"${name || 'Marble Example'}\"\n             style=\"max-width:100%; border:1px solid #ccc; border-radius:4px;\" />\n      </div>\n    `;\n\n    let inserted = false;\n\n    // 1. Try after last <hr>\n    const hrPos = body.lastIndexOf(\"<hr\");\n    if (hrPos !== -1) {\n      const hrClose = body.indexOf(\">\", hrPos);\n      if (hrClose !== -1) {\n        body = body.slice(0, hrClose + 1) + imageHtml + body.slice(hrClose + 1);\n        inserted = true;\n      }\n    }\n\n    // 2. Fallback → after last </p>\n    if (!inserted) {\n      const pPos = body.lastIndexOf(\"</p>\");\n      if (pPos !== -1) {\n        body = body.slice(0, pPos + 4) + imageHtml + body.slice(pPos + 4);\n        inserted = true;\n      }\n    }\n\n    // 3. If no hr and no </p>, just append\n    if (!inserted) {\n      body += imageHtml;\n    }\n  }\n\n  return {\n    json: {\n      email: item.email,\n      subject,\n      body,\n      template_id: item.template_id,\n      last_sent_date: new Date().toISOString(),\n      templates_sent: prevSent.join(','),\n      workspace_used: item.workspace_used,\n      row_number: item.row_number,\n      contact_id: item.id,\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        928
+      ],
+      "id": "19f1d08d-9225-45fb-93d4-eb70c3b8f909",
+      "name": "Prepare Personalized Email"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "58f143f9-3d72-4f00-9bc1-d11028ce341f"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ab41390f-c2af-42b0-865b-5d92fa34189a",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f8ae9c02-66e9-4181-a2a6-599c7862dec7",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "97dd265a-b350-4563-8a46-908934a6eea1",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "36bde7ca-64c8-4993-9239-01d1272479e4",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W5",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c29c3613-df40-4576-8f4d-f024b3d4f301",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9acf46c3-2dad-46bf-8992-95efa28c0c05",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W7",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "36532580-9b65-4e7d-9bb2-d06d2e8bb1d1",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W8",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2d4d80ba-ba8e-4c75-9a25-f97bd8fe7f61",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W9",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c7b07bbd-232a-48e2-83ff-90293483954e",
+                    "leftValue": "={{ $json.workspace_used }}",
+                    "rightValue": "W10",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -544,
+        800
+      ],
+      "id": "dc3b1624-74b5-425e-9d49-8818ebef2d48",
+      "name": "Select Workspace"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "668c1bfe-662a-4917-bb47-5e0850a5c9bd",
+              "leftValue": "={{ $json.labelIds[0] }}",
+              "rightValue": "=SENT",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b1685967-3d3e-48e0-a9b1-615a39d3cea2",
+              "leftValue": "={{ $json.labelIds[0] }}",
+              "rightValue": "UNREAD",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "2d26d4bc-ed0a-4392-a587-c64ed219e6fa",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        1072
+      ],
+      "id": "b31565bd-23eb-416e-887d-194a85df586e",
+      "name": "Check Email Status"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "last_sent_date": "={{ $json.last_sent_date }}",
+            "templates_sent": "={{ $json.templates_sent }}",
+            "workspace_used": "={{ $json.workspace_used }}",
+            "status": "=SENT",
+            "thread_id": "={{ $json.threadId }}",
+            "id": "={{ $json.contact_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_sent_date",
+              "displayName": "last_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "templates_sent",
+              "displayName": "templates_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workspace_used",
+              "displayName": "workspace_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "replied",
+              "displayName": "replied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "thread_id",
+              "displayName": "thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1696,
+        832
+      ],
+      "id": "e2f1674b-31f2-4075-8ef3-e2bad42672cb",
+      "name": "Update Contact Sheet",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sl7BzWmDES9teQwiIvMc2qB6C0GMdQ-_WSHcYSbmNvM/edit#gid=0"
+        },
+        "clear": "specificRows",
+        "startIndex": "={{ $json.row_number }}"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        1312
+      ],
+      "id": "0f93626b-0558-4db9-9b3c-382341167b56",
+      "name": "Clear Uninterested Contact Row",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 10
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        976,
+        944
+      ],
+      "id": "48bd88b8-2bec-4a1e-9827-5ad44a6924c9",
+      "name": "Merge All Sent Emails"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        -64
+      ],
+      "id": "758e488f-e7fa-4237-b49d-18abd8cf4bdd",
+      "name": "Collect Workspace 1 Results"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        -80
+      ],
+      "id": "01004bdb-ab45-4848-baf8-c8844c356ac2",
+      "name": "Send Email via Workspace 1",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1J1oCBUsab-KyEh3H3A0ZCw3vM4-U9fp8IVi3kzZM2t8",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1J1oCBUsab-KyEh3H3A0ZCw3vM4-U9fp8IVi3kzZM2t8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2032,
+        688
+      ],
+      "id": "118b8e19-d974-4803-86b5-aa7f7b2b68ed",
+      "name": "Read Images",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1072,
+        928
+      ],
+      "id": "8eb7c0eb-e5b2-41dc-9b12-3c140c2f2da4",
+      "name": "Join Images & Contacts"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        336
+      ],
+      "id": "14e8e48c-1527-4de0-9c9f-4d871c3ef213",
+      "name": "Send Email via Workspace 3",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        544
+      ],
+      "id": "44ad40df-f59f-41a1-9f43-de3c975d18f6",
+      "name": "Send Email via Workspace 4",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        752
+      ],
+      "id": "45253a1a-5c88-484f-8a8f-e8c9b2deba13",
+      "name": "Send Email via Workspace 5",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        1216
+      ],
+      "id": "ac4dffe2-1690-4d44-a361-65b80d3e1d37",
+      "name": "Send Email via Workspace 6",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        128
+      ],
+      "id": "52825bc1-016f-40c7-bc61-f6dcf99afcd7",
+      "name": "Send Email via Workspace 2",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "D2acViITg9VwQHFX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        144
+      ],
+      "id": "5eb704b3-ef0e-4e90-9403-e3989e71647c",
+      "name": "Collect Workspace 2 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        352
+      ],
+      "id": "452015f8-ad07-42bd-aa27-93eda8db180e",
+      "name": "Collect Workspace 3 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        560
+      ],
+      "id": "788ef79b-6006-4a02-aa1f-7e1547fc358a",
+      "name": "Collect Workspace 4 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        768
+      ],
+      "id": "2f7f3c73-f9a9-4c18-b174-29c17d7746fe",
+      "name": "Collect Workspace 5 Results"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        2064
+      ],
+      "id": "67c388a3-1995-4cd3-813e-800c3ceb9f9e",
+      "name": "Send Email via Workspace 10",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        1840
+      ],
+      "id": "c9c5a615-417d-46d3-a471-78ee254ed107",
+      "name": "Send Email via Workspace 9",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        1632
+      ],
+      "id": "00d7fcf5-1ad9-4126-afcd-70069df0fa5d",
+      "name": "Send Email via Workspace 8",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -144,
+        1424
+      ],
+      "id": "66cc3ad2-c2b9-443f-9e4a-a0a9ad367190",
+      "name": "Send Email via Workspace 7",
+      "webhookId": "909851dd-ab25-47d2-a010-b22b42805276",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        1200
+      ],
+      "id": "b5b809d8-d9d3-4f37-9f1b-9b9eafd6da5c",
+      "name": "Collect Workspace 6 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        1408
+      ],
+      "id": "da5017e6-ad51-4e6f-9d92-41c36bd354ab",
+      "name": "Collect Workspace 7 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        1616
+      ],
+      "id": "1f406b17-1509-4cea-bd99-af2a72f38cbd",
+      "name": "Collect Workspace 8 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        1824
+      ],
+      "id": "386edbb7-3f18-42e2-8ff7-25ac6761e989",
+      "name": "Collect Workspace 9 Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        304,
+        2048
+      ],
+      "id": "aecc2d22-2075-476f-95e4-e088c38221dc",
+      "name": "Collect Workspace 10 Results"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            },
+            {
+              "triggerAtHour": 12
+            },
+            {
+              "triggerAtHour": 15
+            },
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2704,
+        928
+      ],
+      "id": "966430a0-d653-4427-a1a7-774e61bef46d",
+      "name": "Run Email Campaign (Schedule at 9,12,15,18)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fetch Contacts from Sheet": {
+      "main": [
+        [
+          {
+            "node": "Filter Eligible Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Email Templates": {
+      "main": [
+        [
+          {
+            "node": "Join Contacts with Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Eligible Contacts": {
+      "main": [
+        [
+          {
+            "node": "Join Contacts with Templates",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Join Contacts with Templates": {
+      "main": [
+        [
+          {
+            "node": "Join Images & Contacts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Personalized Email": {
+      "main": [
+        [
+          {
+            "node": "Select Workspace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Workspace": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Workspace 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 1 Results",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 2 Results",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 3 Results",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 4 Results",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 5 Results",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 6",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 6 Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 7 Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 8",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 8 Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 9",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 9 Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email via Workspace 10",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Collect Workspace 10 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Status": {
+      "main": [
+        [
+          {
+            "node": "Update Contact Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Uninterested Contact Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Sent Emails": {
+      "main": [
+        [
+          {
+            "node": "Check Email Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 1 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 1": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 1 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Images": {
+      "main": [
+        [
+          {
+            "node": "Join Images & Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join Images & Contacts": {
+      "main": [
+        [
+          {
+            "node": "Prepare Personalized Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 3": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 3 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 4": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 4 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 5": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 5 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 6": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 6 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 2": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 2 Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 10": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 10 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 9": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 9 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 8": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 8 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Email via Workspace 7": {
+      "main": [
+        [
+          {
+            "node": "Collect Workspace 7 Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 6 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 2 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 3 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 4 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 5 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 7 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 8 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 9 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 8
+          }
+        ]
+      ]
+    },
+    "Collect Workspace 10 Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Sent Emails",
+            "type": "main",
+            "index": 9
+          }
+        ]
+      ]
+    },
+    "Run Email Campaign (Schedule at 9,12,15,18)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contacts from Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Email Templates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "lCKzp9palLBEIxbr"
+  },
+  "versionId": "9322a74c-ec3c-4e5e-888d-8d628b3aa810",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af7f26490923ca2d0aa357dde67168def30bf4f82b066a76121648e16bf3dd89"
+  },
+  "id": "FkagcYfann6G7QgD",
+  "tags": []
+}

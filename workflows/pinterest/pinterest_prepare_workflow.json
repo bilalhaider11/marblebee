@@ -1,0 +1,504 @@
+{
+  "name": "Pinterest WF1 - Prepare Pins",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest – Workflow 1: Prepare Pins (runs weekly)\n\n**What it does:** finds newly Posted blogs, reads the blog page, pulls all content images, plans pins (1 carousel of 3 hero images + single pins for the rest, 3/month), AI writes title/description/alt, writes review rows to the **Pinterest Pins** tab.\n\n**Setup:**\n1. Credentials: Google Sheets OAuth2 + OpenAI API key on the relevant nodes.\n2. Create tabs: **Pinterest Pins** and **Board Map** (Category → Pinterest Board).\n3. Add **Pinterest Status** column to Blogs.\n4. Check **Set Config** values.\n\n**Note:** the image-extraction selector (Extract & Plan) may need tuning to your live blog HTML.",
+        "height": 320,
+        "width": 420
+      },
+      "id": "sticky1",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Weekly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "a2",
+              "name": "blogTab",
+              "type": "string",
+              "value": "Blogs"
+            },
+            {
+              "id": "a3",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            },
+            {
+              "id": "a4",
+              "name": "boardMapTab",
+              "type": "string",
+              "value": "Board Map"
+            },
+            {
+              "id": "a5",
+              "name": "pinsPerDay",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "a6",
+              "name": "openAiModel",
+              "type": "string",
+              "value": "gpt-4o"
+            },
+            {
+              "id": "a7",
+              "name": "postingHours",
+              "type": "string",
+              "value": "9,13,17"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Blogs",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-getblogs",
+      "name": "Get Blog Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        760,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e1",
+              "leftValue": "={{ ($json['Update Status'] || '').toString().trim().toLowerCase() }}",
+              "rightValue": "posted",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "e2",
+              "leftValue": "={{ ($json['Pinterest Status'] || '').toString().trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-filter",
+      "name": "Filter Eligible",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node-loop",
+      "name": "Loop Over Blogs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Done",
+        "height": 120,
+        "width": 160
+      },
+      "id": "sticky2",
+      "name": "All Prepared",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json['BLog-URL'] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "html"
+            }
+          }
+        }
+      },
+      "id": "node-fetch",
+      "name": "Fetch Blog Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst pinsPerDay = parseInt(cfg.pinsPerDay) || 3;\nconst hours = (cfg.postingHours || '9,13,17').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || '';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\n// Isolate our article content wrapper (.mb-blog-content) via balanced <div> matching\nfunction contentRegion(h){\n  const marker = h.indexOf('mb-blog-content');\n  if (marker < 0) return h;\n  const start = h.lastIndexOf('<div', marker);\n  if (start < 0) return h;\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = h.length;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return h.slice(start, end);\n}\nconst region = contentRegion(html);\n\n// Extract content image URLs (Shopify CDN or Google Drive), in order, deduped\nconst urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\nconst seen = new Set(); const images = [];\nfor (let raw of urls) {\n  let u = raw.replace(/&amp;/g,'&');\n  const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n  const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n  const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n  if (!(isShopify || isDrive || isExt)) continue;\n  let key;\n  if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n  else key = u.split('?')[0];\n  if (!seen.has(key)) { seen.add(key); images.push(u); }\n}\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\nlet board = ''; let boardId = ''; // chosen manually by the reviewer\n\nconst pins = images.map((img, i) => {\n  const day = Math.floor(i / pinsPerDay);\n  const hour = hours[(i % pinsPerDay) % hours.length] || 9;\n  const scheduledDate = $now.plus({ days: day + 1 }).set({ hour: hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, board, boardId, text, imageCount: images.length, pins } }];\n"
+      },
+      "id": "node-extract",
+      "name": "Extract & Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Blogs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Blog.No."
+          ],
+          "value": {
+            "Blog.No.": "={{ $('Extract & Plan').item.json.blogNo }}",
+            "Pinterest Status": "Queued"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-markqueued",
+      "name": "Mark Blog Queued",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1840,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Extract & Plan').item.json;\nconst out = [];\n(ctx.pins || []).forEach((p, idx) => {\n  const prompt = 'You are a Pinterest SEO copywriter. Look at the image(s) and the article context, then return ONLY a JSON object with keys: title, description, alt. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Blog title: ' + ctx.blogTitle + '\\nCategory: ' + ctx.category + '\\nArticle context: ' + (ctx.text || '')\n    + '\\nThis is ' + (p.type === 'carousel' ? 'a carousel made of these images.' : 'a single image.')\n    + '\\nThe pin links to: ' + ctx.blogUrl;\n  out.push({ json: {\n    blogNo: ctx.blogNo, blogTitle: ctx.blogTitle, blogUrl: ctx.blogUrl,\n    category: ctx.category, board: ctx.board, boardId: ctx.boardId,\n    type: p.type, images: p.images, scheduledDate: p.scheduledDate,\n    pinIndex: idx + 1, promptText: prompt\n  } });\n});\nreturn out;\n"
+      },
+      "id": "node-split",
+      "name": "Split Pins",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "text": "={{ $json.promptText }}",
+        "inputType": "url",
+        "imageUrls": "={{ ($json.images || []).join(',') }}",
+        "options": {}
+      },
+      "id": "node-ai",
+      "name": "AI Vision Copy",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        2280,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 240, 160)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': pin.board,\n    'Board ID': pin.boardId,\n    'Scheduled Date': pin.scheduledDate,\n    'Approval': '',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
+      },
+      "id": "node-buildrow",
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Pinterest Pins",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "node-append",
+      "name": "Append Pin Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2720,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Blog Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Blog Rows": {
+      "main": [
+        [
+          {
+            "node": "Filter Eligible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Eligible": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Blogs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Fetch Blog Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Blog Page": {
+      "main": [
+        [
+          {
+            "node": "Extract & Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Plan": {
+      "main": [
+        [
+          {
+            "node": "Mark Blog Queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Blog Queued": {
+      "main": [
+        [
+          {
+            "node": "Split Pins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Pins": {
+      "main": [
+        [
+          {
+            "node": "AI Vision Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Vision Copy": {
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row": {
+      "main": [
+        [
+          {
+            "node": "Append Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Pin Row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

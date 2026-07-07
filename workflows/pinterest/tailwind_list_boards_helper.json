@@ -1,0 +1,238 @@
+{
+  "name": "Tailwind - List Boards Helper",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Tailwind – List Boards helper (run once)\n\nPulls every Pinterest board name + ID from Tailwind into the **Tailwind Boards** tab, so you can copy the IDs into **Board Map**.\n\n**Setup:** create a tab named **Tailwind Boards** with headers: Pinterest Account | Board Name | Board ID. Set the Google Sheets + Tailwind (Bearer) credentials. Then click Execute.",
+        "height": 260,
+        "width": 420
+      },
+      "id": "sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-trig",
+      "name": "Run Once",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "a2",
+              "name": "boardsTab",
+              "type": "string",
+              "value": "Tailwind Boards"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api-v1.tailwind.ai/v1/accounts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "n-accts",
+      "name": "List Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        200
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "TAILWIND_CRED_ID",
+          "name": "Tailwind App"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let resp = $json;\nconst obj = Array.isArray(resp) ? (resp[0] || {}) : resp;\nlet accts = [];\nif (obj.data && Array.isArray(obj.data.accounts)) accts = obj.data.accounts;\nelse if (Array.isArray(obj.accounts)) accts = obj.accounts;\nelse if (obj.data && Array.isArray(obj.data)) accts = obj.data;\nelse if (Array.isArray(obj)) accts = obj;\nreturn accts.map(a => ({ json: {\n  accountId: a.id || a.accountId || a.account_id,\n  accountName: (a.username || a.displayName || a.name || '').toString().trim()\n} }));\n"
+      },
+      "id": "n-split",
+      "name": "Split Accounts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api-v1.tailwind.ai/v1/accounts/{{ $json.accountId }}/boards",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "n-boards",
+      "name": "List Boards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        200
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "TAILWIND_CRED_ID",
+          "name": "Tailwind App"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let resp = $json;\nconst obj = Array.isArray(resp) ? (resp[0] || {}) : resp;\nconst acct = $('Split Accounts').item.json;\nlet boards = [];\nif (obj.data && Array.isArray(obj.data.boards)) boards = obj.data.boards;\nelse if (Array.isArray(obj.boards)) boards = obj.boards;\nelse if (obj.data && Array.isArray(obj.data)) boards = obj.data;\nelse if (Array.isArray(obj)) boards = obj;\nreturn boards.map(b => ({ json: {\n  'Pinterest Account': acct.accountName,\n  'Board Name': b.name || b.title || '',\n  'Board ID': (b.id || b.boardId || b.board_id || '').toString()\n} }));\n"
+      },
+      "id": "n-flat",
+      "name": "Flatten Boards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tailwind Boards",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "n-write",
+      "name": "Write Boards",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1360,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Once": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "List Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Accounts": {
+      "main": [
+        [
+          {
+            "node": "Split Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Accounts": {
+      "main": [
+        [
+          {
+            "node": "List Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Boards": {
+      "main": [
+        [
+          {
+            "node": "Flatten Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Boards": {
+      "main": [
+        [
+          {
+            "node": "Write Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

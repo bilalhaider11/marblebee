@@ -1,0 +1,986 @@
+{
+  "name": "MarbleBee - Google Doc to Shopify Blog",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## MarbleBee → Shopify Blog Publisher\n\n**Setup before running**\n1. Set credentials on every HTTP node:\n   - Google nodes → *Google Drive OAuth2* (must include Drive + Docs scope)\n   - Shopify nodes → *Header Auth* credential named exactly `X-Shopify-Access-Token` whose value is your Admin API access token\n   - Sheet nodes → *Google Sheets OAuth2*\n2. Fill the **Set Config** node (shop domain, API version, numeric blog id, blog handle, public domain).\n3. Make sure the Drive folder + photo subfolder are shared with the Google account, or let the **Share Folder** node make them public.\n\nProcesses one sheet row per loop: reads the Doc, uploads images to Shopify CDN, rebuilds the HTML, creates the article, writes the URL/status/time back to the sheet.",
+        "height": 360,
+        "width": 460
+      },
+      "id": "sticky1",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        -120
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "node-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "shop",
+              "type": "string",
+              "value": "marblebee.myshopify.com"
+            },
+            {
+              "id": "c2",
+              "name": "apiVersion",
+              "type": "string",
+              "value": "2025-01"
+            },
+            {
+              "id": "c3",
+              "name": "blogId",
+              "type": "string",
+              "value": "72589344921"
+            },
+            {
+              "id": "c4",
+              "name": "blogHandle",
+              "type": "string",
+              "value": "news"
+            },
+            {
+              "id": "c5",
+              "name": "publicDomain",
+              "type": "string",
+              "value": "marblebee.com"
+            },
+            {
+              "id": "c6",
+              "name": "websiteUrl",
+              "type": "string",
+              "value": "https://marblebee.com/"
+            },
+            {
+              "id": "c7",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "c8",
+              "name": "sheetName",
+              "type": "string",
+              "value": "Blogs"
+            },
+            {
+              "id": "c10",
+              "name": "publishVisible",
+              "type": "string",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        380,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Blogs",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-getrows",
+      "name": "Get Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        600,
+        160
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1",
+              "leftValue": "={{ ($json['Update Status'] || '').toString().trim().toLowerCase() }}",
+              "rightValue": "ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-filter",
+      "name": "Filter Unposted",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "node-loop",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1040,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Set Config').first().json;\nconst row = $json;\nfunction extractId(u){ if(!u) return ''; u=String(u).trim(); const m=u.match(/[-\\w]{25,}/); return m?m[0]:u; }\nconst get = (keys) => { for(const k of keys){ if(row[k]!==undefined && row[k]!==null && String(row[k]).trim()!==''){ return String(row[k]).trim(); } } return ''; };\nreturn { json: {\n  blogNo: get(['Blog.No.','Blog.No','Blog No','BlogNo']),\n  blogTitle: get(['Blog-Article','Blog Article','Blog-article']),\n  categoryName: get(['Category (name)','Category(name)','Category( name)','Category name','Category']),\n  categoryLink: get(['Category( Link)','Category (Link)','Category(Link)','Category Link']),\n  folderId: extractId(get(['Folder_url','Folder Url','Folder URL'])),\n  shop: cfg.shop, apiVersion: cfg.apiVersion, blogId: cfg.blogId,\n  blogHandle: cfg.blogHandle, publicDomain: cfg.publicDomain, websiteUrl: cfg.websiteUrl\n} };"
+      },
+      "id": "node-parse",
+      "name": "Parse Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $('Parse Row').first().json.folderId + \"' in parents and mimeType = 'application/vnd.google-apps.document' and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-finddoc",
+      "name": "Find Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $json.files[0].id + '/export' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mimeType",
+              "value": "text/html"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "docHtml"
+            }
+          }
+        }
+      },
+      "id": "node-exportdoc",
+      "name": "Export Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $('Parse Row').first().json.folderId + \"' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-findphoto",
+      "name": "Find Photo Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $('Find Photo Folder').first().json.files[0].id + '/permissions' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ role: 'reader', type: 'anyone' }) }}",
+        "options": {}
+      },
+      "id": "node-share",
+      "name": "Share Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2060,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $('Find Photo Folder').first().json.files[0].id + \"' in parents and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "1000"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-listphotos",
+      "name": "List Photos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2280,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = $json.files || [];\nconst photos = files.filter(f => /\\.(png|jpe?g|webp|gif)$/i.test(f.name || '')).map(f => ({ id: f.id, name: f.name, baseName: f.name.replace(/\\.[^.]+$/, ''), driveUrl: 'https://drive.google.com/thumbnail?id=' + f.id + '&sz=w2000' }));\nreturn [{ json: { photos } }];"
+      },
+      "id": "node-collect",
+      "name": "Collect Photos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "id": "node-wait",
+      "name": "Wait For Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4040,
+        320
+      ],
+      "webhookId": "wait-image-processing"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Parse Row').first().json.shop + '/admin/api/' + $('Parse Row').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query getFiles($ids: [ID!]!) { nodes(ids: $ids) { ... on MediaImage { id alt fileStatus image { url width height } } } }', variables: { ids: ($json.uploadedFiles || []).map(f => f.id) } }) }}",
+        "options": {},
+        "nodeCredentialType": "shopifyOAuth2Api"
+      },
+      "id": "node-geturls",
+      "name": "Get Image URLs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4260,
+        320
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "SHOPIFY_OAUTH2_CRED_ID",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parse = $('Parse Row').first().json;\nconst docHtml = $('Export Doc').first().json.docHtml || '';\nconst categoryName = parse.categoryName || '';\nconst categoryLink = parse.categoryLink || '';\nconst websiteUrl = parse.websiteUrl || 'https://marblebee.com/';\nconst photos = $('Collect Photos').first().json.photos || [];\nconst resp = $json || {};\nconst nodes = (resp.data && resp.data.nodes) ? resp.data.nodes : [];\nconst imgByAlt = {};\nfor (const n of nodes) { if (n && n.alt && n.image && n.image.url) { imgByAlt[n.alt] = { url: n.image.url, w: n.image.width || null, h: n.image.height || null }; } }\nconst fallback = {};\nfor (const p of photos) { fallback[p.baseName] = p.driveUrl; }\nfunction imgFor(b) { return imgByAlt[b] || (fallback[b] ? { url: fallback[b], w: null, h: null } : null); }\nlet html = docHtml;\nconst styleMatch = html.match(/<style[^>]*>([\\s\\S]*?)<\\/style>/i);\nlet styleInner = styleMatch ? styleMatch[1] : '';\nconst bodyMatch = html.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);\nlet body = bodyMatch ? bodyMatch[1] : html;\nbody = body.replace(/^[\\s\\S]*?<\\/(?:h1|h2)>/i, ''); const scope = '.mb-blog-content';\nif (styleInner) { styleInner = styleInner.replace(/(^|})\\s*([^{}@]+)\\s*\\{/g, function(m, br, sel) { const s = sel.split(',').map(x => x.trim()).filter(Boolean).map(x => scope + ' ' + x).join(', '); return br + ' ' + s + ' {'; }); }\nstyleInner += ' ' + scope + ' a { color: inherit !important; text-decoration: none !important; }'; styleInner += ' ' + scope + ' h1, ' + scope + ' h2, ' + scope + ' h3, ' + scope + ' h4 { text-align: left !important; }';\nbody = body.replace(/&#12304;/g, '\\u3010').replace(/&#12305;/g, '\\u3011').replace(/&#x3010;/gi, '\\u3010').replace(/&#x3011;/gi, '\\u3011');\nfunction buildImgBlock(m, names) { const parts = names.split('/').map(s => s.trim()).filter(Boolean); const first = parts[0] || ''; const prefix = first.replace(/[^-]*$/, ''); const resolved = parts.map(p => (p.indexOf('-') >= 0 ? p : (prefix + p))); const two = resolved.length > 1; const validImgs = resolved.map(function(base){ const img = imgFor(base); return img ? { base: base, img: img } : null; }).filter(Boolean); if (!validImgs.length) return ''; const paired = validImgs.length > 1; function makeImg(img, base) { const u = img.url; const ws = [360,480,600,720,840,960,1280,1440]; const sep = u.indexOf('?') >= 0 ? '&' : '?'; const srcset = ws.map(function(w){ return u + sep + 'width=' + w + ' ' + w + 'w'; }).join(', '); const sizes = paired ? '(max-width:600px) 46vw, 46vw' : '(max-width:600px) 95vw, 820px'; return '<img src=\"' + u + '\" alt=\"' + base + '\" loading=\"lazy\" srcset=\"' + srcset + '\" sizes=\"' + sizes + '\" />'; } return validImgs.map(function(x){ return makeImg(x.img, x.base); }).join(''); }\nconst phRe = /\\u3010\\s*insert\\s*image\\s*:\\s*([^\\u3011]+)\\u3011/;\nconst phReG = /\\u3010\\s*insert\\s*image\\s*:\\s*([^\\u3011]+)\\u3011/gi;\nbody = body.replace(/<p[^>]*>(?:(?!<\\/p>)[\\s\\S])*?\\u3010\\s*insert\\s*image\\s*:\\s*[^\\u3011]+\\u3011(?:(?!<\\/p>)[\\s\\S])*?<\\/p>/gi, function(block) { const mm = block.match(phRe); return mm ? buildImgBlock(mm[0], mm[1]) : block; });\nbody = body.replace(phReG, function(m, names) { return buildImgBlock(m, names); });\nfunction escapeReg(s) { return s.replace(/[^a-zA-Z0-9 ]/g, function(c) { return '\\\\' + c; }); }\nconst segs = body.split(/(<[^>]+>)/);\nconst catRe = categoryName ? new RegExp(escapeReg(categoryName), 'gi') : null;\nfor (let i = 0; i < segs.length; i++) { if (segs[i].charAt(0) === '<') continue; let t = segs[i]; if (websiteUrl) { t = t.replace(/MarbleBee/gi, function(m){ return '<a href=\"' + websiteUrl + '\" style=\"color:inherit;text-decoration:none;\">' + m + '</a>'; }); } if (catRe && categoryLink) { t = t.replace(catRe, function(m){ return '<a href=\"' + categoryLink + '\" style=\"color:inherit;text-decoration:none;\">' + m + '</a>'; }); } segs[i] = t; }\nbody = segs.join('');\nfunction styleDocTables(h){ return h.replace(/<table\\b[^>]*>([\\s\\S]*?)<\\/table>/gi, function(full, inner){ var ri = 0; var ni = inner.replace(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi, function(rf, cells){ var first = (ri === 0); var ci = 0; var nc = cells.replace(/<(?:td|th)\\b([^>]*)>([\\s\\S]*?)<\\/(?:td|th)>/gi, function(cf, attrs, content){ var bg = first ? 'background:#e5e5e5;' : (ci === 0 ? 'background:#f3f3f3;' : ''); ci++; var keep = ''; var csm = attrs.match(/\\bcolspan\\s*=\\s*\"?\\d+\"?/i); if (csm) keep += ' ' + csm[0]; var rsm = attrs.match(/\\browspan\\s*=\\s*\"?\\d+\"?/i); if (rsm) keep += ' ' + rsm[0]; content = content.replace(/<p\\b[^>]*>/gi, '<p style=\"margin:0;padding:0;\">'); return '<td' + keep + ' style=\"' + bg + 'border:1px solid #ccc;padding:12px;vertical-align:top;\">' + content + '</td>'; }); ri++; return '<tr>' + nc + '</tr>'; }); return '<div style=\"overflow-x:auto;margin:20px 0;\"><table style=\"width:100%;border-collapse:collapse;\">' + ni + '</table></div>'; }); }\nbody = styleDocTables(body);\nconst finalHtml = (styleInner ? '<style>' + styleInner + '</style>' : '') + '<div class=\"mb-blog-content\">' + body + '</div>';\nreturn { json: { body_html: finalHtml, blogTitle: parse.blogTitle, categoryName: categoryName, blogNo: parse.blogNo } };"
+      },
+      "id": "node-process",
+      "name": "Process HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Parse Row').first().json.shop + '/admin/api/' + $('Parse Row').first().json.apiVersion + '/blogs/' + $('Parse Row').first().json.blogId + '/articles.json' }}",
+        "authentication": "predefinedCredentialType",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ article: Object.assign({ title: $json.blogTitle, body_html: $json.body_html, author: 'MarbleBee', tags: 'split', published: (String($('Set Config').first().json.publishVisible) === 'true') }, (String($('Set Config').first().json.publishVisible) === 'true') ? { published_at: $now.toISO() } : {}) }) }}",
+        "options": {},
+        "nodeCredentialType": "shopifyOAuth2Api"
+      },
+      "id": "node-article",
+      "name": "Create Article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4700,
+        320
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "SHOPIFY_OAUTH2_CRED_ID",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Blogs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Blog.No."
+          ],
+          "value": {
+            "Blog.No.": "={{ $('Parse Row').first().json.blogNo }}",
+            "BLog-URL": "={{ 'https://' + $('Set Config').first().json.publicDomain + '/blogs/' + $('Set Config').first().json.blogHandle + '/' + $json.article.handle }}",
+            "Admin BLog-URL": "={{ 'https://admin.shopify.com/store/' + $('Set Config').first().json.shop.replace('.myshopify.com', '') + '/content/articles/' + $json.article.id }}",
+            "Update Status": "Posted",
+            "Update Time": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-updatesheet",
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4920,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $('Find Photo Folder').first().json.files[0].id + '/permissions/' + $('Share Folder').first().json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-revoke",
+      "name": "Revoke Folder Access",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5140,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "node-done",
+      "name": "All Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const photos = $('Collect Photos').first().json.photos || [];\nfunction mime(name){ const e=(String(name).split('.').pop()||'').toLowerCase(); return e==='png'?'image/png':(e==='jpg'||e==='jpeg')?'image/jpeg':e==='webp'?'image/webp':e==='gif'?'image/gif':'application/octet-stream'; }\nreturn photos.map(p => ({ json: { photoId: p.id, baseName: p.baseName, fileName: p.name, mimeType: mime(p.name) } }));"
+      },
+      "id": "node-split",
+      "name": "Split Photos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Parse Row').first().json.shop + '/admin/api/' + $('Parse Row').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation stagedUploadsCreate($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }', variables: { input: [{ resource: 'IMAGE', filename: $json.fileName, mimeType: $json.mimeType, httpMethod: 'PUT' }] } }) }}",
+        "options": {}
+      },
+      "id": "node-staged",
+      "name": "Staged Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2940,
+        320
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "SHOPIFY_OAUTH2_CRED_ID",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $('Split Photos').item.json.photoId + '?alt=media&supportsAllDrives=true' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "node-download-orig",
+      "name": "Download Original",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3160,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (let i = 0; i < items.length; i++) {\n  const target = $('Staged Create').all()[i].json.data.stagedUploadsCreate.stagedTargets[0];\n  const headers = {};\n  for (const p of (target.parameters || [])) { headers[p.name] = p.value; }\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  await this.helpers.httpRequest({ method: 'PUT', url: target.url, body: buffer, headers: headers });\n  results.push({ json: { resourceUrl: target.resourceUrl, alt: $('Split Photos').all()[i].json.baseName } });\n}\nreturn results;"
+      },
+      "id": "node-uploadgcs",
+      "name": "Upload to Storage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3380,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Parse Row').first().json.shop + '/admin/api/' + $('Parse Row').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $json.alt, contentType: 'IMAGE', originalSource: $json.resourceUrl }] } }) }}",
+        "options": {}
+      },
+      "id": "node-filecreate",
+      "name": "File Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3600,
+        320
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "SHOPIFY_OAUTH2_CRED_ID",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst uploadedFiles = [];\nfor (const it of items) {\n  const fc = it.json.data && it.json.data.fileCreate;\n  if (fc && fc.files) { for (const f of fc.files) { uploadedFiles.push({ id: f.id, alt: f.alt }); } }\n}\nreturn [{ json: { uploadedFiles } }];"
+      },
+      "id": "node-aggregate",
+      "name": "Aggregate Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3820,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rows": {
+      "main": [
+        [
+          {
+            "node": "Filter Unposted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unposted": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "All Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Row": {
+      "main": [
+        [
+          {
+            "node": "Find Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Doc": {
+      "main": [
+        [
+          {
+            "node": "Export Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Doc": {
+      "main": [
+        [
+          {
+            "node": "Find Photo Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Photo Folder": {
+      "main": [
+        [
+          {
+            "node": "Share Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Folder": {
+      "main": [
+        [
+          {
+            "node": "List Photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Photos": {
+      "main": [
+        [
+          {
+            "node": "Collect Photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Photos": {
+      "main": [
+        [
+          {
+            "node": "Split Photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Processing": {
+      "main": [
+        [
+          {
+            "node": "Get Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image URLs": {
+      "main": [
+        [
+          {
+            "node": "Process HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process HTML": {
+      "main": [
+        [
+          {
+            "node": "Create Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Article": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet": {
+      "main": [
+        [
+          {
+            "node": "Revoke Folder Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revoke Folder Access": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Photos": {
+      "main": [
+        [
+          {
+            "node": "Staged Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staged Create": {
+      "main": [
+        [
+          {
+            "node": "Download Original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Original": {
+      "main": [
+        [
+          {
+            "node": "Upload to Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Storage": {
+      "main": [
+        [
+          {
+            "node": "File Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Create": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Files": {
+      "main": [
+        [
+          {
+            "node": "Wait For Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

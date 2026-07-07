@@ -1,0 +1,217 @@
+{
+  "name": "Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        128
+      ],
+      "id": "0878c71c-1f52-4a1b-b497-6a41f3d88ebd"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(i => {\n  const { execution, workflow, node } = i.json || {};\n\n  const workflow_name = workflow?.name || workflow?.id || 'unknown';\n  const workflow_id   = workflow?.id || '';\n  const execution_id  = execution?.id || '';\n  const execution_url = execution?.url || '';\n  const failed_node   = execution?.error?.node?.name || execution?.error?.node?.id || '';\n  const error_message = execution?.error?.message || (execution.error ? JSON.stringify(execution.error) : 'Unknown error');\n  const time         = new Date().toISOString();\n  \n  const subject = `N8N: Workflow error — ${workflow_name}`;\n\n  // Build HTML body\n  const body = `\n    <html>\n      <body style=\"font-family: Arial, sans-serif; line-height: 1.5; color: #333;\">\n        \n        <h2 style=\"color: #d9534f;\">⚠️ Workflow Error Notification</h2>\n        \n        <p>Hi,</p>\n        \n        <p>The following workflow just failed:</p>\n        \n        <table border=\"0\" cellspacing=\"0\" cellpadding=\"6\" style=\"border:1px solid #ddd; background: #fafafa; width:100%; max-width:600px;\">\n          <tr><td><strong>Workflow:</strong></td><td>${workflow_name} (${workflow_id})</td></tr>\n          <tr><td><strong>Failed Node:</strong></td><td>${failed_node}</td></tr>\n          <tr><td><strong>Error Message:</strong></td><td style=\"color:#b22222\">${error_message}</td></tr>\n          <tr><td><strong>Execution ID:</strong></td><td>${execution_id}</td></tr>\n          <tr><td><strong>Execution URL:</strong></td><td><a href=\"${execution_url}\">${execution_url}</a></td></tr>\n          <tr><td><strong>Time:</strong></td><td>${time}</td></tr>\n        </table>\n        \n        <h3 style=\"margin-top:20px;\">Attached References</h3>\n        <p>Here are some useful screenshots or diagrams:</p>\n        \n        <h4 style=\"margin-top:20px;\">Full Error Object (JSON)</h4>\n        <pre style=\"background:#f4f4f4; padding:10px; border-radius:4px; font-size:12px; max-width:600px; white-space:pre-wrap;\">${JSON.stringify(execution.error || {}, null, 2)}</pre>\n        \n        <p style=\"margin-top:30px;\">Regards,<br><strong>N8N Bot 🤖</strong></p>\n        \n      </body>\n    </html>\n  `;\n\n  return {\n    json: {\n      subject,\n      body,\n      workflow_name,\n      workflow_id,\n      failed_node,\n      error_message,\n      execution_id,\n      execution_url,\n      timestamp: time,\n      raw: { execution, workflow, node }\n    }\n  };\n});"
+      },
+      "name": "Format Error Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        128
+      ],
+      "id": "3080f0e5-d00f-4de2-9ce5-83050a535865"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1EY6Flx5OP61oyglf7McOXzfSYAHsqGJiO7pXvzx5GqM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EY6Flx5OP61oyglf7McOXzfSYAHsqGJiO7pXvzx5GqM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_name": "={{ $json.workflow_name }}",
+            "workflow_id": "={{ $json.workflow_id }}",
+            "failed_node": "={{ $json.failed_node }}",
+            "error_message": "={{ $json.error_message }}",
+            "execution _id": "={{ $json.execution_id }}",
+            "execution_url": "={{ $json.execution_url }}",
+            "timestamp": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "failed_node",
+              "displayName": "failed_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution _id",
+              "displayName": "execution _id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_message",
+              "displayName": "error_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_url",
+              "displayName": "execution_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Append Error Log (Google Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        144,
+        240
+      ],
+      "id": "2c33b1e3-7a06-4e0d-9328-c9b3e263e418",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "mbeen504@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        -48
+      ],
+      "id": "94916f97-fadc-4db4-bfeb-a634f37abbbb",
+      "name": "Notify Admin (Gmail)",
+      "webhookId": "9436d90c-b3c4-439e-a0f8-26868d1cf63e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Message": {
+      "main": [
+        [
+          {
+            "node": "Append Error Log (Google Sheets)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Admin (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Admin (Gmail)": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7a9b6436-2796-4968-b610-0b2c7ced38f9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af7f26490923ca2d0aa357dde67168def30bf4f82b066a76121648e16bf3dd89"
+  },
+  "id": "lCKzp9palLBEIxbr",
+  "tags": []
+}

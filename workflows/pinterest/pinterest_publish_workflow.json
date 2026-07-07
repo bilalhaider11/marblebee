@@ -1,0 +1,396 @@
+{
+  "name": "Pinterest WF2 - Publish via Tailwind",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest – Workflow 2: Publish approved pins (daily)\n\nReads the **Pinterest Pins** tab, takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from Tailwind Boards), and schedules each pin in **Tailwind** at its **Scheduled Date** (Tailwind publishes it then). Writes back Status / Pin URL / Error / Pinned Time.\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials. Set accountId in Set Config.",
+        "height": 300,
+        "width": 420
+      },
+      "id": "sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "n-trig",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "accountId",
+              "type": "string",
+              "value": "919328"
+            },
+            {
+              "id": "a2",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "a3",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            },
+            {
+              "id": "a4",
+              "name": "boardsTab",
+              "type": "string",
+              "value": "Tailwind Boards"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Pinterest Pins",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getpins",
+      "name": "Get Pins",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        560,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tailwind Boards",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getboards",
+      "name": "Get Boards",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        760,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[‐-―]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Pinterest Board'] || r['Board Name'] || r['Board'] || ''; }\nfunction bId(r){ return r['Tailwind Board ID'] || r['Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  let dt = DateTime.fromISO(s);\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm');\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  if (norm(pin['Status']) !== 'review') continue;\n  const boardId = resolveBoardId(pin);\n  const sendAt = toSendAt(pin['Scheduled Date']);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) { ready=false; reason='Scheduled time must be 15+ min in the future'; }\n  out.push({ json: {\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt\n  } });\n}\nreturn out;\n"
+      },
+      "id": "n-prep",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.ready }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n-if",
+      "name": "IF Ready",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api-v1.tailwind.ai/v1/accounts/{{ $('Set Config').first().json.accountId }}/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mediaUrl: $json.mediaUrl, title: $json.title, description: $json.description, url: $json.url, boardId: $json.boardId, altText: $json.altText, sendAt: $json.sendAt }) }}",
+        "options": {}
+      },
+      "id": "n-create",
+      "name": "Create Pin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        120
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "TAILWIND_CRED_ID",
+          "name": "Tailwind App"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pin = $('Prepare').item.json;\nconst r = $json || {};\nlet status, err='', tw='';\nif (r.error) { status='Error'; err = (typeof r.error === 'string') ? r.error : (r.error.message || JSON.stringify(r.error)); err = String(err).slice(0,300); }\nelse { status='Scheduled'; const o = Array.isArray(r)?(r[0]||{}):r; const postId = o.id || (o.data && (o.data.id || o.data.postId || (o.data.post && o.data.post.id))) || ''; tw = postId ? String(postId) : ''; }\nreturn [{ json: { 'Pin ID': pin.pinId, 'Status': status, 'Tailwind Post ID': tw, 'Error': err } }];"
+      },
+      "id": "n-res",
+      "name": "Build Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $json;\nreturn [{ json: { 'Pin ID': p.pinId, 'Status': 'Review', 'Tailwind Post ID': '', 'Error': p.reason || 'Not ready' } }];"
+      },
+      "id": "n-err",
+      "name": "Build Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Pinterest Pins",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Pin ID"
+          ],
+          "value": {
+            "Pin ID": "={{ $json['Pin ID'] }}",
+            "Status": "={{ $json['Status'] }}",
+            "Error": "={{ $json['Error'] }}",
+            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "n-upd",
+      "name": "Update Pin Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1840,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Pins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins": {
+      "main": [
+        [
+          {
+            "node": "Get Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Boards": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "IF Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Ready": {
+      "main": [
+        [
+          {
+            "node": "Create Pin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pin": {
+      "main": [
+        [
+          {
+            "node": "Build Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Result": {
+      "main": [
+        [
+          {
+            "node": "Update Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error": {
+      "main": [
+        [
+          {
+            "node": "Update Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

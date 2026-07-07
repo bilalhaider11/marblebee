@@ -1,0 +1,22 @@
+# OAuth credentials — never commit
+client_secret_*.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Scraper runtime state
+houzz-scraper/logs/
+houzz-scraper/scraping_state.json
+houzz-scraper/data/
+
+# Legacy folders (superseded by workflows/)
+Email Automation/
+Pinterest/
+
+# OS
+.DS_Store
+Thumbs.db

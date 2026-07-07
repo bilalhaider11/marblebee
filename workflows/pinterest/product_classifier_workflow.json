@@ -1,0 +1,327 @@
+{
+  "name": "Product Classifier - Auto 2026",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Product Classifier (Auto 2026)\n\nFor each product row with an image and no Category yet: AI looks at the image, writes a one-sentence surface description, and picks Category + Subcategory from the **Category List** tab (auto-fills the Number too).\n\n**Setup:**\n1. Set **sheetId** (Auto 2026 sheet) + tab names + **keyColumn** (the unique product column to match on) in Set Config.\n2. Create a **Category List** tab: columns `Category | Subcategory | Number`.\n3. Make sure products have a public **image URL** column.\n4. Set Google Sheets + OpenAI credentials.",
+        "height": 340,
+        "width": 440
+      },
+      "id": "sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-trig",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "sheetId",
+              "type": "string",
+              "value": "AUTO_2026_SHEET_ID"
+            },
+            {
+              "id": "a2",
+              "name": "productsTab",
+              "type": "string",
+              "value": "Sheet1"
+            },
+            {
+              "id": "a3",
+              "name": "categoryTab",
+              "type": "string",
+              "value": "Category List"
+            },
+            {
+              "id": "a4",
+              "name": "keyColumn",
+              "type": "string",
+              "value": "Product"
+            },
+            {
+              "id": "a5",
+              "name": "imageColumn",
+              "type": "string",
+              "value": "Image URL"
+            },
+            {
+              "id": "a6",
+              "name": "openAiModel",
+              "type": "string",
+              "value": "gpt-4o"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "=AUTO_2026_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Category List",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-cats",
+      "name": "Get Category List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        580,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "=AUTO_2026_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-prod",
+      "name": "Get Products",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Set Config').first().json;\nconst products = $('Get Products').all().map(i => i.json);\nconst cats = $('Get Category List').all().map(i => i.json);\nconst keyCol = cfg.keyColumn || 'Product';\nconst imgCol = cfg.imageColumn || 'Image URL';\n// allowed category/subcategory list for the prompt\nconst lines = cats.map(c => '- ' + (c['Category']||'') + ' > ' + (c['Subcategory']||'')).filter(s => s.trim() !== '- >');\nconst listText = lines.join('\\n');\nfunction getImg(p){ return p[imgCol] || p['Image URL'] || p['Image'] || p['Image Url'] || p['image'] || ''; }\nconst out = [];\nfor (const p of products) {\n  const img = getImg(p);\n  const cat = (p['Category']==null?'':String(p['Category'])).trim();\n  if (!img) continue;        // needs an image\n  if (cat) continue;         // already classified -> skip (so re-runs only do new rows)\n  const prompt = 'You are a natural stone slab expert. Look at the product image, which is a stone slab/surface.\\n'\n    + '1) Write ONE short sentence describing the surface feature of the slab (color, veining, finish/texture).\\n'\n    + '2) Pick the single best Category and Subcategory for this product, using the EXACT names from the allowed list below.\\n'\n    + 'Return ONLY a JSON object: {\"description\":\"...\",\"category\":\"...\",\"subcategory\":\"...\"}. No text or markdown outside the JSON.\\n\\n'\n    + 'Allowed Category > Subcategory options:\\n' + listText;\n  out.push({ json: { key: p[keyCol] || '', imageUrl: img, prompt } });\n}\nreturn out;\n"
+      },
+      "id": "n-sel",
+      "name": "Select & Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "text": "={{ $json.prompt }}",
+        "inputType": "url",
+        "imageUrls": "={{ $json.imageUrl }}",
+        "options": {}
+      },
+      "id": "n-ai",
+      "name": "Analyze Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1180,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiItems = $input.all();\nconst src = $('Select & Prompt').all();\nconst cats = $('Get Category List').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction catNum(c){ return c['Number'] || c['Category Number'] || c['Subcategory Number'] || c['ID'] || c['Id'] || ''; }\nconst out = [];\nfor (let i=0;i<aiItems.length;i++){\n  const r = aiItems[i].json || {};\n  let content = r.content || r.text || (r.message && r.message.content) || '';\n  if (!content && r.choices && r.choices[0] && r.choices[0].message) content = r.choices[0].message.content || '';\n  content = String(content).replace(/```json/gi,'').replace(/```/g,'').trim();\n  let ai = {}; try { ai = JSON.parse(content); } catch(e){ ai = {}; }\n  const sub = ai.subcategory || '';\n  let match = cats.find(c => norm(c['Subcategory']) === norm(sub));\n  if (!match && sub) match = cats.find(c => { const s = norm(c['Subcategory']); return s && (s.includes(norm(sub)) || norm(sub).includes(s)); });\n  const category = match ? (match['Category']||'') : (ai.category||'');\n  const number = match ? String(catNum(match)) : '';\n  out.push({ json: {\n    'key': src[i].json.key,\n    'Product Description': ai.description || '',\n    'Category': category,\n    'Subcategory': match ? (match['Subcategory']||sub) : sub,\n    'Category Number': number\n  } });\n}\nreturn out;\n"
+      },
+      "id": "n-parse",
+      "name": "Parse & Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "=AUTO_2026_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Product"
+          ],
+          "value": {
+            "Product": "={{ $json['key'] }}",
+            "Product Description": "={{ $json['Product Description'] }}",
+            "Category": "={{ $json['Category'] }}",
+            "Subcategory": "={{ $json['Subcategory'] }}",
+            "Category Number": "={{ $json['Category Number'] }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "n-upd",
+      "name": "Update Product Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1580,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Category List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Category List": {
+      "main": [
+        [
+          {
+            "node": "Get Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Products": {
+      "main": [
+        [
+          {
+            "node": "Select & Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select & Prompt": {
+      "main": [
+        [
+          {
+            "node": "Analyze Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Image": {
+      "main": [
+        [
+          {
+            "node": "Parse & Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Map": {
+      "main": [
+        [
+          {
+            "node": "Update Product Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

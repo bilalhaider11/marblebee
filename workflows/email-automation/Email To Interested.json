@@ -1,0 +1,451 @@
+{
+  "name": "Email To Interested",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            },
+            {
+              "triggerAtHour": 12
+            },
+            {
+              "triggerAtHour": 15
+            },
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "fa50e030-c258-453f-8c64-c03d1171b883",
+      "name": "Run at 9, 12, 15, 18"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "status",
+              "lookupValue": "Scheduled"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        144,
+        0
+      ],
+      "id": "b2daeb25-e753-49db-9376-c410c41c7b04",
+      "name": "Fetch Scheduled Emails",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const scheduled_at = new Date(item.json.scheduled_at);\n\n  return scheduled_at <= new Date();\n})\n.slice(0, 125);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        0
+      ],
+      "id": "973814e4-ce36-4a35-8c18-ce2bb0b48039",
+      "name": "Filter Due Emails (time passed)"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rO6V63_uxtCNSH-bYGDNca6-rYiUhLXq9PhkfdflzcU",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rO6V63_uxtCNSH-bYGDNca6-rYiUhLXq9PhkfdflzcU/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "type",
+              "lookupValue": "={{ $json.type }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        608,
+        -144
+      ],
+      "id": "314ac20e-67b7-48eb-aa5b-b6953f92338c",
+      "name": "Fetch Template by Type",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        -16
+      ],
+      "id": "af435109-99bb-4d5f-a794-527d8c2770cd",
+      "name": "Combine Contact + Template"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const row = item.json;\n\n  // Process body with replacements\n  let body = String(row.body)\n    // Replace {{Name}} with actual name\n    .replace(/\\{\\{\\s*Name\\s*\\}\\}/gi, row.name || \"\")\n    // Replace ${url} with actual URL\n    .replace(/\\$\\{url\\}/gi, row.url || \"\")\n    // Replace ${name} with actual img_name\n    .replace(/\\$\\{name.*?\\}/gi, row.img_name || \"Marble Example\")\n    // Normalize newlines\n    .replace(/\\r\\n/g, \"\\n\")\n    .replace(/\\n/g, \"\\n\");\n\n  return {\n    json: {\n      rowNumber: row.row_number,\n      email: row.email,\n      subject: row.subject,\n      body: body,   // final processed body\n      name: row.name,\n      type: row.type,\n      status: row.status,\n      scheduled_at: row.scheduled_at,\n      preparedAt: new Date().toISOString()\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -16
+      ],
+      "id": "363b9023-1bfc-4841-80a2-88016bf6b4af",
+      "name": "Prepare Email Payload"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1312,
+        -144
+      ],
+      "id": "13260e62-5fb2-4a58-96a6-bff0118ae3eb",
+      "name": "Send Email",
+      "webhookId": "6d656db9-d82f-4a8b-bb0b-0c88620f3b9e",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bvp3DwvhNTXgiNcw",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1520,
+        -32
+      ],
+      "id": "36834a86-6756-45e1-9796-e52f1d8acda5",
+      "name": "Combine Sent Result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "43c87720-661b-4cef-829d-69eb7a3c8179",
+              "leftValue": "={{ $json.labelIds }}",
+              "rightValue": "SENT",
+              "operator": {
+                "type": "array",
+                "operation": "contains",
+                "rightType": "any"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        -32
+      ],
+      "id": "b1b3b2b0-1027-40a3-b030-b7d9eadb01f5",
+      "name": "Check If Email Sent"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1mRRtc-XN-XZkotUQiI4eLINETkTI0x8QSsVCi0L1dWA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "status": "SENT"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "scheduled_at",
+              "displayName": "scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2016,
+        -48
+      ],
+      "id": "e36c5b94-6d2a-43e5-b418-c11bbbe7be37",
+      "name": "Update Sheet Status to SENT",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4M23Lwl8AJ2nkq7t",
+          "name": "Google Sheets"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run at 9, 12, 15, 18": {
+      "main": [
+        [
+          {
+            "node": "Fetch Scheduled Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Scheduled Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Emails (time passed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Due Emails (time passed)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Template by Type",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Contact + Template",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch Template by Type": {
+      "main": [
+        [
+          {
+            "node": "Combine Contact + Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Contact + Template": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Sent Result",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Combine Sent Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Sent Result": {
+      "main": [
+        [
+          {
+            "node": "Check If Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet Status to SENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "lCKzp9palLBEIxbr"
+  },
+  "versionId": "a04cd678-6348-48f5-b448-9d03335e35ae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af7f26490923ca2d0aa357dde67168def30bf4f82b066a76121648e16bf3dd89"
+  },
+  "id": "wlUyfKk4pccYwgX7",
+  "tags": []
+}
