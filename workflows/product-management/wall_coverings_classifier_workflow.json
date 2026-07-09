@@ -167,11 +167,11 @@
         }
       },
       "retryOnFail": true,
-      "waitBetweenTries": 10000
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "jsCode": "const aiItems = $input.all();\nconst src = $('Filter & Build Prompts').all();\nconst cfg = $('Set Config').first().json;\n\nconst collectionMap = {\n  'A':  { id1: cfg.collectionId_A,  id2: '' },\n  'B1': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B1 },\n  'B2': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B2 },\n  'B3': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B3 },\n};\n\nconst CATEGORY_NAMES = {\n  'A':  { cat: 'Marble decorative breeze blocks',     sub: '' },\n  'B1': { cat: 'Architectural Surface Systems',       sub: 'Linear & Fluted Collections' },\n  'B2': { cat: 'Architectural Surface Systems',       sub: 'Geometric & Faceted Collections' },\n  'B3': { cat: 'Architectural Surface Systems',       sub: 'Sculptural & Parametric Panels' },\n};\n\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const r = aiItems[i].json || {};\n\n  // Resolve the product key: Gemini node passes through the input json,\n  // so r.key is the fastest path; fall back to the paired src item.\n  const productKey = (typeof r.key === 'string' && r.key)\n    ? r.key\n    : (src[i] ? String(src[i].json.key || '') : '');\n\n  // Gemini dedicated node returns { content: { parts: [{ text: \"...\" }], role: \"model\" } }\n  let content = '';\n  if (r.content && r.content.parts && r.content.parts[0]) {\n    content = r.content.parts[0].text || '';\n  }\n  // Fallbacks for other response shapes\n  if (!content && r.candidates && r.candidates[0]) {\n    const parts = r.candidates[0].content?.parts;\n    content = (parts && parts[0]?.text) || '';\n  }\n  if (!content) content = r.text || '';\n  content = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n\n  let ai = {};\n  try { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\n  const code  = (ai.category_code || '').trim().toUpperCase();\n  if (!collectionMap[code]) continue;  // skip C/D or unknown codes\n  const ids   = collectionMap[code];\n  const names = CATEGORY_NAMES[code];\n\n  out.push({\n    json: {\n      'Product No.':      productKey,\n      'Category_Name':    names.cat,\n      'Subcategory_Name': names.sub,\n      'Wall_Panel_Name':  ai.wall_panel_name || '',\n      'Collection_ID1':   String(ids.id1 || ''),\n      'Collection_ID2':   String(ids.id2 || '')\n    }\n  });\n}\n\nreturn out;\n"
+        "jsCode": "const aiItems = $input.all();\nconst cfg = $('Set Config').first().json;\n\nconst collectionMap = {\n  'A':  { id1: cfg.collectionId_A,  id2: '' },\n  'B1': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B1 },\n  'B2': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B2 },\n  'B3': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B3 },\n};\n\nconst CATEGORY_NAMES = {\n  'A':  { cat: 'Marble decorative breeze blocks',     sub: '' },\n  'B1': { cat: 'Architectural Surface Systems',       sub: 'Linear & Fluted Collections' },\n  'B2': { cat: 'Architectural Surface Systems',       sub: 'Geometric & Faceted Collections' },\n  'B3': { cat: 'Architectural Surface Systems',       sub: 'Sculptural & Parametric Panels' },\n};\n\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const r = aiItems[i].json || {};\n\n  // Use current loop item's key \u2014 Gemini node does not pass through input JSON\n  const productKey = String($('Loop Over Items').item.json.key || '');\n\n  // Gemini dedicated node returns { content: { parts: [{ text: \"...\" }], role: \"model\" } }\n  let content = '';\n  if (r.content && r.content.parts && r.content.parts[0]) {\n    content = r.content.parts[0].text || '';\n  }\n  // Fallbacks for other response shapes\n  if (!content && r.candidates && r.candidates[0]) {\n    const parts = r.candidates[0].content?.parts;\n    content = (parts && parts[0]?.text) || '';\n  }\n  if (!content) content = r.text || '';\n  content = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n\n  let ai = {};\n  try { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\n  const code  = (ai.category_code || '').trim().toUpperCase();\n  if (!collectionMap[code]) continue;  // skip C/D or unknown codes\n  const ids   = collectionMap[code];\n  const names = CATEGORY_NAMES[code];\n\n  out.push({\n    json: {\n      'Product No.':      productKey,\n      'Category_Name':    names.cat,\n      'Subcategory_Name': names.sub,\n      'Wall_Panel_Name':  ai.wall_panel_name || '',\n      'Collection_ID1':   String(ids.id1 || ''),\n      'Collection_ID2':   String(ids.id2 || '')\n    }\n  });\n}\n\nreturn out;\n"
       },
       "id": "a0883e69-c199-4704-bb23-529d892138e4",
       "name": "Parse & Map",
@@ -287,7 +287,8 @@
       "position": [
         13088,
         2976
-      ]
+      ],
+      "retryOnFail": true
     },
     {
       "parameters": {
@@ -310,7 +311,7 @@
     },
     {
       "parameters": {
-        "batchSize": 10,
+        "batchSize": 1,
         "options": {}
       },
       "type": "n8n-nodes-base.splitInBatches",
@@ -446,7 +447,10 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timeSavedMode": "fixed"
   },
   "versionId": "7d0b0fbc-d002-4f6c-b073-f4c476a79cfe",
   "meta": {
