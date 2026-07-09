@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Wall-Coverings Image Classifier 2026\n\nReads every row in the **Wall-Coverings** tab that has an image URL but no `Category_Name` yet. Sends the image to **Gemini 2.5 Pro**, classifies it into the 4-category system, generates a descriptive name, and writes back:\n\n| Column | What gets filled |\n|---|---|\n| `Category_Name` | Main category full name |\n| `Subcategory_Name` | Subcategory name (only for category B) |\n| `Wall_Panel_Name` | AI descriptive name, e.g. \"Fluted Marble Wall Panel\" |\n| `Collection_ID1` | Shopify collection ID for main category |\n| `Collection_ID2` | Shopify collection ID for subcategory (B only) |\n\n**Setup before first run:**\n1. Add 3 new columns to the Wall-Coverings tab: `Category_Name`, `Subcategory_Name`, `Wall_Panel_Name`.\n2. Select your Google Sheets credential on the sheet nodes.\n3. Select your Google Gemini credential on the Analyze node.\n\n**Safe to re-run** — rows that already have `Category_Name` are skipped automatically.\n\n**Flow:** Filter & Build Prompts → Limit → Analyze an image → Parse & Map → Update Sheet",
+        "content": "## Wall-Coverings Image Classifier 2026\n\nReads every row in the **Wall-Coverings** tab that has an image URL but no `Category_Name` yet. Sends the image to **Gemini 2.5 Pro**, classifies it into the 4-category system, generates a descriptive name, and writes back:\n\n| Column | What gets filled |\n|---|---|\n| `Category_Name` | Main category full name |\n| `Subcategory_Name` | Subcategory name (only for category B) |\n| `Wall_Panel_Name` | AI descriptive name, e.g. \"Fluted Marble Wall Panel\" |\n| `Collection_ID1` | Shopify collection ID for main category |\n| `Collection_ID2` | Shopify collection ID for subcategory (B only) |\n\n**Setup before first run:**\n1. Add 3 new columns to the Wall-Coverings tab: `Category_Name`, `Subcategory_Name`, `Wall_Panel_Name`.\n2. Select your Google Sheets credential on the sheet nodes.\n3. Select your Google Gemini credential on the Analyze node.\n\n**Safe to re-run** \u2014 rows that already have `Category_Name` are skipped automatically.\n\n**Flow:** Filter & Build Prompts \u2192 Limit \u2192 Analyze an image \u2192 Parse & Map \u2192 Update Sheet",
         "height": 480,
         "width": 540
       },
@@ -73,18 +73,6 @@
               "name": "collectionId_B3",
               "type": "string",
               "value": "356219584665"
-            },
-            {
-              "id": "cfg10",
-              "name": "collectionId_C",
-              "type": "string",
-              "value": "356220272793"
-            },
-            {
-              "id": "cfg11",
-              "name": "collectionId_D",
-              "type": "string",
-              "value": "356220567705"
             }
           ]
         },
@@ -139,7 +127,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $('Set Config').first().json;\nlet products = $('Get Products').all().map(i => i.json);\nconst keyCol = cfg.keyColumn || 'Product No.';\nconst catCol = cfg.categoryColumn || 'Category_Name';\n\n// ── Auto-fix col_N naming (fallback if header row not detected by n8n) ────\nlet headerMap = null;\nif (products.length > 0) {\n  const usesColN = Object.keys(products[0]).some(k => /^col_\\d+$/.test(k));\n  if (usesColN) {\n    const hIdx = products.findIndex(p =>\n      Object.values(p).some(v => String(v || '').trim() === keyCol)\n    );\n    if (hIdx >= 0) {\n      const hRow = products[hIdx];\n      headerMap = {};\n      for (const [k, v] of Object.entries(hRow)) {\n        const name = String(v || '').trim();\n        if (name) headerMap[k] = name;\n      }\n      products = products.slice(hIdx + 1);\n    }\n  }\n}\nfunction getVal(p, colName) {\n  if (!headerMap) return String(p[colName] || '');\n  const entry = Object.entries(headerMap).find(([, v]) => v === colName);\n  return entry ? String(p[entry[0]] || '') : '';\n}\n// ─────────────────────────────────────────────────────────────────────────\n\nconst IMAGE_COLS = [\n  'IMAGE URL1','IMAGE URL2','IMAGE URL3','IMAGE URL4','IMAGE URL5',\n  'IMAGE URL6','IMAGE URL7','IMAGE URL8','IMAGE URL9','IMAGE URL10'\n];\n\nfunction getFirstImage(p) {\n  for (const col of IMAGE_COLS) {\n    const v = getVal(p, col).trim();\n    if (v && (v.startsWith('http://') || v.startsWith('https://'))) return v;\n  }\n  return '';\n}\n\nconst PROMPT = `You are a specialist in stone wall panel products.\nAnalyze the product image and do TWO things:\n\n━━━ STEP 1: CLASSIFY ━━━\nAssign the product to ONE code from this list:\n\nA  — Marble decorative breeze blocks\n     Perforated / carved / breathable stone screens; stone lattice / jali / screen panels;\n     decorative perforated walls; ventilation + light-filtering stone facades;\n     carved geometric screen walls.\n\nB1 — Architectural Surface Systems › Linear & Fluted Collections\n     Vertical grooves, ribbed / fluted stone panels, rhythmic extrusion surfaces.\n\nB2 — Architectural Surface Systems › Geometric & Faceted Collections\n     Diamond cuts, angled planes, 3D geometric stone reliefs.\n\nB3 — Architectural Surface Systems › Sculptural & Parametric Panels\n     Organic shapes, algorithmic / flowing forms, custom CNC sculpted stone walls.\n\nC  — Stone Surface Finishes & SAMPLES\n     Flat panels where the key feature is the SURFACE FINISH / TREATMENT:\n     polished, honed, leathered, brushed, axe-cut, antique, acid-washed,\n     bush-hammered, sandblasted, flamed, split face, chiseled, etc.\n     (This is the most common category for standard wall panels.)\n\nD  — Mosaic / Pattern Wall Panels\n     KEY INDICATOR: The surface is made of MULTIPLE SEPARATE small tiles or\n     pieces assembled/joined together. Look for individual pieces, grout lines,\n     or visible joints between tiles.\n\n     Includes: stone mosaics, tessellated tile panels, herringbone tile layouts,\n     chevron patterns, basketweave, hexagonal tiles, penny tiles, arabesque,\n     fish scale, brick-bond stone tiles, stacked tile arrangements,\n     mixed-material mosaic panels, pebble mosaics.\n\n     IMPORTANT: Even if the mosaic tiles form a linear or geometric pattern,\n     always classify as D — not B1 or B2 — if the surface is built from\n     individual assembled pieces. The key distinction is:\n     - B categories = one continuous stone with carved/shaped texture\n     - D = many separate pieces assembled together\n\n━━━ STEP 2: NAME ━━━\nGenerate a short, descriptive product name (3-6 words) that clearly describes\nthe surface. Focus on the material and the finish/shape feature.\nExamples: \"Fluted Marble Wall Panel\", \"Split Face Travertine Panel\",\n\"Carved Marble Breeze Block Screen\", \"Diamond Cut Limestone Wall Panel\",\n\"Brushed Basalt Stone Panel\", \"Herringbone Stone Mosaic Panel\".\n\n━━━ OUTPUT ━━━\nReturn ONLY a single valid JSON object - no markdown, no extra text:\n{\n  \"category_code\": \"A|B1|B2|B3|C|D\",\n  \"category_name\": \"exact parent category name from above\",\n  \"subcategory_name\": \"subcategory name, or empty string if none\",\n  \"wall_panel_name\": \"your generated descriptive product name\"\n}`;\n\nconst out = [];\nfor (const p of products) {\n  const key = getVal(p, keyCol).trim();\n  if (!key) continue;\n\n  // Skip if already classified (either field filled = already processed)\n  const cat = getVal(p, catCol).trim();\n  const col1 = getVal(p, 'Collection_ID1').trim();\n  if (cat || col1) continue;\n\n  // Must have an image URL\n  const img = getFirstImage(p);\n  if (!img) continue;\n\n  out.push({ json: { key, imageUrl: img, prompt: PROMPT } });\n}\n\nreturn out;\n"
+        "jsCode": "const cfg = $('Set Config').first().json;\nlet products = $('Get Products').all().map(i => i.json);\nconst keyCol = cfg.keyColumn || 'Product No.';\nconst catCol = cfg.categoryColumn || 'Category_Name';\n\n// \u2500\u2500 Auto-fix col_N naming (fallback if header row not detected by n8n) \u2500\u2500\u2500\u2500\nlet headerMap = null;\nif (products.length > 0) {\n  const usesColN = Object.keys(products[0]).some(k => /^col_\\d+$/.test(k));\n  if (usesColN) {\n    const hIdx = products.findIndex(p =>\n      Object.values(p).some(v => String(v || '').trim() === keyCol)\n    );\n    if (hIdx >= 0) {\n      const hRow = products[hIdx];\n      headerMap = {};\n      for (const [k, v] of Object.entries(hRow)) {\n        const name = String(v || '').trim();\n        if (name) headerMap[k] = name;\n      }\n      products = products.slice(hIdx + 1);\n    }\n  }\n}\nfunction getVal(p, colName) {\n  if (!headerMap) return String(p[colName] || '');\n  const entry = Object.entries(headerMap).find(([, v]) => v === colName);\n  return entry ? String(p[entry[0]] || '') : '';\n}\n// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nconst IMAGE_COLS = [\n  'IMAGE URL1','IMAGE URL2','IMAGE URL3','IMAGE URL4','IMAGE URL5',\n  'IMAGE URL6','IMAGE URL7','IMAGE URL8','IMAGE URL9','IMAGE URL10'\n];\n\nfunction getFirstImage(p) {\n  for (const col of IMAGE_COLS) {\n    const v = getVal(p, col).trim();\n    if (v && (v.startsWith('http://') || v.startsWith('https://'))) return v;\n  }\n  return '';\n}\n\nconst PROMPT = `You are a specialist in stone wall panel products.\nAnalyze the product image and do TWO things:\n\n\u2501\u2501\u2501 STEP 1: CLASSIFY \u2501\u2501\u2501\nAssign the product to ONE code from this list:\n\nA  \u2014 Marble decorative breeze blocks\n     Perforated / carved / breathable stone screens; stone lattice / jali / screen panels;\n     decorative perforated walls; ventilation + light-filtering stone facades;\n     carved geometric screen walls.\n\nB1 \u2014 Architectural Surface Systems \u203a Linear & Fluted Collections\n     Vertical grooves, ribbed / fluted stone panels, rhythmic extrusion surfaces.\n\nB2 \u2014 Architectural Surface Systems \u203a Geometric & Faceted Collections\n     Diamond cuts, angled planes, 3D geometric stone reliefs.\n\nB3 \u2014 Architectural Surface Systems \u203a Sculptural & Parametric Panels\n     Organic shapes, algorithmic / flowing forms, custom CNC sculpted stone walls.\n\n\n\n\u2501\u2501\u2501 STEP 2: NAME \u2501\u2501\u2501\nGenerate a short, descriptive product name (3-6 words) that clearly describes\nthe surface. Focus on the material and the finish/shape feature.\nExamples: \"Fluted Marble Wall Panel\", \"Split Face Travertine Panel\",\n\"Carved Marble Breeze Block Screen\", \"Diamond Cut Limestone Wall Panel\",\n\"Brushed Basalt Stone Panel\", \"Herringbone Stone Mosaic Panel\".\n\n\u2501\u2501\u2501 OUTPUT \u2501\u2501\u2501\nReturn ONLY a single valid JSON object - no markdown, no extra text:\n{\n  \"category_code\": \"A|B1|B2|B3\",\n  \"category_name\": \"exact parent category name from above\",\n  \"subcategory_name\": \"subcategory name, or empty string if none\",\n  \"wall_panel_name\": \"your generated descriptive product name\"\n}`;\n\nconst out = [];\nfor (const p of products) {\n  const key = getVal(p, keyCol).trim();\n  if (!key) continue;\n\n  // Skip if already classified (either field filled = already processed)\n  const cat = getVal(p, catCol).trim();\n  const col1 = getVal(p, 'Collection_ID1').trim();\n  if (cat || col1) continue;\n\n  // Must have an image URL\n  const img = getFirstImage(p);\n  if (!img) continue;\n\n  out.push({ json: { key, imageUrl: img, prompt: PROMPT } });\n}\n\nreturn out;\n"
       },
       "id": "f30cf886-6db7-4b77-a8d7-487e359d8374",
       "name": "Filter & Build Prompts",
@@ -177,11 +165,13 @@
           "id": "YLL6T5HbTFpyXNbx",
           "name": "Google Gemini"
         }
-      }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 10000
     },
     {
       "parameters": {
-        "jsCode": "const aiItems = $input.all();\nconst src = $('Filter & Build Prompts').all();\nconst cfg = $('Set Config').first().json;\n\nconst collectionMap = {\n  'A':  { id1: cfg.collectionId_A,  id2: '' },\n  'B1': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B1 },\n  'B2': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B2 },\n  'B3': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B3 },\n  'C':  { id1: cfg.collectionId_C,  id2: '' },\n  'D':  { id1: cfg.collectionId_D,  id2: '' }\n};\n\nconst CATEGORY_NAMES = {\n  'A':  { cat: 'Marble decorative breeze blocks',     sub: '' },\n  'B1': { cat: 'Architectural Surface Systems',       sub: 'Linear & Fluted Collections' },\n  'B2': { cat: 'Architectural Surface Systems',       sub: 'Geometric & Faceted Collections' },\n  'B3': { cat: 'Architectural Surface Systems',       sub: 'Sculptural & Parametric Panels' },\n  'C':  { cat: 'Stone Surface Finishes & SAMPLES',    sub: '' },\n  'D':  { cat: 'Mosaic / Pattern Wall Panels',        sub: '' }\n};\n\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const r = aiItems[i].json || {};\n\n  // Resolve the product key: Gemini node passes through the input json,\n  // so r.key is the fastest path; fall back to the paired src item.\n  const productKey = (typeof r.key === 'string' && r.key)\n    ? r.key\n    : (src[i] ? String(src[i].json.key || '') : '');\n\n  // Gemini dedicated node returns { content: { parts: [{ text: \"...\" }], role: \"model\" } }\n  let content = '';\n  if (r.content && r.content.parts && r.content.parts[0]) {\n    content = r.content.parts[0].text || '';\n  }\n  // Fallbacks for other response shapes\n  if (!content && r.candidates && r.candidates[0]) {\n    const parts = r.candidates[0].content?.parts;\n    content = (parts && parts[0]?.text) || '';\n  }\n  if (!content) content = r.text || '';\n  content = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n\n  let ai = {};\n  try { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\n  const code  = (ai.category_code || '').trim().toUpperCase();\n  const ids   = collectionMap[code]  || { id1: '', id2: '' };\n  const names = CATEGORY_NAMES[code] || { cat: ai.category_name || '', sub: ai.subcategory_name || '' };\n\n  out.push({\n    json: {\n      'Product No.':      productKey,\n      'Category_Name':    names.cat,\n      'Subcategory_Name': names.sub,\n      'Wall_Panel_Name':  ai.wall_panel_name || '',\n      'Collection_ID1':   String(ids.id1 || ''),\n      'Collection_ID2':   String(ids.id2 || '')\n    }\n  });\n}\n\nreturn out;\n"
+        "jsCode": "const aiItems = $input.all();\nconst src = $('Filter & Build Prompts').all();\nconst cfg = $('Set Config').first().json;\n\nconst collectionMap = {\n  'A':  { id1: cfg.collectionId_A,  id2: '' },\n  'B1': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B1 },\n  'B2': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B2 },\n  'B3': { id1: cfg.collectionId_B,  id2: cfg.collectionId_B3 },\n};\n\nconst CATEGORY_NAMES = {\n  'A':  { cat: 'Marble decorative breeze blocks',     sub: '' },\n  'B1': { cat: 'Architectural Surface Systems',       sub: 'Linear & Fluted Collections' },\n  'B2': { cat: 'Architectural Surface Systems',       sub: 'Geometric & Faceted Collections' },\n  'B3': { cat: 'Architectural Surface Systems',       sub: 'Sculptural & Parametric Panels' },\n};\n\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const r = aiItems[i].json || {};\n\n  // Resolve the product key: Gemini node passes through the input json,\n  // so r.key is the fastest path; fall back to the paired src item.\n  const productKey = (typeof r.key === 'string' && r.key)\n    ? r.key\n    : (src[i] ? String(src[i].json.key || '') : '');\n\n  // Gemini dedicated node returns { content: { parts: [{ text: \"...\" }], role: \"model\" } }\n  let content = '';\n  if (r.content && r.content.parts && r.content.parts[0]) {\n    content = r.content.parts[0].text || '';\n  }\n  // Fallbacks for other response shapes\n  if (!content && r.candidates && r.candidates[0]) {\n    const parts = r.candidates[0].content?.parts;\n    content = (parts && parts[0]?.text) || '';\n  }\n  if (!content) content = r.text || '';\n  content = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n\n  let ai = {};\n  try { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\n  const code  = (ai.category_code || '').trim().toUpperCase();\n  if (!collectionMap[code]) continue;  // skip C/D or unknown codes\n  const ids   = collectionMap[code];\n  const names = CATEGORY_NAMES[code];\n\n  out.push({\n    json: {\n      'Product No.':      productKey,\n      'Category_Name':    names.cat,\n      'Subcategory_Name': names.sub,\n      'Wall_Panel_Name':  ai.wall_panel_name || '',\n      'Collection_ID1':   String(ids.id1 || ''),\n      'Collection_ID2':   String(ids.id2 || '')\n    }\n  });\n}\n\nreturn out;\n"
       },
       "id": "a0883e69-c199-4704-bb23-529d892138e4",
       "name": "Parse & Map",
@@ -316,7 +306,37 @@
         2816
       ],
       "id": "fb3c31df-6b1c-4863-9b8c-c6e55d79ce7c",
-      "name": "⏰ Daily 9am Trigger"
+      "name": "\u23f0 Daily 9am Trigger"
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        12368,
+        2976
+      ],
+      "id": "5dfd3157-dc08-4af3-9ca7-b71a3a7f1caa",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        13280,
+        2976
+      ],
+      "id": "5a8967bf-91ff-4a9a-ae73-7b740f7804e1",
+      "name": "Wait 3s",
+      "webhookId": "69713ba9-6f2c-4323-984a-495ea1b98317"
     }
   ],
   "pinData": {},
@@ -347,7 +367,7 @@
       "main": [
         [
           {
-            "node": "Analyze an image",
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -376,11 +396,45 @@
         ]
       ]
     },
-    "⏰ Daily 9am Trigger": {
+    "\u23f0 Daily 9am Trigger": {
       "main": [
         [
           {
             "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Product Row": {
+      "main": [
+        [
+          {
+            "node": "Wait 3s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }

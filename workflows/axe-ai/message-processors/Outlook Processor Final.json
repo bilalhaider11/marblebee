@@ -1,0 +1,576 @@
+{
+  "name": "sub workflow for outlook Final",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -192,
+        288
+      ],
+      "id": "bc801008-db6e-4bc5-905a-2323b104ee68",
+      "name": "Loop | Outlook Message IDs"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        176,
+        304
+      ],
+      "id": "53d6bb94-495b-476f-99d5-3f8e74762f52",
+      "name": "Outlook | Fetch Message + Attachments",
+      "webhookId": "c1c331d7-f9bd-4045-b252-f530d984d7e9",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst data = $('Loop | Outlook Message IDs');\nconst sheet_id = data.item.json.sheet_id;\n// logged-in mailbox email\nconst MY_EMAIL = 'jack@marblebee.com'.toLowerCase();\n\n/**\n * Cut message at polite sign-offs like \"Kind regards,\"\n */\nfunction cutAtKindRegards(text = '') {\n  const match = text.match(\n    /\\b(Kind regards|Best regards|Regards|Warm regards),\\b/i\n  );\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Extract latest message from Outlook/Gmail HTML body\n */\nfunction extractLatestMessageFromHtml(html = '') {\n  if (!html) return '';\n\n  // 1ï¸â£ Remove scripts & styles\n  html = html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '');\n\n  // 2ï¸â£ Cut at known reply/forward separators (earliest match wins)\n  const cutPatterns = [\n    /<hr[\\s\\S]*?>/i,\n    /<div[^>]+id=[\"']divRplyFwdMsg[\"'][\\s\\S]*?>/i,\n    /<div[^>]+class=[\"'][^\"']*gmail_quote[^\"']*[\"'][\\s\\S]*?>/i,\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},/i\n  ];\n\n  for (const pattern of cutPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      html = html.slice(0, match.index);\n    }\n  }\n\n  // 3ï¸â£ Strip remaining HTML â plain text\n  return html\n    .replace(/<\\/?[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n\nfunction cutAtReplyDate(text = '') {\n  const replyRegex =\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s*(AM|PM)/i;\n\n  const match = text.match(replyRegex);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Strip HTML safely\n */\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Cut text at first occurrence of:\n *  - 5 or more underscores\n *  - \"Get Outlook for \"\n * whichever comes first\n */\nfunction cutAtSeparator(text = '') {\n  const match = text.match(/_{5,}|Get Outlook for /i);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const fromEmail =\n    msg.from?.emailAddress?.address || null;\n\n  // receivers\n  const toEmail =\n    (msg.toRecipients || []).map(\n      r => r.emailAddress?.address\n    );\n\n  // sent or received\n  const direction =\n    fromEmail?.toLowerCase() === MY_EMAIL\n      ? 'sent'\n      : 'received';\n\n  // body (HTML â text)\nlet message = '';\n\nif (msg.body?.contentType === 'html') {\n  message = extractLatestMessageFromHtml(msg.body.content);\n} else {\n  message = stripHtml(msg.body?.content || '');\n}\n\n// 1ï¸â£ Remove signatures / Outlook footer\nmessage = cutAtSeparator(message);\n\n// 2ï¸â£ Remove quoted reply thread\nmessage = cutAtReplyDate(message);\n\n// 3ï¸â£ Remove content after \"Kind regards,\"\nmessage = cutAtKindRegards(message);\n\n\n  return {\n    json: {\n      sheet_id,\n      message,\n      fromEmail,\n      toEmail,\n      direction,\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false,\n      row_number:\n        data.first().json.row_number\n    },\n\n    binary: $input.all()[index]?.binary || {}\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        304
+      ],
+      "id": "28170fc2-c919-44a8-b4ee-78cf3389766f",
+      "name": "Normalize | Extract Message Metadata"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6208f34c-3b3d-4da1-8664-727894a695e8",
+              "leftValue": "={{ $json.hasAttachments }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        304
+      ],
+      "id": "77ccfd7e-87fb-41ea-86ab-d7a20ebc6eb0",
+      "name": "If Has Attachments"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        96
+      ],
+      "id": "ab4429f5-e428-4c20-b4be-4082796fc7d5",
+      "name": "Expand | Split Attachments"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.binary_field_name }}",
+        "name": "={{ $binary.attachment_0.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Loop | Outlook Message IDs').item.json.subf5_id }}",
+          "mode": "id"
+        },
+        "options": {
+          "useContentAsIndexableText": true
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1376,
+        96
+      ],
+      "id": "b5674e91-5a24-4986-bb10-98f8b7105230",
+      "name": "Drive | Upload Attachment",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`webViewLink${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        96
+      ],
+      "id": "9a1eb0ec-e007-41f8-bb19-7aaf04af14c4",
+      "name": "Merge | Add Drive Links"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1584,
+        320
+      ],
+      "id": "dc933fb3-15bf-418c-aba6-0a0fafe3d1a7",
+      "name": "Sheets | Log Message Row",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "mainf4_id",
+              "lookupValue": "10e1vDtThiyaGDkzsdQNJLmOc8935EU2p"
+            },
+            {
+              "lookupColumn": "Processed",
+              "lookupValue": "false"
+            },
+            {
+              "lookupColumn": "source"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -528,
+        288
+      ],
+      "id": "3e44b95d-9f2f-4de3-8e84-eaba7063a9d9",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -816,
+        288
+      ],
+      "id": "f18247b4-dd8d-45d6-856d-cc820b4013c4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Loop | Outlook Message IDs').first().json.id }}",
+            "Processed": "true"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "threadId",
+              "displayName": "threadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "by_mail",
+              "displayName": "by_mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sheet_id",
+              "displayName": "sheet_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mainf4_id",
+              "displayName": "mainf4_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "subf5_id",
+              "displayName": "subf5_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "index",
+              "displayName": "index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Processed",
+              "displayName": "Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1808,
+        320
+      ],
+      "id": "9f70cff3-fef2-4c72-8a1c-e71a4c8a6df0",
+      "name": "Append or update row in sheet",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-02-10T16:09:28.288-05:00",
+          "Readable date": "February 10th 2026, 4:09:28 pm",
+          "Readable time": "4:09:28 pm",
+          "Day of week": "Tuesday",
+          "Year": "2026",
+          "Month": "February",
+          "Day of month": "10",
+          "Hour": "16",
+          "Minute": "09",
+          "Second": "28",
+          "Timezone": "America/New_York (UTC-05:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Loop | Outlook Message IDs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Fetch Message + Attachments": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize | Extract Message Metadata": {
+      "main": [
+        [
+          {
+            "node": "If Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Attachments": {
+      "main": [
+        [
+          {
+            "node": "Expand | Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand | Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge | Add Drive Links": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Log Message Row": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0d793252-23d3-4595-9f5d-ebb9165cfd1d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "XwwicP3Ug6baCjYZiXS60",
+  "tags": []
+}

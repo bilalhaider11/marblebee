@@ -1,0 +1,807 @@
+{
+  "name": "sub workflow for gmail Final",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\nconst sheet_id = $('Loop | Gmail Message IDs').item.json.sheet_id;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields,\n      sheet_id: sheet_id\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        224
+      ],
+      "id": "2e15504e-07b2-406a-b8ef-5a630dedec06",
+      "name": "Merge | Add Drive Links"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst items = $input.all();\n\n// Sort by timestamp: oldest â newest\nitems.sort((a, b) => {\n  const t1 = new Date(a.json.timestamp).getTime();\n  const t2 = new Date(b.json.timestamp).getTime();\n  return t1 - t2;\n});\n\n// Return sorted items\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "b95ed818-3ebf-457a-bc88-689233a478e0",
+      "name": "Prepare | Resolve Sheet ID"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.binary_field_name }}",
+        "name": "={{ $binary.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Loop | Gmail Message IDs').item.json.subf5_id }}",
+          "mode": "id"
+        },
+        "options": {
+          "useContentAsIndexableText": true
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1920,
+        224
+      ],
+      "id": "169dc3cb-3342-4154-87c0-085bdd51e6e4",
+      "name": "Drive | Upload Attachment",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        224
+      ],
+      "id": "2b30b90d-bc71-40cf-82ce-9340da46b2d2",
+      "name": "Expand | Split Attachments"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        512,
+        192
+      ],
+      "id": "618de394-0010-4a6b-8c28-705c3237d372",
+      "name": "Gmail | Fetch Message + Attachments",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -144,
+        400
+      ],
+      "id": "e058819b-2a2e-457b-b00d-f1d5c55649e0",
+      "name": "Loop | Gmail Message IDs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6208f34c-3b3d-4da1-8664-727894a695e8",
+              "leftValue": "={{ Object.keys($binary || {}).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        416
+      ],
+      "id": "cfdce29b-c99f-4dd3-8090-ea3e0d5929dc",
+      "name": "If Has Attachments"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Processed",
+              "lookupValue": "false"
+            },
+            {
+              "lookupColumn": "source",
+              "lookupValue": "email"
+            },
+            {
+              "lookupColumn": "mainf4_id",
+              "lookupValue": "1mS9R8JnI0uABeg1UKr1AUil8pWyBV-5G"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -592,
+        400
+      ],
+      "id": "8dc7317e-f63e-4091-b0dc-be918eae2379",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get only the first 10 items\nconst items = $input.all().slice(0, 5);\n\n// Loop over those 10 items\nfor (const item of items) {\n  item.json.myNewField = 1;\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        256
+      ],
+      "id": "554ec016-14dc-4eba-8cd3-c4f614c0cb9c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        512,
+        416
+      ],
+      "id": "a63a92fd-5d78-4459-a753-3cec32f4ec80",
+      "name": "Gmail | Fetch Message + Attachments1",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        512,
+        704
+      ],
+      "id": "e24a1dff-c1bc-4db7-8543-42945e2f93bc",
+      "name": "Gmail | Fetch Message + Attachments2",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        0
+      ],
+      "id": "04ce453b-1c3e-4458-b6b8-c5bd4292c7d4",
+      "name": "Sheets | Log Message Row4",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "=1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Soc0sLIrMCsaY5AJQybhh1oHpjsYctt1vRI53ZHs6ys/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Processed": "true",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "threadId",
+              "displayName": "threadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "by_mail",
+              "displayName": "by_mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sheet_id",
+              "displayName": "sheet_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mainf4_id",
+              "displayName": "mainf4_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "subf5_id",
+              "displayName": "subf5_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "index",
+              "displayName": "index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Processed",
+              "displayName": "Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        752,
+        0
+      ],
+      "id": "b3ee2ddd-6fbc-4150-b8e3-3486e151e9dd",
+      "name": "Sheets | Cleanup Template Columns5",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "sales_emily",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "57381659-54a1-4eb2-b073-792d0da8d1f7"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bf03cd96-6584-4b68-a374-367d8d3733b5",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "sales_terry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "460b00c1-5cbd-43ed-8609-3d8d85c5bb9c",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "sales_office",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        80,
+        400
+      ],
+      "id": "3a2d50c0-eb78-4802-8008-0c53565860d7",
+      "name": "Route by Workspace1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nconst data = $('Loop | Gmail Message IDs').item.json;\nconst row = data.row;\nconst row_number = data.row_number;\n/**\n * Clean unwanted characters and normalize spacing\n */\nconst cleanText = (text = \"\") =>\n  text\n    ?.replace(/[<>&*]/g, \"\")   // remove special chars\n    .replace(/\\s+/g, \" \")     // normalize spaces\n    .trim();\n\n/**\n * Remove everything AFTER an email inside <>\n * Example stop point: <example@gmail.com>\n */\nconst cutAfterAngleEmail = (text = \"\") => {\n  if (!text) return null;\n\n  // Match <email@domain>\n  const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n  const match = text.match(angleEmailRegex);\n  if (!match) return text;\n\n  return text.slice(0, match.index);\n};\n\n/**\n * Extract ONLY reply content (remove quoted Gmail reply)\n */\nconst extractReplyText = (text = \"\") => {\n  if (!text) return null;\n\n  // First: remove quoted reply block\n  const splitPatterns = [\n    \"\\nOn \",   // Gmail reply marker\n    \"\\n>\"      // quoted lines\n  ];\n\n  let clean = text;\n  for (const p of splitPatterns) {\n    if (clean.includes(p)) {\n      clean = clean.split(p)[0];\n      break;\n    }\n  }\n\n  // Second: cut after <email@domain>\n  clean = cutAfterAngleEmail(clean);\n\n  return cleanText(clean);\n};\n\n/**\n * MAIN LOOP\n */\nfor (const input of items) {\n  const e = input.json;\n  const headers = e.headers || {};\n\n  const isSent = e.labelIds?.includes(\"SENT\");\n  const isReply =\n    !!e.inReplyTo ||\n    !!headers[\"in-reply-to\"] ||\n    !!headers.references;\n\n  const rawText = e.text || \"\";\n\n  const finalText = isReply\n    ? extractReplyText(rawText)\n    : cleanText(cutAfterAngleEmail(rawText));\n\n  output.push({\n    json: {\n      // Direction\n      direction: isSent ? \"SENT\" : \"RECEIVED\",\n      sheet_id:data.sheet_id,\n      row,\n      row_number,\n\n      // From\n      fromEmail: e.from?.value?.[0]?.address || null,\n      fromName: e.from?.value?.[0]?.name || null,\n\n      // To\n      toEmail: e.to?.value?.[0]?.address || null,\n      toName: e.to?.value?.[0]?.name || null,\n\n      // Subject\n      subject:\n        e.subject ||\n        headers.subject?.replace(\"Subject: \", \"\") ||\n        null,\n\n      // Timestamp\n      timestamp: e.date || null,\n\n      //  Cleaned message\n      message: finalText || null,\n    },\n\n    //  Preserve attachments exactly\n    binary: input.binary ?? undefined,\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        416
+      ],
+      "id": "086f425e-442f-4296-8cfb-e5d5cf81320d",
+      "name": "Normalize | Extract Clean Reply Text2"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        432
+      ],
+      "id": "5c93b51b-624e-48f9-b5d3-cd0538c902bf",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -848,
+        400
+      ],
+      "id": "7c45e67a-8c36-478d-b756-34dd28b88428",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Merge | Add Drive Links": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare | Resolve Sheet ID": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Log Message Row4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand | Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail | Fetch Message + Attachments": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Clean Reply Text2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop | Gmail Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Prepare | Resolve Sheet ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Workspace1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Attachments": {
+      "main": [
+        [
+          {
+            "node": "Expand | Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop | Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail | Fetch Message + Attachments2": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Clean Reply Text2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail | Fetch Message + Attachments1": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Clean Reply Text2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Log Message Row4": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Cleanup Template Columns5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Workspace1": {
+      "main": [
+        [
+          {
+            "node": "Gmail | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail | Fetch Message + Attachments1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail | Fetch Message + Attachments2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize | Extract Clean Reply Text2": {
+      "main": [
+        [
+          {
+            "node": "If Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Loop | Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e4ebf9e2-0c34-4c37-9ba1-53f1cfda6967",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "EQtjfa06RVRxn5eNf-_kc",
+  "tags": []
+}

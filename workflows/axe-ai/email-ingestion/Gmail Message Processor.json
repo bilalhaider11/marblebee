@@ -1,0 +1,584 @@
+{
+  "name": "AXE | Gmail Message & Attachment Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6208f34c-3b3d-4da1-8664-727894a695e8",
+              "leftValue": "={{ Object.keys($binary || {}).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        144
+      ],
+      "id": "9b3e7634-fea8-4a27-9f25-4ebe7f2a2170",
+      "name": "If Has Attachments"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "875a8924-2cc3-4d05-b073-a298ecb401f6",
+      "typeVersion": 1.1,
+      "name": "Trigger | From Main Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -1648,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1360,
+        208
+      ],
+      "id": "61717bc1-b51e-494e-a7ef-f0ed8658e65e",
+      "name": "Loop | Gmail Message IDs"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        240
+      ],
+      "id": "ab32ab31-ae8c-4ca5-8a54-807fc0bc698b",
+      "name": "Gmail | Fetch Message + Attachments",
+      "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n/**\n\u00c2\u00a0* Clean unwanted characters and normalize spacing\n\u00c2\u00a0*/\nconst cleanText = (text = \"\") =>\n\u00c2\u00a0\u00c2\u00a0text\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0.replace(/[<>&*]/g, \"\")\u00c2\u00a0\u00c2\u00a0 // remove special chars\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0.replace(/\\s+/g, \" \")\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0 // normalize spaces\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0.trim();\n\n/**\n\u00c2\u00a0* Remove everything AFTER an email inside <>\n\u00c2\u00a0* Example stop point: <example@gmail.com>\n\u00c2\u00a0*/\nconst cutAfterAngleEmail = (text = \"\") => {\n\u00c2\u00a0\u00c2\u00a0if (!text) return null;\n\n\u00c2\u00a0\u00c2\u00a0// Match <email@domain>\n\u00c2\u00a0\u00c2\u00a0const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n\u00c2\u00a0\u00c2\u00a0const match = text.match(angleEmailRegex);\n\u00c2\u00a0\u00c2\u00a0if (!match) return text;\n\n\u00c2\u00a0\u00c2\u00a0return text.slice(0, match.index);\n};\n\n/**\n\u00c2\u00a0* Extract ONLY reply content (remove quoted Gmail reply)\n\u00c2\u00a0*/\nconst extractReplyText = (text = \"\") => {\n\u00c2\u00a0\u00c2\u00a0if (!text) return null;\n\n\u00c2\u00a0\u00c2\u00a0// First: remove quoted reply block\n\u00c2\u00a0\u00c2\u00a0const splitPatterns = [\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\"\\nOn \",\u00c2\u00a0\u00c2\u00a0 // Gmail reply marker\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\"\\n>\"\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0 // quoted lines\n\u00c2\u00a0\u00c2\u00a0];\n\n\u00c2\u00a0\u00c2\u00a0let clean = text;\n\u00c2\u00a0\u00c2\u00a0for (const p of splitPatterns) {\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0if (clean.includes(p)) {\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0clean = clean.split(p)[0];\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0break;\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0}\n\u00c2\u00a0\u00c2\u00a0}\n\n\u00c2\u00a0\u00c2\u00a0// Second: cut after <email@domain>\n\u00c2\u00a0\u00c2\u00a0clean = cutAfterAngleEmail(clean);\n\n\u00c2\u00a0\u00c2\u00a0return cleanText(clean);\n};\n\n/**\n\u00c2\u00a0* MAIN LOOP\n\u00c2\u00a0*/\nfor (const input of items) {\n\u00c2\u00a0\u00c2\u00a0const e = input.json;\n\u00c2\u00a0\u00c2\u00a0const headers = e.headers || {};\n\n\u00c2\u00a0\u00c2\u00a0const isSent = e.labelIds?.includes(\"SENT\");\n\u00c2\u00a0\u00c2\u00a0const isReply =\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0!!e.inReplyTo ||\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0!!headers[\"in-reply-to\"] ||\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0!!headers.references;\n\n\u00c2\u00a0\u00c2\u00a0const rawText = e.text || \"\";\n\n\u00c2\u00a0\u00c2\u00a0const finalText = isReply\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0? extractReplyText(rawText)\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0: cleanText(cutAfterAngleEmail(rawText));\n\n\u00c2\u00a0\u00c2\u00a0output.push({\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0json: {\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0// Direction\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0direction: isSent ? \"SENT\" : \"RECEIVED\",\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0sheet_id:$('Loop | Gmail Message IDs').item.json.sheet_id,\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0// From\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0fromEmail: e.from?.value?.[0]?.address || null,\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0fromName: e.from?.value?.[0]?.name || null,\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0// To\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0toEmail: e.to?.value?.[0]?.address || null,\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0toName: e.to?.value?.[0]?.name || null,\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0// Subject\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0subject:\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0e.subject ||\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0headers.subject?.replace(\"Subject: \", \"\") ||\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0null,\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0// Timestamp\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0timestamp: e.date || null,\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0//  Cleaned message\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0message: finalText || null,\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0},\n\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0//  Preserve attachments exactly\n\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0\u00c2\u00a0binary: input.binary ?? undefined,\n\u00c2\u00a0\u00c2\u00a0});\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        240
+      ],
+      "id": "5b7fc793-79d5-4b1f-a534-9dbe97cab2aa",
+      "name": "Normalize | Extract Clean Reply Text"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4eba2b24-0248-459a-8112-63d7234e4485",
+      "name": "Expand | Split Attachments"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.binary_field_name }}",
+        "name": "={{ $binary.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Loop | Gmail Message IDs').item.json.subf5_id }}",
+          "mode": "id"
+        },
+        "options": {
+          "useContentAsIndexableText": true
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "f62acc0a-7f0b-4e30-8859-dc9a2fe4fbc6",
+      "name": "Drive | Upload Attachment",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "threadId",
+              "displayName": "threadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fromEmail",
+              "displayName": "fromEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fromName",
+              "displayName": "fromName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "toEmail",
+              "displayName": "toEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "toName",
+              "displayName": "toName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "messageId",
+              "displayName": "messageId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "inReplyTo",
+              "displayName": "inReplyTo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "references",
+              "displayName": "references",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "labels",
+              "displayName": "labels",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "isUnread",
+              "displayName": "isUnread",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "isImportant",
+              "displayName": "isImportant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sizeEstimate",
+              "displayName": "sizeEstimate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        432,
+        240
+      ],
+      "id": "e0a7ce4e-457f-433e-991a-a50cf004240c",
+      "name": "Sheets | Log Message Row",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3c51fb96-2323-40d0-9d33-f084129441f4",
+              "leftValue": "={{ ($json.index + 1) % 50 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1072,
+        224
+      ],
+      "id": "054a15e1-7c2a-4040-9316-9053b2686faa",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        96
+      ],
+      "id": "0e8f5c89-ebf6-4531-b749-066828e4612f",
+      "name": "Wait",
+      "webhookId": "7712318c-ae6b-4108-be52-e5fc6fa11594"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\nconst sheet_id = $('Loop | Gmail Message IDs').item.json.sheet_id;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields,\n      sheet_id: sheet_id\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "9f11faac-4f3b-4112-895c-45c262549579",
+      "name": "Merge | Add Drive Links"
+    }
+  ],
+  "pinData": {
+    "Trigger | From Main Workflow": [
+      {
+        "json": {
+          "isArtificialRecoveredEventItem": true
+        }
+      }
+    ]
+  },
+  "connections": {
+    "If Has Attachments": {
+      "main": [
+        [
+          {
+            "node": "Expand | Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger | From Main Workflow": {
+      "main": [
+        [
+          {
+            "node": "Loop | Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop | Gmail Message IDs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail | Fetch Message + Attachments": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Clean Reply Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize | Extract Clean Reply Text": {
+      "main": [
+        [
+          {
+            "node": "If Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand | Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Log Message Row": {
+      "main": [
+        [
+          {
+            "node": "Loop | Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Gmail | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge | Add Drive Links": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "86573ede-5844-42e7-9004-e10e330dc9da",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "Q7l1JHLGbGBUrbAR3myWE",
+  "tags": []
+}

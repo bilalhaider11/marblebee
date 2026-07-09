@@ -1,0 +1,871 @@
+{
+  "name": "AXE AI | Email Intake â Drive + Sheets Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2192,
+        592
+      ],
+      "id": "dcf4e4ed-8be5-461f-8c68-34441047fc3e",
+      "name": "Cron Trigger (Every 30 Min)"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1tueybUaFikZTVuBJOB3JeY5wePWRaczyQVk7jVQZSE4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tueybUaFikZTVuBJOB3JeY5wePWRaczyQVk7jVQZSE4/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Processed"
+            },
+            {
+              "lookupColumn": "Email",
+              "lookupValue": "briannaleeepierro@gmail.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1936,
+        592
+      ],
+      "id": "34e8cfb3-f644-4702-a30a-87156681070d",
+      "name": "Load Accounts from Control Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1632,
+        592
+      ],
+      "id": "6aa7ee61-0062-48dc-8455-d719493ff69d",
+      "name": "For Each Account"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  let googleQuery = '';\n  let outlookQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    googleQuery += i !== 0 ? ' OR ' : ''\n    googleQuery += `from:${email} OR to:${ email }`\n\n    outlookQuery += i !== 0 ? ' OR ' : ''\n    outlookQuery += `${email}`\n  })\n  item.json.googleQuery = googleQuery;\n  item.json.outlookQuery = outlookQuery;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        608
+      ],
+      "id": "9653047d-8339-42d3-b352-1d884a5e6b79",
+      "name": "Build Gmail & Outlook Search Queries"
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.googleQuery }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1152,
+        608
+      ],
+      "id": "bf177619-3812-47cc-92e9-dc25755a7577",
+      "name": "Gmail API | Search Messages",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b80e841b-38b3-4638-8007-9a79d1fbb552",
+              "leftValue": "={{ $json.resultSizeEstimate }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -912,
+        608
+      ],
+      "id": "defd4df7-47ad-4c68-ab0c-34e33f90fe71",
+      "name": "If Gmail Has Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst data = $('For Each Account').item.json;\n\nreturn items.map(item => {\n  const messages = item.json.messages || [];\n\n  // extract ids\n  const ids = messages.map(m => m.id);\n\n  // reverse order\n  ids.reverse();\n\n  return {\n    json: {\n      resource: \"gmail\",\n      email:data.Email,\n      name: data.Name,\n      ids\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        288
+      ],
+      "id": "2653ecba-1f2d-4a0b-b77c-770e202e0b46",
+      "name": "Normalize Gmail Message IDs"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filtersUI": {
+          "values": {
+            "filterBy": "search",
+            "search": "={{ $('Build Gmail & Outlook Search Queries').item.json.outlookQuery }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        880
+      ],
+      "id": "4fbc77e9-8ea9-467c-bdcb-b0ab320d519b",
+      "name": "Outlook | Search Messages",
+      "webhookId": "d626b425-8dc0-4a90-8942-8efd9ec72be2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// get all incoming messages (current node input) in DESC order\nconst messages = [...$input.all()].reverse();\nconst data = $('For Each Account').item.json;\n\n// extract only VALID ids\nconst ids = messages\n  .map(item => item.json.id)\n  .filter(id => id); // ð¥ removes null, undefined, empty\n\n// ð« if no ids, return nothing\nif (ids.length === 0) {\n  return [];\n}\n\n// â return only when ids exist\nreturn [\n  {\n    json: {\n      resource: \"outlook\",\n      email: data.Email,\n      name: data.Name,\n      ids\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        880
+      ],
+      "id": "23495802-d133-47d1-bb3b-da779b3a55e7",
+      "name": "Normalize Outlook Message IDs",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cd11dede-1f67-4823-bbd9-9cdae58bf528",
+              "leftValue": "={{ $json.ids }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "8b6fd61b-924c-4020-8dfc-1d8c0cc0408c",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        880
+      ],
+      "id": "956aaa0e-7727-4584-8a93-0745dbba1be5",
+      "name": "If Outlook Has Valid IDs"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('For Each Account').first().json.Name  }} <{{ $('For Each Account').first().json.Email }}>",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -448,
+        592
+      ],
+      "id": "e3f59520-991f-4e1a-a47a-f439352b3f69",
+      "name": "Create Client Root Folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "attachments",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -224,
+        592
+      ],
+      "id": "8202d804-ed6f-4bce-ac33-a1903608760d",
+      "name": "Create Attachments Subfolder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "=conversation",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "sheet1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        16,
+        592
+      ],
+      "id": "57e53944-f21a-4fb5-9d86-e79e05fb02fe",
+      "name": "Create Conversation Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Create Conversation Sheet').item.json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Create Client Root Folder').item.json.id }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        304,
+        416
+      ],
+      "id": "ff7014d6-290d-4e21-a3ac-8766a5821aa0",
+      "name": "Move Sheet to Client Folder",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cd11dede-1f67-4823-bbd9-9cdae58bf528",
+              "leftValue": "={{ $('Detect Email Provider (Gmail vs Outlook)').item.json.resource }}",
+              "rightValue": "gmail",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        592
+      ],
+      "id": "0d0eb01d-44fc-42b7-8c32-cc0bc86c4de4",
+      "name": "Route by Provider"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\n\n\nreturn [\n  {\n    json: {\n      resource: $input.first().json.resource,\n      email: $input.first().json.email,\n      name: $input.first().json.name\n\n      \n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        592
+      ],
+      "id": "15bf0343-3e49-481b-a64c-8eb8b6b09e40",
+      "name": "Detect Email Provider (Gmail vs Outlook)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const idsObj = $('Normalize Gmail Message IDs').item.json;\nconst sheet_id = $('Create Conversation Sheet').item.json.spreadsheetId;\nconst mainf4_id = $('Create Client Root Folder').item.json.id\nconst subf5_id = $('Create Attachments Subfolder').item.json.id\n\n\nreturn idsObj.ids.map((id, index) => ({\n  json: {\n    id,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        576
+      ],
+      "id": "3ce2ef6a-ee50-491e-8034-4ace2c81a0a5",
+      "name": "Expand Gmail Message IDs"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Q7l1JHLGbGBUrbAR3myWE",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Q7l1JHLGbGBUrbAR3myWE",
+          "cachedResultName": "AXE | Gmail Message & Attachment Processor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        576
+      ],
+      "id": "f6bad87e-120e-41f1-ab95-65d1a9957a2e",
+      "name": "Process Gmail Messages (Sub-Workflow)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const idsObj = $('Normalize Outlook Message IDs').item.json;\nconst sheet_id = $('Create Conversation Sheet').item.json.spreadsheetId;\nconst mainf4_id = $('Create Client Root Folder').item.json.id\nconst subf5_id = $('Create Attachments Subfolder').item.json.id\n\n\nreturn idsObj.ids.map((id, i) => ({\n  json: {\n    id,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index: i\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        800
+      ],
+      "id": "8f33115d-7a3b-4b3b-9307-8a45ac3fd911",
+      "name": "Expand Outlook Message IDs"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "hoI4w6wnGkWsuNYGnwxOY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/hoI4w6wnGkWsuNYGnwxOY",
+          "cachedResultName": "AXE | Outlook Message & Attachment Processor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        976,
+        800
+      ],
+      "id": "150b3491-fa08-4074-b018-8c7685ef9da5",
+      "name": "Process Outlook Messages (Sub-Workflow)"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1tueybUaFikZTVuBJOB3JeY5wePWRaczyQVk7jVQZSE4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tueybUaFikZTVuBJOB3JeY5wePWRaczyQVk7jVQZSE4/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Processed": "true",
+            "Email": "={{ $('Build Gmail & Outlook Search Queries').first().json.Email }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Processed",
+              "displayName": "Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        288,
+        1120
+      ],
+      "id": "1c442e10-a520-4181-b9ae-ace6da2c319b",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Cron Trigger (Every 30 Min)": [
+      {
+        "json": {
+          "timestamp": "2026-02-07T03:45:28.773-05:00",
+          "Readable date": "February 7th 2026, 3:45:28 am",
+          "Readable time": "3:45:28 am",
+          "Day of week": "Saturday",
+          "Year": "2026",
+          "Month": "February",
+          "Day of month": "07",
+          "Hour": "03",
+          "Minute": "45",
+          "Second": "28",
+          "Timezone": "America/New_York (UTC-05:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Cron Trigger (Every 30 Min)": {
+      "main": [
+        [
+          {
+            "node": "Load Accounts from Control Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Accounts from Control Sheet": {
+      "main": [
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "For Each Account": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Build Gmail & Outlook Search Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gmail & Outlook Search Queries": {
+      "main": [
+        [
+          {
+            "node": "Gmail API | Search Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail API | Search Messages": {
+      "main": [
+        []
+      ]
+    },
+    "If Gmail Has Results": {
+      "main": [
+        [
+          {
+            "node": "Normalize Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook | Search Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Gmail Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Detect Email Provider (Gmail vs Outlook)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Search Messages": {
+      "main": [
+        [
+          {
+            "node": "Normalize Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Outlook Message IDs": {
+      "main": [
+        [
+          {
+            "node": "If Outlook Has Valid IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Outlook Has Valid IDs": {
+      "main": [
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detect Email Provider (Gmail vs Outlook)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Client Root Folder": {
+      "main": [
+        [
+          {
+            "node": "Create Attachments Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Attachments Subfolder": {
+      "main": [
+        [
+          {
+            "node": "Create Conversation Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation Sheet": {
+      "main": [
+        [
+          {
+            "node": "Move Sheet to Client Folder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route by Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Provider": {
+      "main": [
+        [
+          {
+            "node": "Expand Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expand Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Email Provider (Gmail vs Outlook)": {
+      "main": [
+        [
+          {
+            "node": "Create Client Root Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Gmail Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Process Gmail Messages (Sub-Workflow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Gmail Messages (Sub-Workflow)": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Outlook Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Process Outlook Messages (Sub-Workflow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Outlook Messages (Sub-Workflow)": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c858476d-68ee-4665-b1ad-6cc746ac3005",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "nLaHB45QBnbOaif8txLX8",
+  "tags": []
+}

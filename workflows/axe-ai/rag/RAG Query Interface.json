@@ -1,0 +1,999 @@
+{
+  "name": "Quering&formating Embedded MSG",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=**Task:** Classify the user statement based on its intent.\n\nYou must analyze the statement and determine whether the user is requesting:\n\n1. **query** â asking for specific product information or searching for product details.\n2. **format** â asking only to structure or present already known data (JSON, table, bullet list, etc.).\n3. **both** â asking for product information **and** specifying the output format.\n4. **AllData** â the request is not about a specific product, is unclear, meaningless, or asks for **general database data such as totals, counts, records, statistics, or system information**.\n\n---\n\n**Important Rule**\n\nIf the user asks for **database-wide information** such as:\n\n* total records\n* total count\n* number of products\n* show all records\n* statistics\n* database size\n* how many entries exist\n\nThen the output must be **`AllData`**.\n\nâ ï¸ **Exception:**\nIf the statement **mentions a specific product or item type** (for example: bathtub, fireplace, table, bench, animal, marble, sink, etc.), then it is **NOT `AllData`**, even if words like *count* or *records* appear.\n\nIn that case classify it as:\n\n* **query** â if the user is asking about the product\n* **both** â if they also request a format (table, JSON, list, etc.)\n\n---\n\n**Classification Rules**\n\nâ¢ If the statement asks for **specific product information** â `query`\nâ¢ If the statement asks **only for formatting** â `format`\nâ¢ If it asks for **product information AND formatting** â `both`\nâ¢ If it asks for **database totals, counts, records, statistics, or unrelated text AND no product is mentioned** â `AllData`\n\n---\n\n**Examples**\n\n\"What is Rosso Levanto marble?\" â query\n\"Show the product details in JSON format\" â format\n\"Find Rosso Levanto marble and show it in a table\" â both\n\nDatabase-level requests:\n\"total records\" â AllData\n\"give total count of records\" â AllData\n\"how many entries are in the database\" â AllData\n\"show all records\" â AllData\n\nProduct mentioned with count:\n\"how many bathtubs are available\" â query\n\"total fireplaces in the database\" â query\n\nOther:\n\"hello\" â AllData\n\n---\n\n**Output Requirements**\n\nReturn **only one word**.\n\nAllowed outputs:\n\nquery\nformat\nboth\nAllData\n\n---\n\n**User Statement:**\n{{ $json.body.query }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -1760,
+        2320
+      ],
+      "id": "33c6e0e8-8ac7-4ca6-b335-938bd7ba6147",
+      "name": "Message a model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "format",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "33fdbd4e-c606-4ad8-adb3-7dc2b561fbbc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "format"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "62fc37ed-b4b0-41ae-a56a-cb5c81256ca9",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "query",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "query"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d732bc31-2b8d-4eeb-b1f8-da281116dc6d",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "both",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "both"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "fa06a856-f445-4372-af0c-4cd7c539c6e3",
+                    "leftValue": "AllData",
+                    "rightValue": "AllData",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AllData"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1408,
+        2288
+      ],
+      "id": "83ef2a45-0579-4c3c-ab41-653fe6d7cf91",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ad175ee-ea0f-48de-8615-b5721cbe39a7",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2032,
+        2320
+      ],
+      "id": "28af8b22-8e1f-405a-b193-89dd8eb3da63",
+      "name": "Webhook",
+      "webhookId": "4ad175ee-ea0f-48de-8615-b5721cbe39a7"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Task: Determine if a user statement is requesting a count of records or general database totals.\n\nIf the statement asks for total records, total count, number of entries, statistics, or database-wide information, output:\ncounter\n\nIf the statement asks for specific product information, details, or any query that is not about totals, output:\nnon-counter\n\nRules:\n\nOnly consider it counter if the request is explicitly about counts, totals, or statistics.\n\nReturn exactly one word, either counter or non-counter.\n\nDo not add explanations, extra text, or formatting.\n\nUser Statement:\n{{ $('Webhook').item.json.body.query }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -1088,
+        2368
+      ],
+      "id": "c0d90fa9-1d79-4cf9-876b-fd63d5151632",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://ljrrflorybbezkhgyqrp.supabase.co/rest/v1/rpc/get_messages_count",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        2272
+      ],
+      "id": "d1751f72-dce0-44a4-911c-ea7bf61d1b13",
+      "name": "HTTP Request",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "counter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "100bbbd4-c805-41d4-982d-2519764ed5e3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "counter"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8f9f9c6a-33bf-454c-993b-5a05e5082bd5",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "non-counter",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "non-counter"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "07bccee5-ab14-4617-bba0-68f8876ff446",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "meaningless",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "meaningless"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -752,
+        2352
+      ],
+      "id": "7057d5fe-2956-4fe3-ab05-b956bfa1d394",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=query or question:\n{{ $('Webhook').item.json.body.query }}\n\nanswer:\n{{ $json }}\n\nmake it a proper answer as responed by ai (short & simple)",
+        "options": {}
+      },
+      "id": "7d051bd5-e4e2-4597-80bf-aba93189534d",
+      "name": "Question & Answer4",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -224,
+        2272
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.session_id }}",
+        "contextWindowLength": 500
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -96,
+        2496
+      ],
+      "id": "79198066-0022-4301-8c9c-5c04ba8e83d2",
+      "name": "Memory1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        2496
+      ],
+      "id": "206e5e4a-eaad-4f2b-981c-252efd8f6941",
+      "name": "chat model",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "conversation_record",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('Webhook').item.json.body.session_id }}"
+            },
+            {
+              "fieldId": "user_message",
+              "fieldValue": "={{ $('Webhook').item.json.body.query }}"
+            },
+            {
+              "fieldId": "response_message",
+              "fieldValue": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        2672
+      ],
+      "id": "169999a1-91f2-4f51-a24d-99ab26549241",
+      "name": "Create a row5",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\nreturn [{\n  response:$input.first().json.response_message\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        2672
+      ],
+      "id": "340018c1-155d-4606-84c2-a6034d57a6d0",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "stripNewLines": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -448,
+        3248
+      ],
+      "id": "111ab933-52ed-4498-b981-6f66d71cb319",
+      "name": "Embeddings OpenAI3",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "={{ $('Webhook').item.json.body.query }}",
+        "tableName": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "list",
+          "cachedResultName": "messages"
+        },
+        "topK": null,
+        "includeDocumentMetadata": false,
+        "useReranker": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        3008
+      ],
+      "id": "fea5133c-87cb-457f-9da7-3ddfe7ca4fd5",
+      "name": "Supabase Vector Store1",
+      "notesInFlow": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "topN": 250
+      },
+      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        3248
+      ],
+      "id": "4991f806-a6e4-43cd-a665-782ca81a75d1",
+      "name": "Reranker Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "mhExRzwjXc727hMA",
+          "name": "CohereApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.query }}",
+        "options": {}
+      },
+      "id": "b2740193-15cd-4d8d-9648-1e11f2c75ed7",
+      "name": "Question & Answer1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -800,
+        2672
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -800,
+        2928
+      ],
+      "id": "1382532b-2658-4a8c-8613-1feb23cf4cb7",
+      "name": "Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.session_id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -704,
+        2928
+      ],
+      "id": "8190564a-9a4b-42d1-921b-23b9bda48bcc",
+      "name": "Memory"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=\nInstructions:\n\nRead the user input text, analyze it that the user just asked the query or asked the counter-query\ncounter-query means asked about the product with their count e.g (give the count of queries related to bathtub)\nFallback Rule:\n\nOutput Rules\n\nExactly one word, the word must be from:\ncounter_query OR simple_query\nUser Input:\n{{ $('Webhook').item.json.body.query }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -864,
+        2048
+      ],
+      "id": "5090805b-5172-4b46-b206-07be1498eb67",
+      "name": "Message a model7",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Task: Extract a single keyword(product) from the user query for database searching.\n\nInstructions:\n\nRead the user input text.\n\nIdentify the most important keyword.\n\nWrap it with % at the beginning and end.\n\nFallback Rule:\nIf no useful keyword is found return:\n\n%a%\n\nOutput Rules\n\nExactly one word\n\nWrapped in %\n\nUser Input:\n{{ $('Webhook').item.json.body.query }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -224,
+        2032
+      ],
+      "id": "a6fd1c06-96b3-414b-85b2-7474d71e505a",
+      "name": "Message a model8",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ljrrflorybbezkhgyqrp.supabase.co/rest/v1/rpc/get_product_count",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"search_text\": \"{{ $json.output[0].content[0].text }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        192,
+        2032
+      ],
+      "id": "f582b7d9-44a5-4f5f-9958-dd5d3ef759f5",
+      "name": "HTTP Request1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "counter_query",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "100bbbd4-c805-41d4-982d-2519764ed5e3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "counter_query"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8f9f9c6a-33bf-454c-993b-5a05e5082bd5",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
+                    "rightValue": "simple_query",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "simple-counter"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        2048
+      ],
+      "id": "4fb77bc1-143b-4ca3-aef7-9260c61d2823",
+      "name": "Switch2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question & Answer4": {
+      "main": [
+        [
+          {
+            "node": "Create a row5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chat model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI3": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reranker Cohere": {
+      "ai_reranker": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_reranker",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question & Answer1": {
+      "main": [
+        [
+          {
+            "node": "Create a row5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model7": {
+      "main": [
+        [
+          {
+            "node": "Switch2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model8": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch2": {
+      "main": [
+        [
+          {
+            "node": "Message a model8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Question & Answer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Question & Answer4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "657f6672-87f4-41fa-b712-aed0987c6ca3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "qmi04iLDKrtm4EgN",
+  "tags": []
+}

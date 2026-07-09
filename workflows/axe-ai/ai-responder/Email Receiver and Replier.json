@@ -1,0 +1,3268 @@
+{
+  "name": "Email+Attachments Receiver&Replier",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "-from:marblebeeltd@gmail.com -from:marblebee1@gmail.com -from:marblebee2025@gmail.com -from:jack@marblebee.com"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3568,
+        4176
+      ],
+      "id": "e33aea09-5a4c-4f4d-81c9-3c72b6cd59f9",
+      "name": "Gmail of Sales Office",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "-from:marblebeeltd@gmail.com -from:marblebee1@gmail.com -from:marblebee2025@gmail.com -from:jack@marblebee.com"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3568,
+        3824
+      ],
+      "id": "c688ce0d-ab29-4510-af9f-fcce9963012e",
+      "name": "Gmail of Sales Manager",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "-from:marblebeeltd@gmail.com -from:marblebee1@gmail.com -from:marblebee2025@gmail.com -from:jack@marblebee.com"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3568,
+        4000
+      ],
+      "id": "ab96eff6-613e-4283-82df-47cb3064356e",
+      "name": "Gmail of Sales Emily",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "61a46b55-7309-43c3-8a4e-4c4420c4f63e",
+              "leftValue": "={{ $json.thread_length }}",
+              "rightValue": 25000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2656,
+        4096
+      ],
+      "id": "4b49cf95-a5a4-4a1a-b402-25c08460d684",
+      "name": "Check thread size"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "={{ $('Files â Loop One-by-One').item.json.binary_label }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        3248
+      ],
+      "id": "760331b6-a86d-47c8-a8ac-5d35aa8a3f0b",
+      "name": "Extract from pdf"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "={{ $json.document_labels }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        3408
+      ],
+      "id": "bf818e64-cb76-4446-badf-9b4d7111a740",
+      "name": "Extract from csv"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "={{ $json.document_labels }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        3728
+      ],
+      "id": "eb47eada-4cf8-4d16-8257-1462b301fdf1",
+      "name": "Extract from txt"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "binaryPropertyName": "={{ $json.document_labels }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        3568
+      ],
+      "id": "0209626b-e894-40aa-9116-b7503f43db7d",
+      "name": "Extract from ods"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        4416
+      ],
+      "id": "c562cadd-9658-45d1-84e5-a314db25148c",
+      "name": "OpenAI Chat Model",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "={{ $('Generate Query from Input').item.json.output[0].content[0].text }}",
+        "tableName": {
+          "__rl": true,
+          "value": "cases",
+          "mode": "list",
+          "cachedResultName": "cases"
+        },
+        "topK": 1,
+        "includeDocumentMetadata": false,
+        "useReranker": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        4416
+      ],
+      "id": "ccbeaef2-304a-48d6-aacd-d504c5ecb4f5",
+      "name": "Supabase Vector Store",
+      "notesInFlow": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "stripNewLines": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        368,
+        4688
+      ],
+      "id": "d6d7c119-6f80-41e4-b123-1d82562cde0d",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================================\n// COLLECT & MERGE IMPORTANT DATA FROM MULTIPLE NODES\n// ======================================================\n\nconst emailItem = $('Source Data Provider').item;\nconst email = emailItem.json;\nconst emailBinary = emailItem.binary || {};\n\nconst contact = $input.first().json;\nconst ai_output = $('RAG Query Processor').item.json.output || null;\n\n// ======================================================\n// EXTRACT ATTACHMENT METADATA (MULTIPLE FILES SAFE)\n// ======================================================\n\nconst attachmentMetadata = [];\n\nfor (const key in emailBinary) {\n  const file = emailBinary[key];\n\n  attachmentMetadata.push({\n    field_name: key,\n\n    // â File ID (auto-detect different providers)\n    file_id: file.id || file.fileId || file.attachmentId || null,\n\n    file_name: file.fileName || null,\n    mime_type: file.mimeType || null,\n    file_size: file.fileSize || null,\n    file_extension: file.fileExtension || null\n  });\n}\n\n// ======================================================\n// BUILD FINAL OBJECT\n// ======================================================\n\nreturn [\n  {\n    json: {\n      // ð Contact info\n      contact_id: contact.id,\n      client_id: contact.client_id,\n      contact_name: contact.name,\n      contact_email: contact.email,\n      contact_role: contact.role,\n      contact_created_at: contact.created_at,\n\n      // ð§ Email metadata\n      email_id: email.id,\n      thread_id: email.thread_id,\n      message_id: email.message_id,\n      subject: email.subject,\n\n      from_email: email.from_email,\n      from_name: email.from_name,\n      to_email: email.to_email,\n      to_name: email.to_name,\n\n      email_processor: email.email_processor,\n\n      // ð Email content\n      message_text: email.message_text,\n      image_details: email.image_details,\n\n      // ð¤ AI response\n      ai_output,\n      document_text: email.attachment_text_details,\n\n      // ð Attachment metadata\n      attachment: {\n        count: attachmentMetadata.length,\n        metadata: attachmentMetadata\n      }\n    },\n\n    // â Keep all binary files intact\n    binary: emailBinary\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        4112
+      ],
+      "id": "fc8a069d-422f-4983-8950-999d84436013",
+      "name": "COLLECT & MERGE IMPORTANT DATA"
+    },
+    {
+      "parameters": {
+        "tableId": "cases",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('COLLECT & MERGE IMPORTANT DATA').item.json.client_id }}"
+            },
+            {
+              "fieldId": "case_summary",
+              "fieldValue": "={{ $('Iterate Cases â Save').item.json.case_description }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $('Iterate Cases â Save').item.json.status }}"
+            },
+            {
+              "fieldId": "msg_id",
+              "fieldValue": "={{ $('Iterate Cases â Save').item.json.msg_id }}"
+            },
+            {
+              "fieldId": "issue_type",
+              "fieldValue": "={{ $('Iterate Cases â Save').item.json.input_type }}"
+            },
+            {
+              "fieldId": "embedding_vector",
+              "fieldValue": "={{ $json.data[0].embedding }}"
+            },
+            {
+              "fieldId": "case_title",
+              "fieldValue": "={{ $('Format AI Text into Cases objects').item.json.case_title }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        4128
+      ],
+      "id": "60ffb513-a796-4a4a-8dbd-a5d938d893e8",
+      "name": "Create cases",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================================\n// 1ï¸â£ INPUT\n// ======================================================\nconst items = $input.all();\n\nconst MAX_CHARS = 3000;\nconst BATCH_THRESHOLD = 25000;\n\n// ======================================================\n// 2ï¸â£ HTML â TEXT CLEANER\n// ======================================================\nfunction htmlToText(html) {\n  if (!html) return \"\";\n\n  return html\n    .replace(/<script[\\s\\S]*?>[\\s\\S]*?<\\/script>/gi, \"\")\n    .replace(/<style[\\s\\S]*?>[\\s\\S]*?<\\/style>/gi, \"\")\n\n    // remove quoted blocks early noise reduction\n    .replace(/<div class=\"gmail_quote\"[\\s\\S]*?<\\/div>/gi, \"\")\n    .replace(/<blockquote[\\s\\S]*?<\\/blockquote>/gi, \"\")\n\n    .replace(/<br\\s*\\/?>/gi, \"\\n\")\n    .replace(/<\\/p>/gi, \"\\n\")\n    .replace(/<\\/div>/gi, \"\\n\")\n\n    .replace(/<[^>]+>/g, \"\")\n\n    // decode entities\n    .replace(/&nbsp;|&#x202F;|\\u202F|\\u00A0/g, \" \")\n    .replace(/&amp;/g, \"&\")\n    .replace(/&lt;/g, \"<\")\n    .replace(/&gt;/g, \">\")\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n\n    // remove unicode junk\n    .replace(/[\\u00AD\\u200B-\\u200D\\u2060]/g, \"\")\n\n    .replace(/\\n{3,}/g, \"\\n\\n\")\n    .replace(/\\s{2,}/g, \" \")\n    .trim();\n}\n\n// ======================================================\n// 3ï¸â£ ð¨ HTML-FIRST THREAD SPLITTER (FIXED CORE)\n// ======================================================\nfunction splitLatestAndQuoted(html) {\n  if (!html) return { latest: \"\", quoted: \"\" };\n\n  const markers = [\n    /<blockquote[\\s\\S]*?>/i,\n    /On\\s.+wrote:/i,\n    /Le\\s.+a\\sÃ©crit\\s:/i,\n    /-----Original Message-----/i\n  ];\n\n  let splitIndex = html.length;\n\n  for (const m of markers) {\n    const match = html.match(m);\n    if (match?.index !== undefined && match.index < splitIndex) {\n      splitIndex = match.index;\n    }\n  }\n\n  return {\n    latest: html.slice(0, splitIndex),\n    quoted: html.slice(splitIndex)\n  };\n}\n\n// ======================================================\n// 4ï¸â£ SAFE SIGNATURE REMOVAL (FIXED - NO CONTENT LOSS)\n// ======================================================\nfunction removeSignature(text) {\n  const patterns = [\n    /\\n--\\s*\\n/,\n    /\\nkind regards[, ]*/i,\n    /\\nbest regards[, ]*/i,\n    /\\nregards[, ]*/i,\n    /\\nsincerely[, ]*/i\n  ];\n\n  let cutIndex = text.length;\n\n  for (const p of patterns) {\n    const match = text.match(p);\n    if (match?.index !== undefined && match.index < cutIndex) {\n      cutIndex = match.index;\n    }\n  }\n\n  return text.substring(0, cutIndex).trim();\n}\n\n// ======================================================\n// 5ï¸â£ LATEST MESSAGE PIPELINE (FIXED ORDER)\n// ======================================================\nfunction extractLatestMessage(html) {\n  if (!html) return \"\";\n\n  // STEP 1: split BEFORE text conversion (CRITICAL FIX)\n  const { latest } = splitLatestAndQuoted(html);\n\n  // STEP 2: convert only latest block\n  let text = htmlToText(latest);\n\n  // STEP 3: remove quoted lines\n  text = text\n    .split(\"\\n\")\n    .filter(line => !line.trim().startsWith(\">\"))\n    .join(\"\\n\");\n\n  // STEP 4: remove footer noise ONLY\n  text = text\n    .replace(/\\[image:[^\\]]+\\]/gi, \"\")\n    .replace(/\\[.*?\\]/g, \"\")\n    .replace(/cid:.*?\\b/gi, \"\")\n    .replace(/https?:\\/\\/\\S+/gi, \"\")\n    .replace(/<http[^>]+>/gi, \"\");\n\n  // STEP 5: signature removal (safe)\n  text = removeSignature(text);\n\n  return text\n    .replace(/\\n{3,}/g, \"\\n\\n\")\n    .trim();\n}\n\n// ======================================================\n// 6ï¸â£ FULL THREAD CLEANER\n// ======================================================\nfunction cleanThreadHistory(html) {\n  if (!html) return \"\";\n\n  return htmlToText(html)\n    .replace(/\\[.*?\\]/g, \"\")\n    .replace(/<http[^>]+>/gi, \"\")\n    .replace(/https?:\\/\\/\\S+/gi, \"\")\n    .replace(/\\+?\\d[\\d\\s\\-().]{7,}/g, \"\")\n    .replace(/\\n{3,}/g, \"\\n\\n\")\n    .trim();\n}\n\n// ======================================================\n// 7ï¸â£ SPLITTER\n// ======================================================\nfunction splitByChars(text, maxChars) {\n  if (!text) return [];\n\n  const batches = [];\n  let start = 0;\n  let index = 1;\n\n  while (start < text.length) {\n    let end = start + maxChars;\n\n    if (end >= text.length) {\n      batches.push({\n        batch_index: index,\n        text: text.slice(start).trim()\n      });\n      break;\n    }\n\n    let safeEnd = text.lastIndexOf(\" \", end);\n    if (safeEnd <= start) safeEnd = end;\n\n    batches.push({\n      batch_index: index,\n      text: text.slice(start, safeEnd).trim()\n    });\n\n    start = safeEnd + 1;\n    index++;\n  }\n\n  return batches;\n}\n\n// ======================================================\n// 8ï¸â£ ROUTING\n// ======================================================\nfunction getEmailProcessor(toAddress) {\n  if (!toAddress) return \"unknown\";\n\n  const email = toAddress.toLowerCase();\n\n  if (email === \"marblebeeltd@gmail.com\") return \"sales_manager\";\n  if (email === \"marblebee1@gmail.com\") return \"sales_emily\";\n  if (email === \"marblebee2025@gmail.com\") return \"sales_office\";\n  if (email === \"jack@marblebee.com\") return \"outlook\";\n  if (email === \"bilalhaider.tech@gmail.com\") return \"test\";\n\n  return \"unknown\";\n}\n\n// ======================================================\n// 9ï¸â£ MAIN PIPELINE\n// ======================================================\nconst results = [];\n\nfor (const item of items) {\n  const json = item.json || {};\n  const binary = item.binary || {};\n\n  const isOutlook = !!json.toRecipients || !!json.from?.emailAddress;\n\n  const from_email = isOutlook\n    ? json.from?.emailAddress?.address || null\n    : json.from?.value?.[0]?.address || null;\n\n  const from_name = isOutlook\n    ? json.from?.emailAddress?.name || null\n    : json.from?.value?.[0]?.name || null;\n\n  const to_email = isOutlook\n    ? json.toRecipients?.[0]?.emailAddress?.address || null\n    : json.to?.value?.[0]?.address || null;\n\n  const to_name = isOutlook\n    ? json.toRecipients?.[0]?.emailAddress?.name || null\n    : json.to?.value?.[0]?.name || null;\n\n  const htmlContent = isOutlook\n    ? json.body?.content || \"\"\n    : json.textAsHtml || \"\";\n\n  // ======================================================\n  // CORE FIXED PIPELINE\n  // ======================================================\n  const latestMessage = extractLatestMessage(htmlContent);\n  const fullThread = cleanThreadHistory(htmlContent);\n\n  const totalLength = fullThread.length;\n\n  let threadOutput =\n    totalLength > BATCH_THRESHOLD\n      ? splitByChars(fullThread, MAX_CHARS)\n      : fullThread;\n\n  // ======================================================\n  // OUTPUT\n  // ======================================================\n  results.push({\n    json: {\n      id: json.id || null,\n      thread_id: isOutlook ? json.conversationId : json.threadId,\n      message_id: isOutlook ? json.internetMessageId : json.messageId,\n\n      subject: json.subject || null,\n\n      date: isOutlook\n        ? json.receivedDateTime || json.sentDateTime\n        : json.date,\n\n      from_email,\n      from_name,\n      to_email,\n      to_name,\n\n      message_text: latestMessage,\n      thread_history: threadOutput,\n      thread_length: totalLength,\n\n      email_processor: getEmailProcessor(to_email),\n\n      has_attachments:\n        (json.hasAttachments || Object.keys(binary).length > 0) ?? false\n    },\n    binary\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3280,
+        4096
+      ],
+      "id": "3847c8e5-2a42-4afa-aead-a6310dd9795f",
+      "name": "Filter & Batch Processor"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.thread_history"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2688,
+        3712
+      ],
+      "id": "98a9e7dc-079b-4a57-bb72-0a6601c5de3d",
+      "name": "Prepare Batches"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet mergedText = \"\";\n\nfor (const item of items) {\n  const content = item.json.content || {};\n  const parts = content.parts || [];\n\n  for (const part of parts) {\n    if (part.text) {\n      mergedText += part.text + \" \";\n    }\n  }\n}\n\nreturn [\n  {\n    json: {\n      query: $('Filter & Batch Processor').first().json.message_text,\n      merged_text: mergedText.trim()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1520,
+        3600
+      ],
+      "id": "98df943f-5ce6-44ca-962d-a0283a63676c",
+      "name": "Merge Summarized Batches"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get ONLY first item from previous node\nconst firstItem = $(\"Filter & Batch Processor\").first();\n\n// Get summary text from current input (AI node)\nconst summaryText =  $input.first().json.content.parts[0].text || $input.first().json.thread_history ||\"\";\n\n// Add summary to that single item\nfirstItem.json.thread_history = summaryText;\n\n// Return as array (n8n requires array)\nreturn [firstItem];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        3856
+      ],
+      "id": "776a79da-68fb-4faa-9ac0-756017e6500e",
+      "name": "Collect Data for File & RAG"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  \n  const emailData = item.json;\n  const binaryData = item.binary || {};\n  const binaryKeys = Object.keys(binaryData);\n\n  // If no binary files â return single item\n  if (binaryKeys.length === 0) {\n    results.push({\n      json: {\n        ...emailData,\n        binary_label: null,\n        binary_count: 0,\n        file_extension: null\n      }\n    });\n    continue;\n  }\n\n  // If binary files exist â create one item per file\n  for (const key of binaryKeys) {\n    results.push({\n      json: {\n        ...emailData,\n        binary_label: key,               // attachment_0, attachment_1 etc\n        binary_count: binaryKeys.length, // total count of binary files\n        file_extension: binaryData[key]?.fileExtension || null // file extension\n      },\n      binary: {\n        [key]: binaryData[key]           // include only that specific file\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        3712
+      ],
+      "id": "2b50085b-614a-4eef-9a79-0e89c3573117",
+      "name": "Format Files for Iteration"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "750c0667-54e2-41d7-a49d-c65dedd2d295",
+              "leftValue": "={{ $binary }}",
+              "rightValue": "jpg",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1104,
+        4112
+      ],
+      "id": "34a63a9c-433c-4322-af9d-9514e68c66c9",
+      "name": "Check File Exists"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all(); // get input array\n\n// Initialize accumulators\nlet mergedText = '';\nconst attachmentUrls = [];\n\n// Loop over all input items\nfor (const item of items) {\n  const data = item.json;\n\n  if (data.text) {\n    // Add text with double line break for separation\n    mergedText += data.text + '\\n\\n';\n  }\n\n  if (data.attachment_url) {\n    attachmentUrls.push(data.attachment_url);\n  }\n}\n\n// Convert the attachment URLs array into a single string with newlines\nconst attachmentUrlsString = attachmentUrls.join(' \\n \\n ');\n\nreturn [\n  {\n    json: {\n      id: $('Format Files for Iteration').first().json.id,\n      merged_text: mergedText.trim(), // remove trailing spaces/newlines\n      attachment_urls: attachmentUrlsString, // now a string with each URL on a new line\n      lenght:$input.all().length\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        3456
+      ],
+      "id": "1e3cec2a-8fb1-4ea3-b3ff-9896afb62bc6",
+      "name": "Merge Summarized File Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c8203aa8-6d3d-4f46-89da-e3c0272709b8",
+              "leftValue": "={{ $json.lenght }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        3456
+      ],
+      "id": "8fd1c5e9-8d86-43e2-b38f-b7db5834b291",
+      "name": "Data Overflow Summarization"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ljrrflorybbezkhgyqrp.supabase.co//storage/v1/object/n8n/{{$binary[$json.binary_label].fileName}}-{{$now}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{$binary[$json.binary_label].mimeType}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "={{ $json.binary_label }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        3728
+      ],
+      "id": "c1285e74-1c98-4db5-ae55-a31c251b0f95",
+      "name": "Upload File to Supabase storage",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        3712
+      ],
+      "id": "4fa56a6e-414d-42a6-9f14-bb8cd826d29b",
+      "name": "Files â Loop One-by-One"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        4128
+      ],
+      "id": "a7c2c194-5705-4473-9f7c-43e6acdfecb4",
+      "name": "Source Data Provider"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      id: $('Data Overflow Summarization').first().json.id,\n      merged_text: $input.first().json.content.parts[0].text,\n      attachment_urls:  $('Data Overflow Summarization').first().json.attachment_urls// now a string with each URL on a new line\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        3440
+      ],
+      "id": "514bb5da-b98e-45ce-9051-8d10a13bee30",
+      "name": "Format data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the previous node's first item\nconst prevItem = $('Files â Loop One-by-One').item;\n\n// Construct the attachment URL using the Key from the previous item\nconst attachment_url = `https://ljrrflorybbezkhgyqrp.supabase.co/storage/v1/object/${$input.first().json.Key}`;\n\n// Return JSON with the attachment URL and the binary\nreturn [\n  {\n    json: {\n      ...prevItem.json,        // include all original JSON\n      attachment_url           // add the URL field\n    },\n    binary: prevItem.binary   // include the binary files\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        3728
+      ],
+      "id": "75e7b430-2acc-4ffc-a888-a40774440be6",
+      "name": "Create File Link"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.question || $json.response }}",
+        "options": {}
+      },
+      "id": "bc273c14-d1e5-4974-bee9-bd63fa6757dd",
+      "name": "RAG Query Processor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        224,
+        4128
+      ],
+      "typeVersion": 1.8,
+      "retryOnFail": true,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4-0613",
+          "mode": "list",
+          "cachedResultName": "GPT-4-0613"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are a professional Sales Manager specializing in marble, stone, and architectural materials.\n\nLatest customer message (PRIMARY):\n{{ $('Check File Exists').item.json.message_text }}\n\nConversation summary (context only):\n{{ $('Source Data Provider').item.json.thread_history }}\n\nDetected intent:\n{{ $('Code in JavaScript1').item.json.intent }}\n\nAnswer / context:\n{{ $('Code in JavaScript1').item.json.question || $('Code in JavaScript1').item.json.response }}\n\nAttachment summary (if available):\n{{ $('Source Data Provider').item.json.merged_text }}\n\n---\n\nYour task:\n\nWrite a short, clear, and professional email reply.\n\nGuidelines:\n\n- Focus primarily on the latest message.\n- Use the conversation summary only to understand context.\n- Do NOT repeat information already confirmed in the conversation.\n- Do NOT respond to past messages directly.\n- Be polite and concise.\n- Do NOT add unnecessary wording.\n- Do NOT provide suggestions.\n- Focus only on collecting or confirming required quotation details.\n- Use customer-provided details wherever possible.\n- If attachment data is relevant, incorporate it naturally.\n\nIntent handling:\n- If intent is \"query\":\n  â Answer clearly OR ask for missing required details.\n- If intent is \"response\" or \"feedback\":\n  â Acknowledge and confirm clearly.\n\nIf required quotation details are missing (size, material, finish, quantity, location), ask for them clearly.\n\n---\n\nEmail format:\n\nStart with:\nDear {{ $('Check File Exists').item.json.from_name || \"Customer\" }},\n\n\nDo NOT add anything after this line.\n---\n\nOutput ONLY the email body."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        704,
+        4128
+      ],
+      "id": "7b5e0ec5-dbaf-4f04-a82e-7e61e6a725b5",
+      "name": "Format Answer into Email",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "lunawang201@gmail.com",
+        "subject": "Approval required",
+        "message": "=Name:{{ $('Source Data Provider').item.json.from_name }}\nEmail:{{ $('Source Data Provider').item.json.from_email }}\n\n{{ $('Source Data Provider').item.json.message_text }}\n\n{{ $('Source Data Provider').item.json.attachment_urls || ''}}\n",
+        "responseType": "=customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea",
+              "defaultValue": "={{ $json.output[0].content[0].text }}\n\nRegards,\nJack\n\nMarbleBee\nOne-Step Destination for Custom Marble Products - from Sculptures to Slabs\nMarbleBee.com"
+            },
+            {
+              "fieldLabel": "Document",
+              "fieldType": "file"
+            },
+            {
+              "fieldLabel": "Approval",
+              "fieldType": "dropdown",
+              "defaultValue": "true",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Approved"
+                  },
+                  {
+                    "option": "Reject"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        4128
+      ],
+      "id": "0f87113a-3a2e-42c6-a88b-148c957deb44",
+      "name": "Send Verification Email",
+      "webhookId": "df0fa951-a8ca-4da8-b014-68971d5d60ee",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst items = $input.all();\nconst results = [];\n\n// Simple function to strip HTML tags\nfunction stripHtml(html) {\n  if (!html) return '';\n  return html.replace(/<\\/?[^>]+(>|$)/g, ''); // remove all HTML tags\n}\n\nfor (const item of items) {\n  const text = item.json?.text || '';\n  const plainText = stripHtml(text).replace(/\\s+/g, ' ').trim(); // optional: normalize spaces\n\n  results.push({\n    json: {\n      plain_text: plainText\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        3472
+      ],
+      "id": "25f4ea41-81fd-4de6-b850-4fb68b6db0ce",
+      "name": "Format Data for Summarization"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Try first option\nlet text = $input.first().json.content.parts[0].text;\n\n// If first option is undefined, try the second option\nif (!text) {\n  text = $input.first().json?.[0]?.content?.[0]?.text || \"\";\n}\n\n// Get the attachment URL from the other node\nconst attachment_url = $('Create File Link').first().json.attachment_url || null;\n\n// Return combined JSON\nreturn [\n  {\n    json: {\n      text,\n      attachment_url\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        3888
+      ],
+      "id": "b1cf748b-b7c6-47ed-8273-a3ae1ac4992c",
+      "name": "Format & Combine Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ec42a545-59c6-4b22-846b-5992cce702d8",
+              "leftValue": "={{ $json.data.Approval }}",
+              "rightValue": "Approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1664,
+        3856
+      ],
+      "id": "6f9ebde5-a479-43d9-af82-bb31a33571b5",
+      "name": "Is Email Verified?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "13fc5b41-1c04-4fcc-b2a7-e14c81674040",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1952,
+        4128
+      ],
+      "id": "12bd95a7-d545-40c3-bd74-8cd5ed4c3fea",
+      "name": "Contact Exists?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  \n  // Get document array safely\n  const documents = item.json.data?.Document || [];\n  const fileCount = Array.isArray(documents) ? documents.length : 0;\n\n  let fileNamesString = null;\n\n  if (fileCount === 1) {\n    fileNamesString = 'Document';\n  } \n  else if (fileCount > 1) {\n    fileNamesString = documents\n      .map((_, index) => `Document_${index}`)\n      .join(',');\n  }\n\n  // Get message text safely\n  let message = item.json.data?.Message || '';\n\n  // ð¹ Step 1: Normalize wrong line breaks (/n â \\n)\n  message = message.replace(/\\/n/g, '\\n');\n\n  // ð¹ Step 2: Remove old signature starting from \"Regards,\"\n  message = message.replace(/Regards,[\\s\\S]*/i, '').trim();\n\n  // ð¹ Step 3: Convert text to HTML\n  const formattedMessage = message\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/\\n/g, '<br>');\n\n  // ð¹ Step 4: Append clean signature\n  const htmlMessage = `\n    ${formattedMessage}\n    <br><br>\n    Regards,<br>\n    Jack<br><br>\n    <span style=\"color:green;\">\n      <b>MarbleBee</b><br>\n      One-Step Destination for Custom Marble Products - from Sculptures to Slabs\n    </span><br>\n    <a href=\"https://MarbleBee.com\" target=\"_blank\" style=\"color:green; text-decoration:none;\">\n      MarbleBee.com\n    </a>\n  `;\n\n  return {\n    json: {\n      ...item.json,\n      document_count: fileCount,\n      document_labels: fileNamesString,\n      html_message: htmlMessage\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        3680
+      ],
+      "id": "d4570647-c851-4111-9304-68d40c913ada",
+      "name": "Finalize Email for Sending"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Source Data Provider').item.json.email_processor }}",
+                    "rightValue": "sales_manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f66000f6-526a-4455-a371-a78a0c0c53da"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sales_manager"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "212193ad-6b8d-4618-9127-367b00307b51",
+                    "leftValue": "={{ $('Source Data Provider').item.json.email_processor }}",
+                    "rightValue": "sales_emily",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sales_emily"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "69955ed2-373e-4c01-bdc7-7b363626580e",
+                    "leftValue": "={{ $('Source Data Provider').item.json.email_processor }}",
+                    "rightValue": "sales_office",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sales_office"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e5acf99f-b350-4f96-bea6-f87f57e1a5e5",
+                    "leftValue": "={{ $('Source Data Provider').item.json.email_processor }}",
+                    "rightValue": "outlook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "outlook"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2144,
+        3648
+      ],
+      "id": "d25357c5-a95f-4209-930d-49df2b1275cb",
+      "name": "Choose From Email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f479b7e-2ede-4585-85bd-47801bd4366f",
+              "leftValue": "={{ $json.document_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2400,
+        3408
+      ],
+      "id": "22cf1127-8e66-4125-b395-3a5a1151ac25",
+      "name": "Check Attachment Needed"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f479b7e-2ede-4585-85bd-47801bd4366f",
+              "leftValue": "={{ $json.document_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2400,
+        3552
+      ],
+      "id": "b82e0567-f68e-4ba5-bcc9-5120ac6896cd",
+      "name": "Check Attachment Needed1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f479b7e-2ede-4585-85bd-47801bd4366f",
+              "leftValue": "={{ $json.document_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2400,
+        3712
+      ],
+      "id": "07ed279b-0ede-4ede-91db-03f7aae55b53",
+      "name": "Check Attachment Needed2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f479b7e-2ede-4585-85bd-47801bd4366f",
+              "leftValue": "={{ $json.document_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2400,
+        3872
+      ],
+      "id": "ba6eddff-8ab8-417b-9867-491b05954044",
+      "name": "Check Attachment Needed3"
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $('Source Data Provider').item.json.id }}",
+          "mode": "id"
+        },
+        "replyToSenderOnly": true,
+        "message": "={{ $json.html_message }}",
+        "additionalFields": {
+          "attachments": {
+            "attachments": [
+              {
+                "binaryPropertyName": "={{ $json.document_labels }}"
+              }
+            ]
+          },
+          "bodyContentType": "html"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        3888
+      ],
+      "id": "96318539-eafa-422c-9898-da4f1aab6001",
+      "name": "Email + File3",
+      "webhookId": "af5e3bdd-3fcd-4120-ae12-3eaad66faa4a",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "{{ $json.document_labels }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2816,
+        3728
+      ],
+      "id": "4d033443-a88f-4790-a927-97d539c204cb",
+      "name": "Email + File2",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "{{ $json.document_labels }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2928,
+        3568
+      ],
+      "id": "d8dfbaaa-bf0b-4c24-b8c0-c67e643a60fe",
+      "name": "Email + File1",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "={{ $json.document_labels }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2816,
+        3424
+      ],
+      "id": "9e345eda-47e1-42ec-a476-da42ea028318",
+      "name": "Email + File",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are a data structuring assistant for a Retrieval-Augmented Generation (RAG) system.\n\nYou are given the following email conversation:\n\nreceieved:\n{{ $json.message_text }}\nsent reply:\n{{ $json.ai_output }}\n\nYour task:\n1. Identify distinct semantic cases (topics, requests, or issues) in this conversation.\n2. For EACH case:\n   - Generate a concise, descriptive title (5â8 words)\n   - Write a detailed description (factual, self-contained)\n   - Determine the input type automatically based on the content (e.g., \"email\", \"chat\", \"document\")\n   - Set a status for the case (e.g., \"new\", \"in progress\", \"closed\"); default is \"new\" if unclear\n3. Each case should summarize the issue or client intent.\n4. Do NOT include personal emails in the title.\n5. Output STRICTLY valid JSON in this format:\n{\n  \"cases\": [\n    {\n      \"case_title\": \"Short descriptive title\",\n      \"case_description\": \"Detailed factual explanation\",\n      \"input_type\": \"email or chat or document\",\n      \"status\": \"new or in progress or closed\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2480,
+        4112
+      ],
+      "id": "6873d348-ad4b-482f-b06c-5e6505a53c00",
+      "name": "Create Cases from Data",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get AI output\nconst aiOutput = $input.all()[0].json.output;\n\n// Extract the text field from the AI response\nconst text = aiOutput[0]?.content[0]?.text || '{}';\n\nlet cases = [];\ntry {\n    // Parse the string into JSON\n    const parsed = JSON.parse(text);\n    cases = parsed.cases || [];\n} catch (err) {\n    console.error(\"Failed to parse AI output:\", err, text);\n}\n\nreturn cases.map(c => ({\n  json: {\n    case_title: c.case_title,\n    case_description: c.case_description,\n    input_type: c.input_type,\n    status: c.status,\n    embedding_text: c.case_description,  // field to feed into Embeddings node\n    msg_id: $input.first().json.output[0].id\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        4112
+      ],
+      "id": "0b85f8ff-1391-4d52-af11-baaa27474e8e",
+      "name": "Format AI Text into Cases objects"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3056,
+        4112
+      ],
+      "id": "b2000bf2-0123-4067-ba10-bcf8b4779b39",
+      "name": "Iterate Cases â Save"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "=text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ '//title: ' + $json.case_title + ' // Description: ' + $json.embedding_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3328,
+        4128
+      ],
+      "id": "cb05d049-1dfa-4a18-8f4a-39767ab725d4",
+      "name": "Create Case Embeddings",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================================\n// SPLIT INTO TWO OBJECTS + ADD case_id TO BOTH\n// ======================================================\n\n// Case record from input (case_id lives here)\nconst caseRecord = $input.first().json;\nconst case_id = caseRecord.id;\n\n// Source data (email + AI content)\nconst source = $('COLLECT & MERGE IMPORTANT DATA').item.json;\n\n// Base object shared by both\nconst base = {\n  ...source,\n  case_id,                 // â added to both\n  client_id: caseRecord.client_id,\n  case_status: caseRecord.status,\n  issue_type: caseRecord.issue_type,\n  msg_id: caseRecord.msg_id,\n  created_at: caseRecord.created_at\n};\n\n// -------------------------------\n// Object 1 â AI output\n// -------------------------------\nconst aiObject = {\n  ...base,\n  content: source.ai_output ?? null,\n  content_type: \"ai_output\"\n};\n\n// -------------------------------\n// Object 2 â Message text\n// -------------------------------\nconst messageObject = {\n  ...base,\n  content: source.message_text ?? null,\n  content_type: \"message_text\"\n};\n\n// Remove original fields to avoid duplication\ndelete aiObject.ai_output;\ndelete aiObject.message_text;\n\ndelete messageObject.ai_output;\ndelete messageObject.message_text;\n\n// Return TWO output items\nreturn [\n  { json: aiObject },\n  { json: messageObject }\n  \n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        3952
+      ],
+      "id": "fc3adcff-1bdb-47d1-97af-479eae0ee51c",
+      "name": "Format Data for Messages"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "29ed7d47-3c84-4b6e-b18b-27d0d6208786",
+              "leftValue": "={{ $('Format Data for Messages').item.json.attachment.metadata }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3696,
+        3952
+      ],
+      "id": "aef4b927-6260-4d35-ae6c-0642b944f657",
+      "name": "File Existence Condition"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely read values\nconst msg_id = $('Create messages').first()?.json?.id ?? null;\nconst document_text = $('Format Data for Messages').first()?.json?.content ?? null;\nconst case_id = $('Create cases').first()?.json?.id ?? null;\nconst summary = $('Format Data for Messages').first()?.json?.content ?? null;\n\n// Get attachments array safely\nconst attachments =\n  $('Format Data for Messages').first()?.json?.attachment?.metadata ?? [];\n\n// If no attachments â return single item\nif (!attachments.length) {\n  return [\n    {\n      json: {\n        msg_id,\n        case_id,\n        document_text,\n        summary,\n        attachment: null\n      }\n    }\n  ];\n}\n\n// If attachments exist â create one item per attachment\nreturn attachments.map(att => ({\n  json: {\n    msg_id,\n    case_id,\n    document_text,\n    summary,\n    attachment: att\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3952,
+        3936
+      ],
+      "id": "e7826a48-864a-4229-92df-3b356aebb7df",
+      "name": "Get Files to Upload"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4160,
+        3936
+      ],
+      "id": "f9c90781-8a08-44a7-bdd1-89b8636c816a",
+      "name": "Process Files One by One"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "=text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ JSON.stringify($('Process Files One by One').item.json.document_text) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4624,
+        3952
+      ],
+      "id": "36a870ef-2343-4b10-8ae8-703143a4818c",
+      "name": "Create Files Embeddings",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1936,
+        3616
+      ],
+      "id": "93a1cb11-07df-4841-b353-f53e77774e80",
+      "name": "Process Batches Individually"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "id",
+        "joinMode": "keepEverything",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -336,
+        3904
+      ],
+      "id": "1cbde95c-aeeb-4d7c-b2f5-624032e5d873",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "output": "raw",
+        "filters": {
+          "custom": "from/emailAddress/address ne 'celestials070070@outlook.com'"
+        },
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlookTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3568,
+        4352
+      ],
+      "id": "26d56f16-fdc9-4e24-a3e2-7564fd0ce281",
+      "name": "Microsoft Outlook Trigger1",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bb6df1a6-949b-4d07-8fe0-c0a5cd2ea87c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "263cd6c1-7877-4b55-b0fd-782cbee72b10",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "csv",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "csv"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "84eb2a90-ea6e-4943-a848-0b42fe60c2a3",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "ods",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ods"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2ab86686-97be-489e-a026-a053af54b319",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "txt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "txt"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5c835eff-9d64-4467-b70a-d36358a37cd6",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "png",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "png"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "48d30a64-fda6-4380-8ee2-c1f6b0fd8f75",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "jpeg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "jpeg"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "fdf45b8d-c6a1-4fd0-be22-88fa514898f4",
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "jpg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "jpg"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        3648
+      ],
+      "id": "451ccc49-37c0-4e77-9afb-69e94efb892b",
+      "name": "Switch2"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.id }}",
+        "contextWindowLength": 100
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        4416
+      ],
+      "id": "a755aeea-2b07-450b-840e-6b31ef9ed6fe",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "topN": 30
+      },
+      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
+      "typeVersion": 1,
+      "position": [
+        608,
+        4688
+      ],
+      "id": "845564ca-43f8-4d25-bd46-b55dfaf8e11c",
+      "name": "Reranker Cohere1",
+      "credentials": {
+        "cohereApi": {
+          "id": "mhExRzwjXc727hMA",
+          "name": "CohereApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $json.client_id }}"
+            },
+            {
+              "fieldId": "contact_id",
+              "fieldValue": "={{ $json.contact_id }}"
+            },
+            {
+              "fieldId": "from_email",
+              "fieldValue": "={{ $json.from_email }}"
+            },
+            {
+              "fieldId": "to_email",
+              "fieldValue": "={{ $json.to_email }}"
+            },
+            {
+              "fieldId": "message_text",
+              "fieldValue": "={{ $json.content }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        3952
+      ],
+      "id": "6e5e0c1d-a88c-4d31-a392-6b23fdf5d5c3",
+      "name": "Create messages",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "attachments",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $json.msg_id }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $json.attachment.file_id }}"
+            },
+            {
+              "fieldId": "file_type",
+              "fieldValue": "={{ $json.attachment.mime_type }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $json.attachment.file_size }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4416,
+        3952
+      ],
+      "id": "ef4689b5-66f2-440b-b505-af7e12ea19bf",
+      "name": "Create attachments",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "documents",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $('Get Files to Upload').item.json.case_id }}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{ $json.data[0].embedding }}"
+            },
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Get Files to Upload').item.json.msg_id }}"
+            },
+            {
+              "fieldId": "attachment_id",
+              "fieldValue": "={{ $('Create attachments').item.json.id }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $('Get Files to Upload').item.json.summary }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ $json.usage }}"
+            },
+            {
+              "fieldId": "content_type",
+              "fieldValue": "={{ $('Process Files One by One').item.json.attachment.mime_type }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4832,
+        3952
+      ],
+      "id": "440ee825-576f-4d63-9a7b-00d75c0b0ca2",
+      "name": "Create document",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        3392
+      ],
+      "id": "b0309e6e-83f5-4596-b328-d949a82419bb",
+      "name": "Reply to a message",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        3536
+      ],
+      "id": "a2933f73-a4a3-44f4-a9b4-42eac5098f9f",
+      "name": "Reply to a message1",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Source Data Provider').item.json.id }}",
+        "message": "={{ $json.html_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2624,
+        3696
+      ],
+      "id": "040bfa16-8877-4a42-aa8a-0bab9c92da7c",
+      "name": "Reply to a message2",
+      "webhookId": "1741cadc-c762-4c27-86eb-43f4f374001e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $('Source Data Provider').item.json.id }}",
+          "mode": "id"
+        },
+        "replyToSenderOnly": "={{ true }}",
+        "message": "={{ $json.html_message }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        2624,
+        3856
+      ],
+      "id": "e21be708-f46b-42b5-9680-6021d0d5a22d",
+      "name": "Reply to a message3",
+      "webhookId": "af5e3bdd-3fcd-4120-ae12-3eaad66faa4a",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "clients",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('Source Data Provider').item.json.from_name}}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{$('Source Data Provider').item.json.from_name}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        4352
+      ],
+      "id": "4004ccaa-1c82-421c-9c8c-186872242070",
+      "name": "Create a client",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "contacts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('Source Data Provider').item.json.from_name}}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{$('Source Data Provider').item.json.from_email}}"
+            },
+            {
+              "fieldId": "role",
+              "fieldValue": "user"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        4352
+      ],
+      "id": "8c2ea7c7-4980-4088-83ad-f30e3aeadb41",
+      "name": "Create a contact",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "contacts",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('Source Data Provider').item.json.to_email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        4128
+      ],
+      "id": "6db1d3ea-4e56-4bb9-beb3-69ba9e3fc529",
+      "name": "Get a contact",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "2SJbBfPYLuRHG4tm",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Summarize the following conversation history batch in a concise and meaningful way.\n\nFocus only on key context, decisions, and relevant details that help understand the user's intent. Ignore repetitive, irrelevant, or low-value information.\n\nThe summary must:\n\nBe 3 to 5 lines maximum\nBe clear, structured, and to the point\nPreserve important context for follow-up queries\n\nIf the content does not contain meaningful or relevant context, return an empty response.\n\nConversation History Batch:\n{{ $json.text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -1888,
+        3872
+      ],
+      "id": "246078b9-4bfe-4e16-b41c-4efbc83dfd8d",
+      "name": "Message a model",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are given:\n\n1. The latest user query (current message)\n2. The summary of conversation history between the user and the system\n\nYour task:\nDetermine whether the latest query depends on previous conversation context.\n\nInstructions:\n\nStep 1 â Detect dependency:\n- If the user query is clear, complete, and can be answered independently WITHOUT needing past conversation â treat it as NOT a follow-up\n- If the query refers to previous messages (e.g., \"this\", \"that\", \"it\", \"previous\", \"dimensions you suggested\", etc.) or lacks full context â treat it as a follow-up\n\nStep 2 â Output:\n- If NOT a follow-up:\nÂ Â â Return an EMPTY string (\"\")\n\n- If it IS a follow-up:\nÂ Â â Summarize ONLY the relevant parts of the conversation history needed to understand and answer the query\n\nSummarization Rules:\n- Include only relevant context related to the current query\n- Remove irrelevant or repeated information\n- Preserve key details (dimensions, requirements, decisions, preferences, pricing, etc.)\n- Keep it concise but complete\n- Do NOT repeat the user query\n- Do NOT add assumptions or new information\n\nInput:\nUser Query:\n{{ $json.query }}\n\nConversation History:\n{{ $json.merged_text }}\n\nOutput:\nReturn ONLY:\n- A concise relevant summary (if follow-up), OR\n- An empty string \"\" (if not a follow-up)"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -1232,
+        3600
+      ],
+      "id": "0983d86e-eed4-4068-9c76-2eaa8f1ef5d1",
+      "name": "Message a model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=from the text given below, analyze it carefully,get all important data from it and summarize it\n{{ $json.merged_text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -128,
+        3440
+      ],
+      "id": "0908ac99-b353-4ac4-985b-d099ba660280",
+      "name": "Message a model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=from the text given below, analyze it carefully,get all important data from it and summarize it\n{{ $json.plain_text }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        3472
+      ],
+      "id": "d5711dc1-2331-406f-a977-baebec89d164",
+      "name": "Message a model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/nano-banana-pro-preview",
+          "mode": "list",
+          "cachedResultName": "models/nano-banana-pro-preview"
+        },
+        "inputType": "binary",
+        "binaryPropertyName": "={{ $json.binary_label }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        512,
+        3888
+      ],
+      "id": "612bc246-f588-4836-ae22-b98a8eadc5a3",
+      "name": "Analyze an image",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are an AI assistant handling business email conversations.\n\nYour job is to:\n1. Understand the user's intent from the latest message\n2. Use previous conversation context if needed\n3. Decide if the user is asking a question or just responding\n4. Generate a useful output accordingly\n\n---\n\nIntent types:\n- query â user is asking for information\n- feedback â user is giving opinion, update, or status\n- response â user is replying but not asking anything\n- unclear â not enough information\n\n---\n\nInstructions:\n- Use the latest message as primary input\n- Use conversation history only for context\n- If the user is asking something â extract or refine the question\n- If NOT asking â generate a short meaningful response instead\n- Keep outputs concise\n- Do NOT hallucinate\n\n---\n\nLatest message:\n{{ $json.message_text }}\n\nImage/File text (optional):\n{{ $json.merged_text }}\n\nConversation history:\n{{ $json.thread_history }}\n\n---\n\nReturn ONLY valid JSON:\n\n{\n  \"intent\": \"query | feedback | response | unclear\",\n  \"is_question\": true/false,\n  \"question\": \"string or empty\",\n  \"response\": \"string or empty\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        4128
+      ],
+      "id": "44ac0827-454c-4690-8764-639507624f2b",
+      "name": "Generate Query from Input",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are an email classifier for a business automation system.\n\nClassify the email into ONE category:\n\n- important â real human conversation requiring reply (client, supplier, inquiry)\n- marketing â promotions, newsletters, ads, gift guides, product suggestions\n- system â automated platform emails (no-reply, notifications, account messages, delivery, alerts)\n- spam â phishing, suspicious, irrelevant, fake urgency\n\n---\n\nSTRICT RULES:\n\n1. If sender is no-reply, noreply, or automated system â NEVER mark as important\n2. If email contains:\n   - \"unsubscribe\"\n   - \"gift guide\"\n   - \"on sale\"\n   - \"download app\"\n   - \"newsletter\"\n   â classify as marketing\n\n3. If email contains:\n   - system notifications\n   - account alerts\n   - platform messages (Etsy, Shopify, Google, etc.)\n   â classify as system\n\n4. Only mark \"important\" if:\n   - It is a real human conversation\n   - There is a clear request, question, or business discussion\n\n5. Be strict: missing context = NOT important\n\n---\n\nOUTPUT FORMAT (ONLY JSON):\n\n{\n  \"category\": \"important | marketing | system | spam\",\n  \"confidence\": 0-1,\n  \"is_human\": true/false\n}\n\n---\n\nEmail:\n{{ $json.message_text || $json.thread_history }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -3072,
+        4096
+      ],
+      "id": "9a2b7f51-6b65-4732-bb5c-5447ead0345d",
+      "name": "Message a model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let rawText = \"\";\n\n// â Extract text safely from OpenAI response\ntry {\n  rawText = $json.output?.[0]?.content?.[0]?.text || \"\";\n} catch (e) {\n  rawText = \"\";\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  // fallback if parsing fails\n  parsed = {\n    category: \"important\",\n    confidence: 0.5,\n    is_human: true\n  };\n}\n\nconst category = parsed.category || \"important\";\nconst confidence = parsed.confidence ?? 0.5;\nconst isHuman = parsed.is_human ?? true;\n\n// ð¥ CORE DECISION LOGIC\nconst shouldProcess =\n  category === \"important\" ||\n  isHuman === true ||\n  confidence < 0.7;\n\nreturn [{\n  json: {\n    ai_raw: rawText,        // optional debug\n    category,\n    confidence,\n    is_human: isHuman,\n    should_process: shouldProcess\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2960,
+        4336
+      ],
+      "id": "c9781d04-f2de-451d-8c80-1881f4734a84",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "481e269e-752f-4786-b103-5a40cc0867ed",
+              "leftValue": "={{ $json.should_process }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2000,
+        4320
+      ],
+      "id": "947056b1-7473-4b74-9689-3b69172ef347",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ======================================================\n// 1ï¸â£ EXTRACT RAW TEXT FROM AI RESPONSE\n// ======================================================\nlet rawText = \"\";\n\ntry {\n  rawText = $json.output?.[0]?.content?.find(c => c.type === \"output_text\")?.text || \"\";\n} catch (e) {\n  rawText = \"\";\n}\n\n// ======================================================\n// 2ï¸â£ PARSE JSON SAFELY\n// ======================================================\nlet parsed;\n\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  // fallback (important for stability)\n  parsed = {\n    intent: \"unclear\",\n    is_question: false,\n    question: \"\",\n    response: \"\"\n  };\n}\n\n// ======================================================\n// 3ï¸â£ EXTRACT FIELDS\n// ======================================================\nconst intent = parsed.intent || \"unclear\";\nconst isQuestion = parsed.is_question ?? false;\nconst question = parsed.question || \"\";\nconst response = parsed.response || \"\";\n\n// ======================================================\n// 4ï¸â£ RETURN CLEAN OUTPUT\n// ======================================================\nreturn [{\n  json: {\n    id: $input.first().json.output[0].id,\n    type: $input.first().json.output[0].type,\n    status: $input.first().json.output[0].status,\n    role: $input.first().json.output[0].role,\n    // extracted values\n    intent,\n    is_question: isQuestion,\n    question,\n    response,\n\n    // optional debug\n    ai_raw: rawText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        4448
+      ],
+      "id": "752cbcc2-d7e2-4ca3-a21e-6ee00be78106",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -2624,
+        4352
+      ],
+      "id": "56ccdf5d-cb55-406e-bde8-13629d693003",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail of Sales Office": {
+      "main": [
+        [
+          {
+            "node": "Filter & Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail of Sales Manager": {
+      "main": [
+        [
+          {
+            "node": "Filter & Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail of Sales Emily": {
+      "main": [
+        [
+          {
+            "node": "Filter & Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check thread size": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check File Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from pdf": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from csv": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from txt": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from ods": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "RAG Query Processor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "RAG Query Processor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "COLLECT & MERGE IMPORTANT DATA": {
+      "main": [
+        [
+          {
+            "node": "Create Cases from Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create cases": {
+      "main": [
+        [
+          {
+            "node": "Iterate Cases â Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Batch Processor": {
+      "main": [
+        [
+          {
+            "node": "Message a model4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Batches": {
+      "main": [
+        [
+          {
+            "node": "Process Batches Individually",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Summarized Batches": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Data for File & RAG": {
+      "main": [
+        [
+          {
+            "node": "Check File Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Files for Iteration": {
+      "main": [
+        [
+          {
+            "node": "Files â Loop One-by-One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check File Exists": {
+      "main": [
+        [
+          {
+            "node": "Format Files for Iteration",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Source Data Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Summarized File Data": {
+      "main": [
+        [
+          {
+            "node": "Data Overflow Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Overflow Summarization": {
+      "main": [
+        [
+          {
+            "node": "Message a model2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to Supabase storage": {
+      "main": [
+        [
+          {
+            "node": "Create File Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files â Loop One-by-One": {
+      "main": [
+        [
+          {
+            "node": "Merge Summarized File Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upload File to Supabase storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Source Data Provider": {
+      "main": [
+        [
+          {
+            "node": "Generate Query from Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format data": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create File Link": {
+      "main": [
+        [
+          {
+            "node": "Switch2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG Query Processor": {
+      "main": [
+        [
+          {
+            "node": "Format Answer into Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Answer into Email": {
+      "main": [
+        [
+          {
+            "node": "Send Verification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Verification Email": {
+      "main": [
+        [
+          {
+            "node": "Get a contact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Email Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data for Summarization": {
+      "main": [
+        [
+          {
+            "node": "Message a model3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format & Combine Data": {
+      "main": [
+        [
+          {
+            "node": "Files â Loop One-by-One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Email Verified?": {
+      "main": [
+        [
+          {
+            "node": "Finalize Email for Sending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Exists?": {
+      "main": [
+        [
+          {
+            "node": "COLLECT & MERGE IMPORTANT DATA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Email for Sending": {
+      "main": [
+        [
+          {
+            "node": "Choose From Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose From Email": {
+      "main": [
+        [
+          {
+            "node": "Check Attachment Needed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Attachment Needed1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Attachment Needed2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Attachment Needed3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Attachment Needed": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email + File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Attachment Needed1": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email + File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Attachment Needed2": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email + File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Attachment Needed3": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email + File3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Cases from Data": {
+      "main": [
+        [
+          {
+            "node": "Format AI Text into Cases objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Text into Cases objects": {
+      "main": [
+        [
+          {
+            "node": "Iterate Cases â Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Iterate Cases â Save": {
+      "main": [
+        [
+          {
+            "node": "Format Data for Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Case Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Case Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Create cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data for Messages": {
+      "main": [
+        [
+          {
+            "node": "Create messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Existence Condition": {
+      "main": [
+        [
+          {
+            "node": "Get Files to Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Files to Upload": {
+      "main": [
+        [
+          {
+            "node": "Process Files One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Files One by One": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Create attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Files Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Create document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Batches Individually": {
+      "main": [
+        [
+          {
+            "node": "Merge Summarized Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Source Data Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Microsoft Outlook Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Filter & Batch Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch2": {
+      "main": [
+        [
+          {
+            "node": "Extract from pdf",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from csv",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from ods",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from txt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "RAG Query Processor",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reranker Cohere1": {
+      "ai_reranker": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_reranker",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create messages": {
+      "main": [
+        [
+          {
+            "node": "File Existence Condition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create attachments": {
+      "main": [
+        [
+          {
+            "node": "Create Files Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create document": {
+      "main": [
+        [
+          {
+            "node": "Process Files One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a client": {
+      "main": [
+        [
+          {
+            "node": "Create a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a contact": {
+      "main": [
+        [
+          {
+            "node": "COLLECT & MERGE IMPORTANT DATA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a contact": {
+      "main": [
+        [
+          {
+            "node": "Contact Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Process Batches Individually",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Collect Data for File & RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model2": {
+      "main": [
+        [
+          {
+            "node": "Format data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model3": {
+      "main": [
+        [
+          {
+            "node": "Format & Combine Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "Format & Combine Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Query from Input": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Check thread size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "RAG Query Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "6ccdde70-1b38-413d-bba5-0809f0ec4143",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "w4BuBoYcAaPyl13h",
+  "tags": []
+}

@@ -1,0 +1,731 @@
+{
+  "name": "AXE | Outlook Message & Attachment Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "787653f5-85fb-47d6-9bd9-72467647fa94",
+      "typeVersion": 1.1,
+      "name": "Trigger | From Main Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -656,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -368,
+        448
+      ],
+      "id": "3d502202-1109-4c88-a3da-6c0030c7543a",
+      "name": "Loop | Outlook Message IDs"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "bodyPreview",
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        304,
+        480
+      ],
+      "id": "544d9eb5-5dbd-4a97-ad37-6a04577b1523",
+      "name": "Outlook | Fetch Message + Attachments",
+      "webhookId": "c1c331d7-f9bd-4045-b252-f530d984d7e9",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst sheet_id = $('Loop | Outlook Message IDs').item.json.sheet_id;\n// logged-in mailbox email (important for sent/received detection)\nconst MY_EMAIL = 'celestials070070@outlook.com'.toLowerCase();\n\n// helper to strip HTML safely\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const senderEmail =\n    msg.from?.emailAddress?.address || null;\n\n  // receivers\n  const receiverEmails =\n    (msg.toRecipients || []).map(\n      r => r.emailAddress?.address\n    );\n\n  // sent or received\n  const direction =\n    senderEmail?.toLowerCase() === MY_EMAIL\n      ? 'sent'\n      : 'received';\n\n  // body (HTML â text)\n  const message =\n    msg.body?.contentType === 'html'\n      ? stripHtml(msg.body.content)\n      : msg.body?.content || msg.bodyPreview || '';\n\n  return {\n    json: {\n      sheet_id,\n      message,                 // â plain text body\n      senderEmail,\n      receiverEmails,\n      direction,               // â sent | received\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false\n    },\n\n    // â keep binary data if Outlook node adds it later\n    binary: $input.all()[index]?.binary || {}\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        480
+      ],
+      "id": "b87c65b7-0b80-474e-b49f-ae121e1d7215",
+      "name": "Normalize | Extract Message Metadata"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6208f34c-3b3d-4da1-8664-727894a695e8",
+              "leftValue": "={{ $json.hasAttachments }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        304
+      ],
+      "id": "8d2b442e-91bf-4ac3-a680-2b6a80c91e13",
+      "name": "If Has Attachments"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        208
+      ],
+      "id": "cf08bdd6-c691-4482-a5b6-4490175544f5",
+      "name": "Expand | Split Attachments"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.binary_field_name }}",
+        "name": "={{ $binary.attachment_0.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Loop | Outlook Message IDs').item.json.subf5_id }}",
+          "mode": "id"
+        },
+        "options": {
+          "useContentAsIndexableText": true
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1312,
+        208
+      ],
+      "id": "d869725a-8111-4c53-ab8c-c7b0b287273b",
+      "name": "Drive | Upload Attachment",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`webViewLink${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        208
+      ],
+      "id": "ab897b30-b1de-4e9d-9b9a-d49fb18dda61",
+      "name": "Merge | Add Drive Links"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sheet_id",
+              "displayName": "sheet_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "senderEmail",
+              "displayName": "senderEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "receiverEmails",
+              "displayName": "receiverEmails",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hasAttachments",
+              "displayName": "hasAttachments",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1680,
+        480
+      ],
+      "id": "67c36acd-de3f-497c-adb2-f62b78b253bb",
+      "name": "Sheets | Log Message Row",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1984,
+        480
+      ],
+      "id": "170a7e4a-1e94-493c-a67a-22f4d5379526",
+      "name": "Control | Rate Limit Loop",
+      "webhookId": "f2e9b603-f100-43e7-b59d-5461128de583"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// If no items, return nothing\nif (items.length === 0) {\n  return [];\n}\n\n// Take sheet_id from first item\nconst sheet_id = items[0].json.sheet_id;\n\n// Return ONLY ONE object\nreturn [\n  {\n    json: {\n      sheet_id\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        176
+      ],
+      "id": "bc89930a-4372-4976-9aeb-2e93c1482658",
+      "name": "Prepare | Resolve Sheet ID"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "sheet1",
+          "mode": "name"
+        },
+        "toDelete": "columns"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        176
+      ],
+      "id": "8595e5e2-a7aa-4839-89dc-1e46a4104723",
+      "name": "Sheets | Cleanup Template Columns",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a9faf7bb-3c0b-4c04-9eda-facea6dc4f1e",
+              "leftValue": "={{ ($json.index + 1) % 50 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -112,
+        464
+      ],
+      "id": "eb5997c9-b562-421c-b956-6ad550a8607f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        336
+      ],
+      "id": "70aca701-1f4c-4f84-bf2b-adbf1c32ca4f",
+      "name": "Wait",
+      "webhookId": "549bc75e-c6c1-42fc-9b74-f91f510182a9"
+    }
+  ],
+  "pinData": {
+    "Trigger | From Main Workflow": [
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWYDMwLAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 0
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWZGuIVAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 1
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWaQ5kIAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 2
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWcwkZ_AAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 3
+        },
+        "pairedItem": {
+          "item": 3
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWcwsVdAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 4
+        },
+        "pairedItem": {
+          "item": 4
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWcwkaeAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 5
+        },
+        "pairedItem": {
+          "item": 5
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWeFKfKAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 6
+        },
+        "pairedItem": {
+          "item": 6
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWeFJBUAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 7
+        },
+        "pairedItem": {
+          "item": 7
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWeFKfLAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 8
+        },
+        "pairedItem": {
+          "item": 8
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWerHe1AAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 9
+        },
+        "pairedItem": {
+          "item": 9
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEJAACGr1cZC9qAQoqA9Mth-qX2AAWg-7xDAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 10
+        },
+        "pairedItem": {
+          "item": 10
+        }
+      },
+      {
+        "json": {
+          "id": "AAMkADEzYjVkZDQ2LWI0Y2ItNDE4Yi05ZjVmLWUzODk2NTUwMDE2ZgBGAAAAAABr_ZkMdTsORqvA4A9-ql_xBwCGr1cZC9qAQoqA9Mth-qX2AAAAAAEMAACGr1cZC9qAQoqA9Mth-qX2AAWiKercAAA=",
+          "sheet_id": "10TtzFjGPQuL0cAVG0xeXJDRHZnjXm7Xj01JFuFvFe6s",
+          "mainf4_id": "1eUx4RXVYixHmsOz_fVp3KEfFXxFfvflT",
+          "subf5_id": "1hwpoFTSPui3Mg0kxyBolk3Fajh8ZeAih",
+          "index": 11
+        },
+        "pairedItem": {
+          "item": 11
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Trigger | From Main Workflow": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop | Outlook Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Prepare | Resolve Sheet ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Fetch Message + Attachments": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize | Extract Message Metadata": {
+      "main": [
+        [
+          {
+            "node": "If Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Attachments": {
+      "main": [
+        [
+          {
+            "node": "Expand | Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand | Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge | Add Drive Links": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Log Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Log Message Row": {
+      "main": [
+        [
+          {
+            "node": "Control | Rate Limit Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Control | Rate Limit Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare | Resolve Sheet ID": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Cleanup Template Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "516da903-efe9-45c2-ae24-fdce8dccca43",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "hoI4w6wnGkWsuNYGnwxOY",
+  "tags": []
+}
