@@ -1,9 +1,9 @@
 {
-  "name": "Drive → Shopify Image Sync",
+  "name": "Drive \u2192 Shopify Image Sync",
   "nodes": [
     {
       "parameters": {
-        "content": "## Drive → Shopify Image Sync\n\n**Two-phase architecture (no nested loops):**\n\n**Phase 1 — Collect** (Iterate Sheets loop)\n`Load Sheet Names → Iterate Sheets → Read Sheet Rows → Collect to Static Data`\nReads all 19 sheets one at a time using the dedicated Google Sheets node.\nFiltered product rows are accumulated in workflow static data.\n\n**Phase 2 — Process** (Iterate Products loop)\n`Get Collected Products → Iterate Products → Drive lookups → Upload → Update Sheet`\nStarts only after Phase 1 finishes. Processes the flat list of products one at a time.\n\n**Image naming (case-insensitive before extension):**\n- Filename ending `-P` → IMAGE URL1 + Picture column\n- Filename ending `-S` → IMAGE URL2\n- All others → IMAGE URL3, IMAGE URL4 …\n\n**Setup:** Connect Google Drive OAuth2 and Shopify OAuth2 credentials.\nGoogle Sheets (`Template_control`) is already wired.",
+        "content": "## Drive \u2192 Shopify Image Sync\n\n**Two-phase architecture (no nested loops):**\n\n**Phase 1 \u2014 Collect** (Iterate Sheets loop)\n`Load Sheet Names \u2192 Iterate Sheets \u2192 Read Sheet Rows \u2192 Collect to Static Data`\nReads all 19 sheets one at a time using the dedicated Google Sheets node.\nFiltered product rows are accumulated in workflow static data.\n\n**Phase 2 \u2014 Process** (Iterate Products loop)\n`Get Collected Products \u2192 Iterate Products \u2192 Drive lookups \u2192 Upload \u2192 Update Sheet`\nStarts only after Phase 1 finishes. Processes the flat list of products one at a time.\n\n**Image naming (case-insensitive before extension):**\n- Filename ending `-P` \u2192 IMAGE URL1 + Picture column\n- Filename ending `-S` \u2192 IMAGE URL2\n- All others \u2192 IMAGE URL3, IMAGE URL4 \u2026\n\n**Setup:** Connect Google Drive OAuth2 and Shopify OAuth2 credentials.\nGoogle Sheets (`Template_control`) is already wired.",
         "height": 480,
         "width": 620
       },
@@ -28,7 +28,7 @@
         }
       },
       "id": "e7a1b2c3-d4e5-4f60-a1b2-c3d4e5f60a1b",
-      "name": "⏰ Schedule Trigger",
+      "name": "\u23f0 Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -69,7 +69,7 @@
         "options": {}
       },
       "id": "adf3c283-4cfd-4601-a660-75ebddf615b4",
-      "name": "⚙️ Set Config",
+      "name": "\u2699\ufe0f Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
@@ -79,10 +79,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const SHEETS = [\n  'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity',\n  'Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround',\n  'Wall-Coverings','MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
+        "jsCode": "const SHEETS = [\n  'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity',\n  'Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround',\n  'Wall-Coverings','Exterior-Wall-Decoration','MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
       },
       "id": "662819e2-ce7d-44b0-9f4b-0e90374b2bbc",
-      "name": "📋 Load Sheet Names",
+      "name": "\ud83d\udccb Load Sheet Names",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -95,7 +95,7 @@
         "options": {}
       },
       "id": "9d56b04d-06db-444a-896a-3daaeee39a14",
-      "name": "🔁 Iterate Sheets",
+      "name": "\ud83d\udd01 Iterate Sheets",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
@@ -107,7 +107,7 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "={{ $('⚙️ Set Config').first().json.sheetId }}",
+          "value": "={{ $('\u2699\ufe0f Set Config').first().json.sheetId }}",
           "mode": "list",
           "cachedResultName": "Auto sync shopify 2026",
           "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI/edit?usp=drivesdk"
@@ -128,7 +128,7 @@
         }
       },
       "id": "221da52e-2853-411e-8ae3-7ee43f7dc6b8",
-      "name": "📖 Read Sheet Rows",
+      "name": "\ud83d\udcd6 Read Sheet Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "alwaysOutputData": true,
@@ -145,10 +145,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Filter rows that need images and store them in workflow static data.\n// Returns a marker item so the Iterate Sheets loop continues.\nconst sheetName = $('🔁 Iterate Sheets').item.json.sheet_name;\nconst hasValue  = v => v !== undefined && v !== null && String(v).trim() !== '';\n\nconst products = items\n  .map(({ json }) => json)\n  .filter(r => hasValue(r['Product No.']) && !hasValue(r['IMAGE URL1']))\n  .map(r => ({ ...r, sheet_name: sheetName }));\n\nconst sd = $getWorkflowStaticData('global');\nif (!Array.isArray(sd.allProducts)) sd.allProducts = [];\nsd.allProducts.push(...products);\n\nreturn [{ json: { _sheetDone: true, sheet: sheetName, added: products.length } }];"
+        "jsCode": "// Filter rows that need images and store them in workflow static data.\n// Returns a marker item so the Iterate Sheets loop continues.\nconst sheetName = $('\ud83d\udd01 Iterate Sheets').item.json.sheet_name;\nconst hasValue  = v => v !== undefined && v !== null && String(v).trim() !== '';\n\nconst products = items\n  .map(({ json }) => json)\n  .filter(r => hasValue(r['Product No.']) && !hasValue(r['IMAGE URL1']))\n  .map(r => ({ ...r, sheet_name: sheetName }));\n\nconst sd = $getWorkflowStaticData('global');\nif (!Array.isArray(sd.allProducts)) sd.allProducts = [];\nsd.allProducts.push(...products);\n\nreturn [{ json: { _sheetDone: true, sheet: sheetName, added: products.length } }];"
       },
       "id": "3c43ddb9-6889-4697-b417-c5c8ef4fee1d",
-      "name": "📥 Collect to Static Data",
+      "name": "\ud83d\udce5 Collect to Static Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -161,7 +161,7 @@
         "jsCode": "// Phase 1 complete. Read the accumulated product list and reset for next run.\nconst sd = $getWorkflowStaticData('global');\nconst products = Array.isArray(sd.allProducts) ? [...sd.allProducts] : [];\nsd.allProducts = [];\nreturn [{ json: { products, total: products.length } }];"
       },
       "id": "59006f4a-ab0e-4418-9524-e6aa2834641e",
-      "name": "📊 Get Collected Products",
+      "name": "\ud83d\udcca Get Collected Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -194,7 +194,7 @@
         "options": {}
       },
       "id": "b4a89630-9dbf-4eb3-b2c2-391dad660263",
-      "name": "✅ Has Products?",
+      "name": "\u2705 Has Products?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
@@ -207,7 +207,7 @@
         "jsCode": "// Expand the products array into individual items for the loop\nreturn $json.products.map(p => ({ json: p }));"
       },
       "id": "33f7f47f-8fc3-45f7-a797-72a68495e700",
-      "name": "🔀 Split Products",
+      "name": "\ud83d\udd00 Split Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -220,7 +220,7 @@
         "options": {}
       },
       "id": "45650e64-e169-407c-9c8c-6cffc17f2c09",
-      "name": "🔁 Iterate Products",
+      "name": "\ud83d\udd01 Iterate Products",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
@@ -236,14 +236,14 @@
         "filter": {
           "folderId": {
             "__rl": true,
-            "value": "={{ $('⚙️ Set Config').first().json.rootDriveFolderId }}",
+            "value": "={{ $('\u2699\ufe0f Set Config').first().json.rootDriveFolderId }}",
             "mode": "id"
           }
         },
         "options": {}
       },
       "id": "c9de7c79-677a-42a0-8edd-5c5dc8627795",
-      "name": "📂 Find Category Folder",
+      "name": "\ud83d\udcc2 Find Category Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -260,7 +260,7 @@
     {
       "parameters": {
         "resource": "fileFolder",
-        "queryString": "={{ $('🔁 Iterate Products').item.json['Product No.'] }}",
+        "queryString": "={{ $('\ud83d\udd01 Iterate Products').item.json['Product No.'] }}",
         "limit": 5,
         "filter": {
           "folderId": {
@@ -272,7 +272,7 @@
         "options": {}
       },
       "id": "8a4a7f95-8f66-492d-b25d-9bd0ea64927f",
-      "name": "📁 Find Product Folder",
+      "name": "\ud83d\udcc1 Find Product Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -301,7 +301,7 @@
         "options": {}
       },
       "id": "4bd4bba9-0a0b-409e-b20c-bc350ec48ec9",
-      "name": "📁 Find LOGO Folder",
+      "name": "\ud83d\udcc1 Find LOGO Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -317,10 +317,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst logoFolder = items.find(\n  item => /logo/i.test(item.json.name || '')\n);\nif (!logoFolder) {\n  throw new Error(`No LOGO subfolder found for product: ${$('🔁 Iterate Products').item.json['Product No.']}`);\n}\nreturn [{ json: { id: logoFolder.json.id, name: logoFolder.json.name } }];"
+        "jsCode": "const items = $input.all();\nconst logoFolder = items.find(\n  item => /logo/i.test(item.json.name || '')\n);\nif (!logoFolder) {\n  throw new Error(`No LOGO subfolder found for product: ${$('\ud83d\udd01 Iterate Products').item.json['Product No.']}`);\n}\nreturn [{ json: { id: logoFolder.json.id, name: logoFolder.json.name } }];"
       },
       "id": "531b19a1-70aa-4aa4-8553-f4d31728fb0f",
-      "name": "📂 Get Image Folder",
+      "name": "\ud83d\udcc2 Get Image Folder",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -342,7 +342,7 @@
         "options": {}
       },
       "id": "6c684ce0-ad89-4aff-a2f8-8a5b619d1c11",
-      "name": "🗂️ List Product Files",
+      "name": "\ud83d\uddc2\ufe0f List Product Files",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -358,10 +358,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || ''\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\nconst ordered = [];\nif (primary)   ordered.push({ id: primary.id,   fileName: primary.name,   mimeType: mime(primary.name),   slot: 'IMAGE URL1', role: 'primary'   });\nif (secondary) ordered.push({ id: secondary.id, fileName: secondary.name, mimeType: mime(secondary.name), slot: 'IMAGE URL2', role: 'secondary' });\nothers.forEach((f, i) => ordered.push({ id: f.id, fileName: f.name, mimeType: mime(f.name), slot: `IMAGE URL${i + 3}`, role: 'other' }));\n\nreturn [{ json: { images: ordered, hasImages: primary !== null, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
+        "jsCode": "const productNo = $('\ud83d\udd01 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('\ud83d\udd01 Iterate Products').item.json.row_number;\nconst sheetName  = $('\ud83d\udd01 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file \u2014 collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || ''\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\nconst ordered = [];\nif (primary)   ordered.push({ id: primary.id,   fileName: primary.name,   mimeType: mime(primary.name),   slot: 'IMAGE URL1', role: 'primary'   });\nif (secondary) ordered.push({ id: secondary.id, fileName: secondary.name, mimeType: mime(secondary.name), slot: 'IMAGE URL2', role: 'secondary' });\nothers.forEach((f, i) => ordered.push({ id: f.id, fileName: f.name, mimeType: mime(f.name), slot: `IMAGE URL${i + 3}`, role: 'other' }));\n\nreturn [{ json: { images: ordered, hasImages: primary !== null, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
       },
       "id": "14e9f56e-eb85-495f-a36f-85f071f59f77",
-      "name": "🏷️ Classify Images",
+      "name": "\ud83c\udff7\ufe0f Classify Images",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -394,7 +394,7 @@
         "options": {}
       },
       "id": "90452f0d-3b68-40e4-9c57-060f8017e470",
-      "name": "🖼️ Has Images?",
+      "name": "\ud83d\uddbc\ufe0f Has Images?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
@@ -407,7 +407,7 @@
         "jsCode": "const { images, row_number, sheet_name, product_no } = $json;\nreturn images.map(img => ({ json: {\n  photoId:    img.id,\n  fileName:   img.fileName,\n  mimeType:   img.mimeType,\n  slot:       img.slot,\n  role:       img.role,\n  row_number,\n  sheet_name,\n  product_no\n} }));"
       },
       "id": "57913c42-177e-4cfc-a6e3-75cc8f43425a",
-      "name": "🔀 Split Per Image",
+      "name": "\ud83d\udd00 Split Per Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -418,7 +418,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "url": "={{ 'https://' + $('\u2699\ufe0f Set Config').first().json.shop + '/admin/api/' + $('\u2699\ufe0f Set Config').first().json.apiVersion + '/graphql.json' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "shopifyOAuth2Api",
         "sendBody": true,
@@ -427,7 +427,7 @@
         "options": {}
       },
       "id": "53597bbb-e72b-4822-96c0-88fa441cee48",
-      "name": "🎯 Staged Create",
+      "name": "\ud83c\udfaf Staged Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -446,15 +446,15 @@
         "operation": "download",
         "fileId": {
           "__rl": true,
-          "value": "={{ $('🔀 Split Per Image').item.json.photoId }}",
+          "value": "={{ $('\ud83d\udd00 Split Per Image').item.json.photoId }}",
           "mode": "id"
         },
         "options": {
-          "fileName": "={{ $('🔀 Split Per Image').item.json.fileName }}"
+          "fileName": "={{ $('\ud83d\udd00 Split Per Image').item.json.fileName }}"
         }
       },
       "id": "f4a24db2-8429-4d95-9eae-c44f050360ac",
-      "name": "⬇️ Download from Drive",
+      "name": "\u2b07\ufe0f Download from Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -471,46 +471,46 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].url }}",
+        "url": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].url }}",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
           "parameters": [
             {
               "name": "Content-Type",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[0].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[0].value }}"
             },
             {
               "name": "success_action_status",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[1].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[1].value }}"
             },
             {
               "name": "acl",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[2].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[2].value }}"
             },
             {
               "name": "key",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[3].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[3].value }}"
             },
             {
               "name": "x-goog-date",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[4].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[4].value }}"
             },
             {
               "name": "x-goog-credential",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[5].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[5].value }}"
             },
             {
               "name": "x-goog-algorithm",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[6].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[6].value }}"
             },
             {
               "name": "x-goog-signature",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[7].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[7].value }}"
             },
             {
               "name": "policy",
-              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[8].value }}"
+              "value": "={{ $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[8].value }}"
             },
             {
               "parameterType": "formBinaryData",
@@ -522,7 +522,7 @@
         "options": {}
       },
       "id": "8b46986d-5316-4d33-a982-fa89dafe968f",
-      "name": "☁️ Upload to Storage",
+      "name": "\u2601\ufe0f Upload to Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
@@ -533,16 +533,16 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "url": "={{ 'https://' + $('\u2699\ufe0f Set Config').first().json.shop + '/admin/api/' + $('\u2699\ufe0f Set Config').first().json.apiVersion + '/graphql.json' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "shopifyOAuth2Api",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('🔀 Split Per Image').item.json.slot, contentType: 'IMAGE', originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('\ud83d\udd00 Split Per Image').item.json.slot, contentType: 'IMAGE', originalSource: $('\ud83c\udfaf Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
         "options": {}
       },
       "id": "a03c824d-869d-4698-885a-633725ec23e9",
-      "name": "📎 File Create",
+      "name": "\ud83d\udcce File Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -558,10 +558,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const allItems   = $input.all();\nconst splitItems = $('🔀 Split Per Image').all();\nconst uploadedFiles = [];\nfor (let i = 0; i < allItems.length; i++) {\n  const fc   = allItems[i].json?.data?.fileCreate;\n  const slot = splitItems[i]?.json?.slot;\n  if (fc?.files?.[0]?.id && slot) uploadedFiles.push({ id: fc.files[0].id, slot });\n}\nconst first = splitItems[0]?.json || {};\nreturn [{ json: { uploadedFiles, row_number: first.row_number, sheet_name: first.sheet_name } }];"
+        "jsCode": "const allItems   = $input.all();\nconst splitItems = $('\ud83d\udd00 Split Per Image').all();\nconst uploadedFiles = [];\nfor (let i = 0; i < allItems.length; i++) {\n  const fc   = allItems[i].json?.data?.fileCreate;\n  const slot = splitItems[i]?.json?.slot;\n  if (fc?.files?.[0]?.id && slot) uploadedFiles.push({ id: fc.files[0].id, slot });\n}\nconst first = splitItems[0]?.json || {};\nreturn [{ json: { uploadedFiles, row_number: first.row_number, sheet_name: first.sheet_name } }];"
       },
       "id": "58645a6f-4d44-4f3b-8eb7-ecd0d409e0f0",
-      "name": "📦 Aggregate Files",
+      "name": "\ud83d\udce6 Aggregate Files",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -574,7 +574,7 @@
         "amount": 15
       },
       "id": "33cdd6e8-cb8a-4685-9538-62eb57421c04",
-      "name": "⏳ Wait 15s",
+      "name": "\u23f3 Wait 15s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
@@ -586,7 +586,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "url": "={{ 'https://' + $('\u2699\ufe0f Set Config').first().json.shop + '/admin/api/' + $('\u2699\ufe0f Set Config').first().json.apiVersion + '/graphql.json' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "shopifyOAuth2Api",
         "sendBody": true,
@@ -595,7 +595,7 @@
         "options": {}
       },
       "id": "928903ae-b4f0-4528-bae5-3dfcbd8b6602",
-      "name": "🔗 Get CDN URLs",
+      "name": "\ud83d\udd17 Get CDN URLs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -611,10 +611,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const nodes  = $json.data?.nodes || [];\nconst { uploadedFiles, row_number, sheet_name } = $('📦 Aggregate Files').first().json;\n\nconst idToUrl = {};\nfor (const node of nodes) {\n  // GenericFile exposes url directly; MediaImage exposes image.url\n  const url = node?.url || node?.image?.url;\n  if (url) idToUrl[node.id] = url;\n}\n\nconst update = { row_number, sheet_name };\nfor (const { id, slot } of uploadedFiles) {\n  const url = idToUrl[id];\n  if (url) {\n    update[slot] = url;\n    if (slot === 'IMAGE URL1') update['Picture'] = '=IMAGE(\"' + url + '\",1)';\n  }\n}\nreturn [{ json: update }];"
+        "jsCode": "const nodes  = $json.data?.nodes || [];\nconst { uploadedFiles, row_number, sheet_name } = $('\ud83d\udce6 Aggregate Files').first().json;\n\nconst idToUrl = {};\nfor (const node of nodes) {\n  // GenericFile exposes url directly; MediaImage exposes image.url\n  const url = node?.url || node?.image?.url;\n  if (url) idToUrl[node.id] = url;\n}\n\nconst update = { row_number, sheet_name };\nfor (const { id, slot } of uploadedFiles) {\n  const url = idToUrl[id];\n  if (url) {\n    update[slot] = url;\n    if (slot === 'IMAGE URL1') update['Picture'] = '=IMAGE(\"' + url + '\",1)';\n  }\n}\nreturn [{ json: update }];"
       },
       "id": "b24b8d03-ec25-486f-8395-15e1e63d142e",
-      "name": "🏗️ Build Sheet Update",
+      "name": "\ud83c\udfd7\ufe0f Build Sheet Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -790,7 +790,7 @@
         }
       },
       "id": "41c9641a-39e0-4017-b50a-a1f034bdf743",
-      "name": "💾 Update Sheet",
+      "name": "\ud83d\udcbe Update Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
@@ -807,7 +807,7 @@
     {
       "parameters": {},
       "id": "d0c71a69-33c2-4825-8d36-241dd0292173",
-      "name": "✅ All Done",
+      "name": "\u2705 All Done",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
@@ -818,325 +818,325 @@
   ],
   "pinData": {},
   "connections": {
-    "⏰ Schedule Trigger": {
+    "\u23f0 Schedule Trigger": {
       "main": [
         [
           {
-            "node": "⚙️ Set Config",
+            "node": "\u2699\ufe0f Set Config",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "⚙️ Set Config": {
+    "\u2699\ufe0f Set Config": {
       "main": [
         [
           {
-            "node": "📋 Load Sheet Names",
+            "node": "\ud83d\udccb Load Sheet Names",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📋 Load Sheet Names": {
+    "\ud83d\udccb Load Sheet Names": {
       "main": [
         [
           {
-            "node": "🔁 Iterate Sheets",
+            "node": "\ud83d\udd01 Iterate Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔁 Iterate Sheets": {
+    "\ud83d\udd01 Iterate Sheets": {
       "main": [
         [
           {
-            "node": "📊 Get Collected Products",
+            "node": "\ud83d\udcca Get Collected Products",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "📖 Read Sheet Rows",
+            "node": "\ud83d\udcd6 Read Sheet Rows",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📖 Read Sheet Rows": {
+    "\ud83d\udcd6 Read Sheet Rows": {
       "main": [
         [
           {
-            "node": "📥 Collect to Static Data",
+            "node": "\ud83d\udce5 Collect to Static Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📥 Collect to Static Data": {
+    "\ud83d\udce5 Collect to Static Data": {
       "main": [
         [
           {
-            "node": "🔁 Iterate Sheets",
+            "node": "\ud83d\udd01 Iterate Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📊 Get Collected Products": {
+    "\ud83d\udcca Get Collected Products": {
       "main": [
         [
           {
-            "node": "✅ Has Products?",
+            "node": "\u2705 Has Products?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "✅ Has Products?": {
+    "\u2705 Has Products?": {
       "main": [
         [
           {
-            "node": "🔀 Split Products",
+            "node": "\ud83d\udd00 Split Products",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "✅ All Done",
+            "node": "\u2705 All Done",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔀 Split Products": {
+    "\ud83d\udd00 Split Products": {
       "main": [
         [
           {
-            "node": "🔁 Iterate Products",
+            "node": "\ud83d\udd01 Iterate Products",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔁 Iterate Products": {
+    "\ud83d\udd01 Iterate Products": {
       "main": [
         [
           {
-            "node": "✅ All Done",
+            "node": "\u2705 All Done",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "📂 Find Category Folder",
+            "node": "\ud83d\udcc2 Find Category Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📂 Find Category Folder": {
+    "\ud83d\udcc2 Find Category Folder": {
       "main": [
         [
           {
-            "node": "📁 Find Product Folder",
+            "node": "\ud83d\udcc1 Find Product Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📁 Find Product Folder": {
+    "\ud83d\udcc1 Find Product Folder": {
       "main": [
         [
           {
-            "node": "📁 Find LOGO Folder",
+            "node": "\ud83d\udcc1 Find LOGO Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📁 Find LOGO Folder": {
+    "\ud83d\udcc1 Find LOGO Folder": {
       "main": [
         [
           {
-            "node": "📂 Get Image Folder",
+            "node": "\ud83d\udcc2 Get Image Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📂 Get Image Folder": {
+    "\ud83d\udcc2 Get Image Folder": {
       "main": [
         [
           {
-            "node": "🗂️ List Product Files",
+            "node": "\ud83d\uddc2\ufe0f List Product Files",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🗂️ List Product Files": {
+    "\ud83d\uddc2\ufe0f List Product Files": {
       "main": [
         [
           {
-            "node": "🏷️ Classify Images",
+            "node": "\ud83c\udff7\ufe0f Classify Images",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🏷️ Classify Images": {
+    "\ud83c\udff7\ufe0f Classify Images": {
       "main": [
         [
           {
-            "node": "🖼️ Has Images?",
+            "node": "\ud83d\uddbc\ufe0f Has Images?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🖼️ Has Images?": {
+    "\ud83d\uddbc\ufe0f Has Images?": {
       "main": [
         [
           {
-            "node": "🔀 Split Per Image",
+            "node": "\ud83d\udd00 Split Per Image",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "🔁 Iterate Products",
+            "node": "\ud83d\udd01 Iterate Products",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔀 Split Per Image": {
+    "\ud83d\udd00 Split Per Image": {
       "main": [
         [
           {
-            "node": "🎯 Staged Create",
+            "node": "\ud83c\udfaf Staged Create",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📎 File Create": {
+    "\ud83d\udcce File Create": {
       "main": [
         [
           {
-            "node": "📦 Aggregate Files",
+            "node": "\ud83d\udce6 Aggregate Files",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📦 Aggregate Files": {
+    "\ud83d\udce6 Aggregate Files": {
       "main": [
         [
           {
-            "node": "⏳ Wait 15s",
+            "node": "\u23f3 Wait 15s",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "⏳ Wait 15s": {
+    "\u23f3 Wait 15s": {
       "main": [
         [
           {
-            "node": "🔗 Get CDN URLs",
+            "node": "\ud83d\udd17 Get CDN URLs",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔗 Get CDN URLs": {
+    "\ud83d\udd17 Get CDN URLs": {
       "main": [
         [
           {
-            "node": "🏗️ Build Sheet Update",
+            "node": "\ud83c\udfd7\ufe0f Build Sheet Update",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🏗️ Build Sheet Update": {
+    "\ud83c\udfd7\ufe0f Build Sheet Update": {
       "main": [
         [
           {
-            "node": "💾 Update Sheet",
+            "node": "\ud83d\udcbe Update Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "💾 Update Sheet": {
+    "\ud83d\udcbe Update Sheet": {
       "main": [
         [
           {
-            "node": "🔁 Iterate Products",
+            "node": "\ud83d\udd01 Iterate Products",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🎯 Staged Create": {
+    "\ud83c\udfaf Staged Create": {
       "main": [
         [
           {
-            "node": "⬇️ Download from Drive",
+            "node": "\u2b07\ufe0f Download from Drive",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "⬇️ Download from Drive": {
+    "\u2b07\ufe0f Download from Drive": {
       "main": [
         [
           {
-            "node": "☁️ Upload to Storage",
+            "node": "\u2601\ufe0f Upload to Storage",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "☁️ Upload to Storage": {
+    "\u2601\ufe0f Upload to Storage": {
       "main": [
         [
           {
-            "node": "📎 File Create",
+            "node": "\ud83d\udcce File Create",
             "type": "main",
             "index": 0
           }

@@ -32,11 +32,11 @@
         2496
       ],
       "id": "0e6f4765-be9f-43e4-a15c-f6b1df347552",
-      "name": "⏰ Daily Trigger at 9 AM"
+      "name": "â° Daily Trigger at 9 AM"
     },
     {
       "parameters": {
-        "jsCode": "const GOOGLE_SHEETS = [\n// 'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab', '2026Instock', 'DoorSurround', 'Wall-Coverings', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion'\n'Test data'  // Uncomment for testing\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
+        "jsCode": "const GOOGLE_SHEETS = [\n'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab', '2026Instock', 'DoorSurround', 'Wall-Coverings', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion', 'Exterior-Wall-Decoration'\n// 'Test data'  // Uncomment for testing\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -45,7 +45,7 @@
         2496
       ],
       "id": "3810fef6-89f0-4ead-bcc9-f00ebb5258b0",
-      "name": "📋 Get Sheet Names"
+      "name": "ð Get Sheet Names"
     },
     {
       "parameters": {
@@ -58,7 +58,7 @@
         2496
       ],
       "id": "424f85da-da1a-4c8b-a8b4-e5a10135e37e",
-      "name": "🔄 Loop Through Sheets"
+      "name": "ð Loop Through Sheets"
     },
     {
       "parameters": {
@@ -89,7 +89,7 @@
         2768
       ],
       "id": "e72fe3b1-ec3a-414c-b5d9-f9a73c562c94",
-      "name": "📖 Read Sheet Data",
+      "name": "ð Read Sheet Data",
       "alwaysOutputData": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -100,7 +100,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  MAX_CREATE_ITEMS: 3,\n  VENDOR: 'Marblebee',\n  WEIGHT_UNIT: 'kg',\n  DECIMAL_PLACES: 2,\n\n  IMAGE_KEYS: [\n    'IMAGE URL1',\n    'IMAGE URL2',\n    'IMAGE URL3',\n    'IMAGE URL4',\n    'IMAGE URL5',\n    'IMAGE URL6',\n    'IMAGE URL7',\n    'IMAGE URL8',\n    'IMAGE URL9',\n    'IMAGE URL10'\n  ],\n\n  SHEET_NAME: $('🔄 Loop Through Sheets').item.json.sheet_name\n};\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst safeRound = (value, decimals = CONFIG.DECIMAL_PLACES) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? Number(num.toFixed(decimals))\n    : '';\n};\n\nconst cleanWeight = (weightRaw) => {\n  const cleaned = String(weightRaw ?? '0').replace(/[^\\d.]/g, '');\n  return cleaned ? parseFloat(cleaned) : 0.0;\n};\n\nconst safeNumeric = (value, defaultValue = 0) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? num\n    : defaultValue;\n};\n\nconst hasValue = (value) =>\n  value !== undefined &&\n  value !== null &&\n  String(value).trim() !== '';\n\n\n// ============================================\n// SEO HELPERS\n// ============================================\n\n// Shopify handle formatter\nconst slugify = (text = '') =>\n  String(text)\n    .toLowerCase()\n    .trim()\n    .replace(/&/g, 'and')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n\n\n// URL HANDLE RULE:\n// \"{keyword}-{material}-{product-number}\"\nconst buildHandle = (data) => {\n  const keyword = data['Keywords (Luna)'] ?? '';\n  const material = data.Material ?? '';\n  const productNumber = data['Product No.'] ?? '';\n\n  return slugify(\n    `${keyword}-${material}-${productNumber}`\n  );\n};\n\n\n// IMAGE ALT RULE:\n// \"{keyword} in {material} - Image {index}\"\nconst buildAltText = (data, index) => {\n  const keyword = data['Keywords (Luna)'].trim() ?? 'Marble Product';\n  const material = data.Material.trim() ?? 'Natural Marble';\n\n  return `${keyword} in ${material} - Image ${index}`;\n};\n\n\n// Build Shopify images with alt text\nconst extractImages = (data, keys) =>\n  keys\n    .filter(key => hasValue(data[key]))\n    .map((key, index) => ({\n      src: data[key],\n      alt: buildAltText(data, index + 1)\n    }));\n\n\n// ============================================\n// VALIDATION & OPERATION TYPE\n// ============================================\n\nconst isReadyToPost = (data) => {\n  const value = String(data?.Ready_to_post ?? '')\n    .trim()\n    .toLowerCase();\n\n  return value === 'yes' || value === 'true';\n};\n\nconst hasTitle = (data) =>\n  hasValue(data?.Title_Shopify);\n\nconst getOperationType = (data) => {\n\n  if (!isReadyToPost(data) || !hasTitle(data)) {\n    return null;\n  }\n\n  const hasFieldsToUpdate = hasValue(data.Fields_to_update);\n  const hasPublicUrl = hasValue(data.Shopify_Product_URL);\n  const hasAdminUrl = hasValue(data.Shopify_Update_product_URL);\n\n  // UPDATE\n  if (\n    hasFieldsToUpdate &&\n    hasPublicUrl &&\n    hasAdminUrl\n  ) {\n    return 'update';\n  }\n\n  // CREATE\n  if (\n    !hasFieldsToUpdate &&\n    !hasPublicUrl &&\n    !hasAdminUrl\n  ) {\n    return 'create';\n  }\n\n  return 'mark false';\n};\n\n\n// ============================================\n// PRODUCT BUILDER\n// ============================================\n\nconst buildProduct = (data, operation) => {\n\n  const weight = safeRound(\n    cleanWeight(data['Weight KG'])\n  );\n\n  const price = safeNumeric(\n    data['Price IN USD $ (Jack)']\n  );\n\n  // ============================================\n  // DIMENSIONS\n  // ============================================\n\n  const isFireplace =\n    CONFIG.SHEET_NAME === 'Fireplace'  ||\n    CONFIG.SHEET_NAME === 'Test data';\n\n  const isWallCoverings =\n    CONFIG.SHEET_NAME === 'Wall-Coverings'\n\n  const isMarbleSlab =\n    CONFIG.SHEET_NAME === 'MarbleSlab';\n\n  const isMarbleRangeHood =\n    CONFIG.SHEET_NAME === 'MarbleRangeHood';\n\n  const isMoulding =\n    CONFIG.SHEET_NAME === 'Moulding';\n\n  const isStoneMosaicTile =\n    CONFIG.SHEET_NAME === 'StoneMosaicTile';\n\n  const isMarbleMedallion =\n    CONFIG.SHEET_NAME === 'MarbleMedallion';\n\n  const dimensions = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isFireplace || isMarbleRangeHood\n    ? {\n        d_cm: data['Depth CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        d_in: safeRound(data['Depth Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      }\n    : isMoulding\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      };\n\n  // ============================================\n  // Opening Size For Fireplace\n  // ============================================\n\n  const opening_size = isFireplace\n    ? {\n        opening_w_cm: data['Width_CM'] ?? '',\n        opening_h_cm: data['Height_CM'] ?? '',\n\n        opening_w_in: safeRound(data['Width_Inch']),\n        opening_h_in: safeRound(data['Height_Inch'])\n      }\n    : {}\n\n  // ============================================\n  // SEO\n  // ============================================\n\n  const seoTitle =\n    data.Shopify_SEO_Title.trim() ??\n    data.Title_Shopify.trim() ??\n    '';\n\n  const seoDescription =\n    data.Shopify_SEO_Description.trim() ??\n    '';\n\n  const handle = buildHandle(data);\n\n  // ============================================\n  // RETURN PRODUCT\n  // ============================================\n\n  return {\n\n    // Metadata\n    row_number: data.row_number ?? 0,\n    sheet_name: CONFIG.SHEET_NAME ?? '',\n    updating_fields: data.Fields_to_update ?? '',\n    operation,\n\n    // URLs\n    public_shopify_url:\n      data.Shopify_Product_URL ?? '',\n\n    admin_shopify_url:\n      data.Shopify_Update_product_URL ?? '',\n\n    // Dimensions\n    ...dimensions,\n    ...opening_size,\n\n    // Shopify Product\n    title: data.Title_Shopify.trim() ?? '',\n    description: data.Description_Shopify.trim() ?? '',\n\n    material: data.Material.trim() ?? '',\n    product_number: data['Product No.'].trim() ?? '',\n\n    weight,\n\n    drain_diameter:\n      data.Drain_Diameter ?? '',\n\n    radius: data.Radius ?? '',\n    surface: data.Surface ?? '',\n\n    signature:\n      data.Signature ?? '',\n\n    // SEO\n\n    seo_title: seoTitle,\n    seo_description: seoDescription,\n    handle,\n\n    // Custom buttons\n    material_catalog_url:\n      data['Material Catalog URL'].trim() ?? '',\n\n    care_guide_url:\n      data['Care Guide URL'].trim() ?? '',\n\n    cad_drawing_url:\n      data['CAD Drawing URL'].trim() ?? '',\n\n    // Etsy\n    title_Etsy:\n      data.Title_Etsy ?? '',\n\n    description_Etsy:\n      data.Description_Etsy ?? '',\n\n    tags_Etsy:\n      data.Tags_Etsy ?? '',\n\n    who_made:\n      data.who_made ?? '',\n\n    when_made:\n      data.when_made ?? '',\n\n    product_type_Etsy:\n      data.Etsy_type ?? '',\n\n    quantity_Etsy:\n      data.Etsy_quantity ?? 0,\n\n    // Shopify\n    vendor: CONFIG.VENDOR,\n\n    product_type:\n      data.Product_Type.trim() ?? 'Default',\n\n    tags:\n      data.Tags_Shopify.trim() ?? '',\n\n    // Variants\n    variants: [\n      {\n        requires_shipping: false,\n        price,\n        weight,\n        weight_unit: CONFIG.WEIGHT_UNIT\n      }\n    ],\n\n    // Images + ALT TEXT\n    images: extractImages(\n      data,\n      CONFIG.IMAGE_KEYS\n    )\n  };\n};\n\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\n\n// Step 1\nconst categorized = items\n  .map(item => {\n\n    const data = item.json ?? {};\n    const operation = getOperationType(data);\n\n    return { data, operation };\n\n  })\n  .filter(({ operation }) => operation !== null);\n\n\n// Step 2\nconst createItems =\n  categorized.filter(\n    ({ operation }) => operation === 'create'\n  );\n\nconst updateItems =\n  categorized.filter(\n    ({ operation }) => operation === 'update'\n  );\n\nconst mark_false =\n  categorized.filter(\n    ({ operation }) => operation === 'mark false'\n  );\n\n\n// Step 3\nconst limitedCreateItems =\n  createItems.slice(0, CONFIG.MAX_CREATE_ITEMS);\n\n\n// Step 4\nconst selectedItems = [\n  ...limitedCreateItems,\n  ...updateItems,\n  ...mark_false\n];\n\n\n// Step 5\nconst outputItems = selectedItems.map(\n  ({ data, operation }) => ({\n\n    json: {\n\n      collection_id1: String(\n        data.Collection_ID1.trim() ?? ''\n      ),\n\n      collection_id2: String(\n        data.Collection_ID2.trim() ?? ''\n      ),\n\n      collection_id3: String(\n        data.Collection_ID3.trim() ?? ''\n      ),\n\n      operation,\n\n      product: buildProduct(\n        data,\n        operation\n      )\n    }\n  })\n);\n\n\nreturn outputItems.length > 0\n  ? outputItems\n  : [\n      {\n        json: {\n          sheet_name: CONFIG.SHEET_NAME,\n          operation: 'None'\n        }\n      }\n    ];"
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  MAX_CREATE_ITEMS: 3,\n  VENDOR: 'Marblebee',\n  WEIGHT_UNIT: 'kg',\n  DECIMAL_PLACES: 2,\n\n  IMAGE_KEYS: [\n    'IMAGE URL1',\n    'IMAGE URL2',\n    'IMAGE URL3',\n    'IMAGE URL4',\n    'IMAGE URL5',\n    'IMAGE URL6',\n    'IMAGE URL7',\n    'IMAGE URL8',\n    'IMAGE URL9',\n    'IMAGE URL10'\n  ],\n\n  SHEET_NAME: $('ð Loop Through Sheets').item.json.sheet_name\n};\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst safeRound = (value, decimals = CONFIG.DECIMAL_PLACES) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? Number(num.toFixed(decimals))\n    : '';\n};\n\nconst cleanWeight = (weightRaw) => {\n  const cleaned = String(weightRaw ?? '0').replace(/[^\\d.]/g, '');\n  return cleaned ? parseFloat(cleaned) : 0.0;\n};\n\nconst safeNumeric = (value, defaultValue = 0) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? num\n    : defaultValue;\n};\n\nconst hasValue = (value) =>\n  value !== undefined &&\n  value !== null &&\n  String(value).trim() !== '';\n\n\n// ============================================\n// SEO HELPERS\n// ============================================\n\n// Shopify handle formatter\nconst slugify = (text = '') =>\n  String(text)\n    .toLowerCase()\n    .trim()\n    .replace(/&/g, 'and')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n\n\n// URL HANDLE RULE:\n// \"{keyword}-{material}-{product-number}\"\nconst buildHandle = (data) => {\n  const keyword = data['Keywords (Luna)'] ?? '';\n  const material = data.Material ?? '';\n  const productNumber = data['Product No.'] ?? '';\n\n  return slugify(\n    `${keyword}-${material}-${productNumber}`\n  );\n};\n\n\n// IMAGE ALT RULE:\n// \"{keyword} in {material} - Image {index}\"\nconst buildAltText = (data, index) => {\n  const keyword = data['Keywords (Luna)'].trim() ?? 'Marble Product';\n  const material = data.Material.trim() ?? 'Natural Marble';\n\n  return `${keyword} in ${material} - Image ${index}`;\n};\n\n\n// Build Shopify images with alt text\nconst extractImages = (data, keys) =>\n  keys\n    .filter(key => hasValue(data[key]))\n    .map((key, index) => ({\n      src: data[key],\n      alt: buildAltText(data, index + 1)\n    }));\n\n\n// ============================================\n// VALIDATION & OPERATION TYPE\n// ============================================\n\nconst isReadyToPost = (data) => {\n  const value = String(data?.Ready_to_post ?? '')\n    .trim()\n    .toLowerCase();\n\n  return value === 'yes' || value === 'true';\n};\n\nconst hasTitle = (data) =>\n  hasValue(data?.Title_Shopify);\n\nconst getOperationType = (data) => {\n\n  if (!isReadyToPost(data) || !hasTitle(data)) {\n    return null;\n  }\n\n  const hasFieldsToUpdate = hasValue(data.Fields_to_update);\n  const hasPublicUrl = hasValue(data.Shopify_Product_URL);\n  const hasAdminUrl = hasValue(data.Shopify_Update_product_URL);\n\n  // UPDATE\n  if (\n    hasFieldsToUpdate &&\n    hasPublicUrl &&\n    hasAdminUrl\n  ) {\n    return 'update';\n  }\n\n  // CREATE\n  if (\n    !hasFieldsToUpdate &&\n    !hasPublicUrl &&\n    !hasAdminUrl\n  ) {\n    return 'create';\n  }\n\n  return 'mark false';\n};\n\n\n// ============================================\n// PRODUCT BUILDER\n// ============================================\n\nconst buildProduct = (data, operation) => {\n\n  const weight = safeRound(\n    cleanWeight(data['Weight KG'])\n  );\n\n  const price = safeNumeric(\n    data['Price IN USD $ (Jack)']\n  );\n\n  // ============================================\n  // DIMENSIONS\n  // ============================================\n\n  const isFireplace =\n    CONFIG.SHEET_NAME === 'Fireplace'  ||\n    CONFIG.SHEET_NAME === 'Test data';\n\n  const isWallCoverings =\n    CONFIG.SHEET_NAME === 'Wall-Coverings'\n\n  const isExteriorWallDecoration =\n    CONFIG.SHEET_NAME === 'Exterior-Wall-Decoration'\n  \n  const isMarbleSlab =\n    CONFIG.SHEET_NAME === 'MarbleSlab';\n\n  const isMarbleRangeHood =\n    CONFIG.SHEET_NAME === 'MarbleRangeHood';\n\n  const isMoulding =\n    CONFIG.SHEET_NAME === 'Moulding';\n\n  const isStoneMosaicTile =\n    CONFIG.SHEET_NAME === 'StoneMosaicTile';\n\n  const isMarbleMedallion =\n    CONFIG.SHEET_NAME === 'MarbleMedallion';\n\n  const dimensions = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isFireplace || isMarbleRangeHood\n    ? {\n        d_cm: data['Depth CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        d_in: safeRound(data['Depth Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      }\n    : isMoulding\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      };\n\n  // ============================================\n  // Opening Size For Fireplace\n  // ============================================\n\n  const opening_size = isFireplace\n    ? {\n        opening_w_cm: data['Width_CM'] ?? '',\n        opening_h_cm: data['Height_CM'] ?? '',\n\n        opening_w_in: safeRound(data['Width_Inch']),\n        opening_h_in: safeRound(data['Height_Inch'])\n      }\n    : {}\n\n  // ============================================\n  // SEO\n  // ============================================\n\n  const seoTitle =\n    data.Shopify_SEO_Title.trim() ??\n    data.Title_Shopify.trim() ??\n    '';\n\n  const seoDescription =\n    data.Shopify_SEO_Description.trim() ??\n    '';\n\n  const handle = buildHandle(data);\n\n  // ============================================\n  // RETURN PRODUCT\n  // ============================================\n\n  return {\n\n    // Metadata\n    row_number: data.row_number ?? 0,\n    sheet_name: CONFIG.SHEET_NAME ?? '',\n    updating_fields: data.Fields_to_update ?? '',\n    operation,\n\n    // URLs\n    public_shopify_url:\n      data.Shopify_Product_URL ?? '',\n\n    admin_shopify_url:\n      data.Shopify_Update_product_URL ?? '',\n\n    // Dimensions\n    ...dimensions,\n    ...opening_size,\n\n    // Shopify Product\n    title: data.Title_Shopify.trim() ?? '',\n    description: data.Description_Shopify.trim() ?? '',\n\n    material: data.Material.trim() ?? '',\n    product_number: data['Product No.'].trim() ?? '',\n\n    weight,\n\n    drain_diameter:\n      data.Drain_Diameter ?? '',\n\n    radius: data.Radius ?? '',\n    surface: data.Surface ?? '',\n\n    signature:\n      data.Signature ?? '',\n\n    // SEO\n\n    seo_title: seoTitle,\n    seo_description: seoDescription,\n    handle,\n\n    // Custom buttons\n    material_catalog_url:\n      data['Material Catalog URL'].trim() ?? '',\n\n    care_guide_url:\n      data['Care Guide URL'].trim() ?? '',\n\n    cad_drawing_url:\n      data['CAD Drawing URL'].trim() ?? '',\n\n    // Etsy\n    title_Etsy:\n      data.Title_Etsy ?? '',\n\n    description_Etsy:\n      data.Description_Etsy ?? '',\n\n    tags_Etsy:\n      data.Tags_Etsy ?? '',\n\n    who_made:\n      data.who_made ?? '',\n\n    when_made:\n      data.when_made ?? '',\n\n    product_type_Etsy:\n      data.Etsy_type ?? '',\n\n    quantity_Etsy:\n      data.Etsy_quantity ?? 0,\n\n    // Shopify\n    vendor: CONFIG.VENDOR,\n\n    product_type:\n      data.Product_Type.trim() ?? 'Default',\n\n    tags:\n      data.Tags_Shopify.trim() ?? '',\n\n    // Variants\n    variants: [\n      {\n        requires_shipping: false,\n        price,\n        weight,\n        weight_unit: CONFIG.WEIGHT_UNIT\n      }\n    ],\n\n    // Images + ALT TEXT\n    images: extractImages(\n      data,\n      CONFIG.IMAGE_KEYS\n    )\n  };\n};\n\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\n\n// Step 1\nconst categorized = items\n  .map(item => {\n\n    const data = item.json ?? {};\n    const operation = getOperationType(data);\n\n    return { data, operation };\n\n  })\n  .filter(({ operation }) => operation !== null);\n\n\n// Step 2\nconst createItems =\n  categorized.filter(\n    ({ operation }) => operation === 'create'\n  );\n\nconst updateItems =\n  categorized.filter(\n    ({ operation }) => operation === 'update'\n  );\n\nconst mark_false =\n  categorized.filter(\n    ({ operation }) => operation === 'mark false'\n  );\n\n\n// Step 3\nconst limitedCreateItems =\n  createItems.slice(0, CONFIG.MAX_CREATE_ITEMS);\n\n\n// Step 4\nconst selectedItems = [\n  ...limitedCreateItems,\n  ...updateItems,\n  ...mark_false\n];\n\n\n// Step 5\nconst outputItems = selectedItems.map(\n  ({ data, operation }) => ({\n\n    json: {\n\n      collection_id1: String(\n        data.Collection_ID1.trim() ?? ''\n      ),\n\n      collection_id2: String(\n        data.Collection_ID2.trim() ?? ''\n      ),\n\n      collection_id3: String(\n        data.Collection_ID3.trim() ?? ''\n      ),\n\n      operation,\n\n      product: buildProduct(\n        data,\n        operation\n      )\n    }\n  })\n);\n\n\nreturn outputItems.length > 0\n  ? outputItems\n  : [\n      {\n        json: {\n          sheet_name: CONFIG.SHEET_NAME,\n          operation: 'None'\n        }\n      }\n    ];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -109,7 +109,7 @@
         2768
       ],
       "id": "622b6222-f8ee-49f2-86af-85b741b56380",
-      "name": "✅ Filter Unacknowledged & Ready to Post"
+      "name": "â Filter Unacknowledged & Ready to Post"
     },
     {
       "parameters": {
@@ -122,7 +122,7 @@
         2768
       ],
       "id": "83773dc4-daab-4a14-81d8-4c826ffd2072",
-      "name": "⏸️ Rate Limit (200ms)",
+      "name": "â¸ï¸ Rate Limit (200ms)",
       "webhookId": "fd9ab9a4-171f-443a-b98e-b0f99561bfb7"
     },
     {
@@ -136,7 +136,7 @@
         2480
       ],
       "id": "54fac287-e14b-415b-9d9a-1d703c115f71",
-      "name": "🔁 Process Each Product"
+      "name": "ð Process Each Product"
     },
     {
       "parameters": {
@@ -169,11 +169,11 @@
         2496
       ],
       "id": "71440822-f491-403b-9695-0085575f172e",
-      "name": "🔀 Route: Create or Update"
+      "name": "ð Route: Create or Update"
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  DIMENSION_FIELDS: new Set([\n    'Lenght CM','Width CM','Height CM','Depth CM', 'Thickness CM',\n    'Length Inch','Width Inch','Height Inch','Depth Inch', 'Thickness Inch'\n  ]),\n  OPENING_SIZE_FIELDS: new Set([\n    'Width_CM', 'Height_CM', 'Width_Inch', 'Height_Inch',\n  ]),\n  CONTENT_FIELDS: new Set([\n    'Material','Description_Shopify','Weight KG','Product No.',\n    'Surface','Drain_Diameter','Radius','Signature'\n  ]),\n  TITLE_FIELD: 'Title_Shopify',\n  TAGS_SHOPIFY: 'Tags_Shopify',\n  COLLECTION_ID1: 'Collection_ID1',\n  COLLECTION_ID2: 'Collection_ID2',\n  COLLECTION_ID3: 'Collection_ID3',\n  PRICE_FIELD: 'Price IN USD $ (Jack)',\n  WEIGHT_FIELD: 'Weight KG',\n\n  // SEO Fields\n  SEO_TITLE_FIELD: 'Shopify_SEO_Title',\n  SEO_DESC_FIELD: 'Shopify_SEO_Description',\n\n  // ✅ NEW (metafield trigger fields)\n  META_URL_FIELDS: new Set([\n    'Material Catalog URL',\n    'Care Guide URL',\n    'CAD Drawing URL'\n  ]),\n\n  PATTERNS: {\n    PRODUCT_ID: /\\/products\\/(\\d+)/,\n    VARIANT_ID: /[?&]variant=(\\d+)/\n  }\n};\n\nconst ALL_BODY_FIELDS = new Set([...CONFIG.DIMENSION_FIELDS,...CONFIG.OPENING_SIZE_FIELDS, ...CONFIG.CONTENT_FIELDS]);\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst normalizeUrl = (url) => {\n  if (!url) return '';\n  return String(url).trim().replace(/\\\\+$/, '');\n};\n\nconst extractId = (url, pattern) => url?.match(pattern)?.[1] ?? '';\nconst getVariantId = (url) => extractId(url, CONFIG.PATTERNS.VARIANT_ID);\nconst extractProductId = (url) => extractId(url, CONFIG.PATTERNS.PRODUCT_ID);\n\nconst parseUpdateFields = (fieldsStr) => \n  fieldsStr?.split(',').map(f => f.trim()).filter(Boolean) ?? [];\n\nconst shouldUpdateBody = (updateList) => \n  updateList.some(field => ALL_BODY_FIELDS.has(field));\n\nconst hasValue = (v) => {\n  if (Array.isArray(v)) return v.length > 0;\n  if (typeof v === 'object' && v !== null) return Object.keys(v).length > 0;\n  return v !== undefined && v !== null && v !== '';\n};\n\nconst field = (label, value, suffix = '') => \n  hasValue(value) ? `<p><strong>${label}:</strong> ${value}${suffix}</p>` : '';\n\n// ============================================\n// HTML BUILDER\n// ============================================\n\nconst buildDimensionLine = (dims) => \n  dims.filter(([, v]) => hasValue(v))\n      .map(([label, v, unit]) => `<strong>${label}:</strong> ${v} ${unit}`)\n      .join(' &nbsp; ');\n\nconst buildBodyHtml = (p) => {\n  const isFireplace = p.sheet_name === 'Fireplace' || p.sheet_name === 'Test data';\n  const isWallCoverings = p.sheet_name === 'Wall-Coverings';\n  const isMarbleSlab = p.sheet_name === 'MarbleSlab';\n  const isMarbleRangeHood = p.sheet_name === 'MarbleRangeHood';\n  const isMoulding = p.sheet_name === 'Moulding';\n  const isStoneMosaicTile = p.sheet_name === 'StoneMosaicTile';\n  const isMarbleMedallion = p.sheet_name === 'MarbleMedallion';\n\n  // =========================\n  // SINGLE SOURCE DIM CONFIG\n  // =========================\n  const dimensionConfig = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : isFireplace || isMarbleRangeHood\n    ? [\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Depth', cm: p.d_cm, inch: p.d_in },\n      ]\n    : isMoulding\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in }\n      ];\n\n  // =========================\n  // BUILD LINES\n  // =========================\n  const cmLine = buildDimensionLine(\n    dimensionConfig.map(d => [d.label, d.cm, 'cm'])\n  );\n\n  const inLine = buildDimensionLine(\n    dimensionConfig.map(d => [d.label, d.inch, 'In'])\n  );\n\n  // =========================\n  // SINGLE SOURCE Openiing Size CONFIG\n  // =========================\n  const openingSizeConfig = isFireplace\n    ? [\n        { label: 'Width', cm: p.opening_w_cm, inch: p.opening_w_in },\n        { label: 'Height', cm: p.opening_h_cm, inch: p.opening_h_in },\n      ]\n    : [];\n\n  // =========================\n  // BUILD LINES\n  // =========================\n  const cmOpeningLine = buildDimensionLine(\n    openingSizeConfig.map(o => [o.label, o.cm, 'cm'])\n  );\n\n  const inOpeningLine = buildDimensionLine(\n    openingSizeConfig.map(o => [o.label, o.inch, 'In'])\n  );\n\n  return [\n    (cmLine || inLine) && '<p><strong>Dimensions</strong></p>',\n    cmLine && `<p>${cmLine}</p>`,\n    inLine && `<p>${inLine}</p>`,\n    (cmOpeningLine || inOpeningLine) && '<p><strong>Opening Size</strong></p>',\n    cmOpeningLine && `<p>${cmOpeningLine}</p>`,\n    inOpeningLine && `<p>${inOpeningLine}</p>`,\n    field('Material', p.material),\n    field('Weight', p.weight, ' kg'),\n    hasValue(p.description) && `<p>${p.description}</p>`,\n    field('Drain Diameter', p.drain_diameter),\n    field('Radius', p.radius),\n    field('Surface', p.surface),\n    p.signature,\n    field('Product Number', p.product_number)\n  ].filter(Boolean).join('');\n};\n\n// ============================================\n// BUILDERS\n// ============================================\n\nconst buildVariants = (product, updateList) => {\n  const variant = {};\n  \n  const variantId = getVariantId(product.public_shopify_url);\n  if (variantId) variant.id = variantId;\n  \n  if (updateList.includes(CONFIG.PRICE_FIELD)) {\n    variant.price = product.variants?.[0]?.price;\n  }\n  \n  if (updateList.includes(CONFIG.WEIGHT_FIELD)) {\n    variant.weight = product.weight;\n  }\n  \n  return Object.keys(variant).length > 0 ? [variant] : [];\n};\n\nconst hasAnyImageUpdate = (updateList) =>\n  updateList.some(f => /^IMAGE URL\\d+$/.test(f));\n\nconst buildImages = (product, updateList) => {\n  if (!hasAnyImageUpdate(updateList)) return [];\n  if (!Array.isArray(product.images) || product.images.length === 0) return [];\n\n  return product.images\n    .filter(img => img?.src)\n    .map(img => ({ src: img.src, alt: img.alt }));\n};\n\n// ============================================\n// CORE UPDATE PAYLOAD\n// ============================================\n\nconst buildUpdatePayload = (product, updateList) => {\n  const input = $input.first().json;\n\n  const payload = {\n    id: extractProductId(product.admin_shopify_url),\n  };\n\n  // ======================\n  // BODY HTML\n  // ======================\n  if (shouldUpdateBody(updateList)) {\n    const bodyHtml = buildBodyHtml(product);\n    if (bodyHtml) payload.body_html = bodyHtml;\n  }\n\n  // ======================\n  // VARIANTS\n  // ======================\n  const variants = buildVariants(product, updateList);\n  if (variants.length > 0) payload.variants = variants;\n\n  // ======================\n  // TITLE\n  // ======================\n  if (updateList.includes(CONFIG.TITLE_FIELD) && product.title) {\n    payload.title = product.title;\n  }\n\n  // ======================\n  // TAGS\n  // ======================\n  if (updateList.includes(CONFIG.TAGS_SHOPIFY) && input.product?.tags) {\n    payload.tags = input.product.tags;\n  }\n\n  // ======================\n  // IMAGES\n  // ======================\n  const images = buildImages(product, updateList);\n  if (images.length > 0) payload.images = images;\n\n  // ======================\n  // COLLECTIONS\n  // ======================\n  if (\n    updateList.includes(CONFIG.COLLECTION_ID1) ||\n    updateList.includes(CONFIG.COLLECTION_ID2) ||\n    updateList.includes(CONFIG.COLLECTION_ID3)\n  ) {\n    payload.collection_id1 = input.collection_id1 ?? '';\n    payload.collection_id2 = input.collection_id2 ?? '';\n    payload.collection_id3 = input.collection_id3 ?? '';\n  }\n\n  // ======================\n  // ✅ METAFIELD DATA (CRITICAL)\n  // ======================\n  if (updateList.includes('Material Catalog URL')) {\n    payload.material_catalog_url =    normalizeUrl(product.material_catalog_url) ?? '';\n   }\n\n  if (updateList.includes('Care Guide URL')) {\n     payload.care_guide_url = normalizeUrl(product.care_guide_url)      ?? '';\n  }\n\n  if (updateList.includes('CAD Drawing URL')) {\n    payload.cad_drawing_url = normalizeUrl(product.cad_drawing_url) ?? '';\n  }\n\n  // ======================\n  // ✅ SEO FIELDS \n  // ======================\n  const metafields = [];\n\n  if (updateList.includes(CONFIG.SEO_TITLE_FIELD) && hasValue(product.seo_title)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"title_tag\",\n      type: \"single_line_text_field\",\n      value: product.seo_title\n    });\n  }\n\n  if (updateList.includes(CONFIG.SEO_DESC_FIELD) && hasValue(product.seo_description)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"description_tag\",\n      type: \"multi_line_text_field\",\n      value: product.seo_description\n    });\n  }\n\n  if (metafields.length > 0) {\n    payload.metafields = metafields;\n  }\n\n  return payload;\n};\n\n// ============================================\n// MAIN\n// ============================================\n\nconst product = items?.[0]?.json?.product;\nif (!product) return [];\n\nconst updateFields = parseUpdateFields(product.updating_fields);\nconst updatePayload = buildUpdatePayload(product, updateFields);\n\nreturn [{ json: { product: updatePayload } }];"
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  DIMENSION_FIELDS: new Set([\n    'Lenght CM','Width CM','Height CM','Depth CM', 'Thickness CM',\n    'Length Inch','Width Inch','Height Inch','Depth Inch', 'Thickness Inch'\n  ]),\n  OPENING_SIZE_FIELDS: new Set([\n    'Width_CM', 'Height_CM', 'Width_Inch', 'Height_Inch',\n  ]),\n  CONTENT_FIELDS: new Set([\n    'Material','Description_Shopify','Weight KG','Product No.',\n    'Surface','Drain_Diameter','Radius','Signature'\n  ]),\n  TITLE_FIELD: 'Title_Shopify',\n  TAGS_SHOPIFY: 'Tags_Shopify',\n  COLLECTION_ID1: 'Collection_ID1',\n  COLLECTION_ID2: 'Collection_ID2',\n  COLLECTION_ID3: 'Collection_ID3',\n  PRICE_FIELD: 'Price IN USD $ (Jack)',\n  WEIGHT_FIELD: 'Weight KG',\n\n  // SEO Fields\n  SEO_TITLE_FIELD: 'Shopify_SEO_Title',\n  SEO_DESC_FIELD: 'Shopify_SEO_Description',\n\n  // â NEW (metafield trigger fields)\n  META_URL_FIELDS: new Set([\n    'Material Catalog URL',\n    'Care Guide URL',\n    'CAD Drawing URL'\n  ]),\n\n  PATTERNS: {\n    PRODUCT_ID: /\\/products\\/(\\d+)/,\n    VARIANT_ID: /[?&]variant=(\\d+)/\n  }\n};\n\nconst ALL_BODY_FIELDS = new Set([...CONFIG.DIMENSION_FIELDS,...CONFIG.OPENING_SIZE_FIELDS, ...CONFIG.CONTENT_FIELDS]);\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst normalizeUrl = (url) => {\n  if (!url) return '';\n  return String(url).trim().replace(/\\\\+$/, '');\n};\n\nconst extractId = (url, pattern) => url?.match(pattern)?.[1] ?? '';\nconst getVariantId = (url) => extractId(url, CONFIG.PATTERNS.VARIANT_ID);\nconst extractProductId = (url) => extractId(url, CONFIG.PATTERNS.PRODUCT_ID);\n\nconst parseUpdateFields = (fieldsStr) => \n  fieldsStr?.split(',').map(f => f.trim()).filter(Boolean) ?? [];\n\nconst shouldUpdateBody = (updateList) => \n  updateList.some(field => ALL_BODY_FIELDS.has(field));\n\nconst hasValue = (v) => {\n  if (Array.isArray(v)) return v.length > 0;\n  if (typeof v === 'object' && v !== null) return Object.keys(v).length > 0;\n  return v !== undefined && v !== null && v !== '';\n};\n\nconst field = (label, value, suffix = '') => \n  hasValue(value) ? `<p><strong>${label}:</strong> ${value}${suffix}</p>` : '';\n\n// ============================================\n// HTML BUILDER\n// ============================================\n\nconst buildDimensionLine = (dims) => \n  dims.filter(([, v]) => hasValue(v))\n      .map(([label, v, unit]) => `<strong>${label}:</strong> ${v} ${unit}`)\n      .join(' &nbsp; ');\n\nconst buildBodyHtml = (p) => {\n  const isFireplace = p.sheet_name === 'Fireplace' || p.sheet_name === 'Test data';\n  const isWallCoverings = p.sheet_name === 'Wall-Coverings';\n    const isExteriorWallDecoration = p.sheet_name === 'Exterior-Wall-Decoration';\n  const isMarbleSlab = p.sheet_name === 'MarbleSlab';\n  const isMarbleRangeHood = p.sheet_name === 'MarbleRangeHood';\n  const isMoulding = p.sheet_name === 'Moulding';\n  const isStoneMosaicTile = p.sheet_name === 'StoneMosaicTile';\n  const isMarbleMedallion = p.sheet_name === 'MarbleMedallion';\n\n  // =========================\n  // SINGLE SOURCE DIM CONFIG\n  // =========================\n  const dimensionConfig = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : isFireplace || isMarbleRangeHood\n    ? [\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Depth', cm: p.d_cm, inch: p.d_in },\n      ]\n    : isMoulding\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in }\n      ];\n\n  // =========================\n  // BUILD LINES\n  // =========================\n  const cmLine = buildDimensionLine(\n    dimensionConfig.map(d => [d.label, d.cm, 'cm'])\n  );\n\n  const inLine = buildDimensionLine(\n    dimensionConfig.map(d => [d.label, d.inch, 'In'])\n  );\n\n  // =========================\n  // SINGLE SOURCE Openiing Size CONFIG\n  // =========================\n  const openingSizeConfig = isFireplace\n    ? [\n        { label: 'Width', cm: p.opening_w_cm, inch: p.opening_w_in },\n        { label: 'Height', cm: p.opening_h_cm, inch: p.opening_h_in },\n      ]\n    : [];\n\n  // =========================\n  // BUILD LINES\n  // =========================\n  const cmOpeningLine = buildDimensionLine(\n    openingSizeConfig.map(o => [o.label, o.cm, 'cm'])\n  );\n\n  const inOpeningLine = buildDimensionLine(\n    openingSizeConfig.map(o => [o.label, o.inch, 'In'])\n  );\n\n  return [\n    (cmLine || inLine) && '<p><strong>Dimensions</strong></p>',\n    cmLine && `<p>${cmLine}</p>`,\n    inLine && `<p>${inLine}</p>`,\n    (cmOpeningLine || inOpeningLine) && '<p><strong>Opening Size</strong></p>',\n    cmOpeningLine && `<p>${cmOpeningLine}</p>`,\n    inOpeningLine && `<p>${inOpeningLine}</p>`,\n    field('Material', p.material),\n    field('Weight', p.weight, ' kg'),\n    hasValue(p.description) && `<p>${p.description}</p>`,\n    field('Drain Diameter', p.drain_diameter),\n    field('Radius', p.radius),\n    field('Surface', p.surface),\n    p.signature,\n    field('Product Number', p.product_number)\n  ].filter(Boolean).join('');\n};\n\n// ============================================\n// BUILDERS\n// ============================================\n\nconst buildVariants = (product, updateList) => {\n  const variant = {};\n  \n  const variantId = getVariantId(product.public_shopify_url);\n  if (variantId) variant.id = variantId;\n  \n  if (updateList.includes(CONFIG.PRICE_FIELD)) {\n    variant.price = product.variants?.[0]?.price;\n  }\n  \n  if (updateList.includes(CONFIG.WEIGHT_FIELD)) {\n    variant.weight = product.weight;\n  }\n  \n  return Object.keys(variant).length > 0 ? [variant] : [];\n};\n\nconst hasAnyImageUpdate = (updateList) =>\n  updateList.some(f => /^IMAGE URL\\d+$/.test(f));\n\nconst buildImages = (product, updateList) => {\n  if (!hasAnyImageUpdate(updateList)) return [];\n  if (!Array.isArray(product.images) || product.images.length === 0) return [];\n\n  return product.images\n    .filter(img => img?.src)\n    .map(img => ({ src: img.src, alt: img.alt }));\n};\n\n// ============================================\n// CORE UPDATE PAYLOAD\n// ============================================\n\nconst buildUpdatePayload = (product, updateList) => {\n  const input = $input.first().json;\n\n  const payload = {\n    id: extractProductId(product.admin_shopify_url),\n  };\n\n  // ======================\n  // BODY HTML\n  // ======================\n  if (shouldUpdateBody(updateList)) {\n    const bodyHtml = buildBodyHtml(product);\n    if (bodyHtml) payload.body_html = bodyHtml;\n  }\n\n  // ======================\n  // VARIANTS\n  // ======================\n  const variants = buildVariants(product, updateList);\n  if (variants.length > 0) payload.variants = variants;\n\n  // ======================\n  // TITLE\n  // ======================\n  if (updateList.includes(CONFIG.TITLE_FIELD) && product.title) {\n    payload.title = product.title;\n  }\n\n  // ======================\n  // TAGS\n  // ======================\n  if (updateList.includes(CONFIG.TAGS_SHOPIFY) && input.product?.tags) {\n    payload.tags = input.product.tags;\n  }\n\n  // ======================\n  // IMAGES\n  // ======================\n  const images = buildImages(product, updateList);\n  if (images.length > 0) payload.images = images;\n\n  // ======================\n  // COLLECTIONS\n  // ======================\n  if (\n    updateList.includes(CONFIG.COLLECTION_ID1) ||\n    updateList.includes(CONFIG.COLLECTION_ID2) ||\n    updateList.includes(CONFIG.COLLECTION_ID3)\n  ) {\n    payload.collection_id1 = input.collection_id1 ?? '';\n    payload.collection_id2 = input.collection_id2 ?? '';\n    payload.collection_id3 = input.collection_id3 ?? '';\n  }\n\n  // ======================\n  // â METAFIELD DATA (CRITICAL)\n  // ======================\n  if (updateList.includes('Material Catalog URL')) {\n    payload.material_catalog_url =    normalizeUrl(product.material_catalog_url) ?? '';\n   }\n\n  if (updateList.includes('Care Guide URL')) {\n     payload.care_guide_url = normalizeUrl(product.care_guide_url)      ?? '';\n  }\n\n  if (updateList.includes('CAD Drawing URL')) {\n    payload.cad_drawing_url = normalizeUrl(product.cad_drawing_url) ?? '';\n  }\n\n  // ======================\n  // â SEO FIELDS \n  // ======================\n  const metafields = [];\n\n  if (updateList.includes(CONFIG.SEO_TITLE_FIELD) && hasValue(product.seo_title)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"title_tag\",\n      type: \"single_line_text_field\",\n      value: product.seo_title\n    });\n  }\n\n  if (updateList.includes(CONFIG.SEO_DESC_FIELD) && hasValue(product.seo_description)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"description_tag\",\n      type: \"multi_line_text_field\",\n      value: product.seo_description\n    });\n  }\n\n  if (metafields.length > 0) {\n    payload.metafields = metafields;\n  }\n\n  return payload;\n};\n\n// ============================================\n// MAIN\n// ============================================\n\nconst product = items?.[0]?.json?.product;\nif (!product) return [];\n\nconst updateFields = parseUpdateFields(product.updating_fields);\nconst updatePayload = buildUpdatePayload(product, updateFields);\n\nreturn [{ json: { product: updatePayload } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -182,7 +182,7 @@
         2480
       ],
       "id": "1cb77e81-5b02-4e8f-a9f7-e877c6082011",
-      "name": "📝 Format Update Request"
+      "name": "ð Format Update Request"
     },
     {
       "parameters": {
@@ -211,7 +211,7 @@
         2464
       ],
       "id": "b180f685-f0a5-4fde-820c-19e098c4c81f",
-      "name": "🔄 Shopify: Update Product",
+      "name": "ð Shopify: Update Product",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -228,7 +228,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const sheet = $('🔀 Route: Create or Update').item.json.product.sheet_name;\nconst row_number = $('🔀 Route: Create or Update').item.json.product.row_number;\n\nreturn [\n  {\n    json: {\n      \"sheet_name\":sheet,\n      \"row_number\":row_number,\n      \"Ready_to_post\": \"no\",\n      \"Fields_to_update\": \"\",\n      \"last_update_time\": $now\n    },\n  },\n];\n"
+        "jsCode": "const sheet = $('ð Route: Create or Update').item.json.product.sheet_name;\nconst row_number = $('ð Route: Create or Update').item.json.product.row_number;\n\nreturn [\n  {\n    json: {\n      \"sheet_name\":sheet,\n      \"row_number\":row_number,\n      \"Ready_to_post\": \"no\",\n      \"Fields_to_update\": \"\",\n      \"last_update_time\": $now\n    },\n  },\n];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -237,7 +237,7 @@
         2800
       ],
       "id": "fc84063b-f8af-4ca2-a974-0eaef53a76ba",
-      "name": "📦 Parse Update Response"
+      "name": "ð¦ Parse Update Response"
     },
     {
       "parameters": {
@@ -266,7 +266,7 @@
         2928
       ],
       "id": "a2abf82d-1761-4ed6-8328-df7bdf7cbe94",
-      "name": "➕ Shopify: Create Product",
+      "name": "â Shopify: Create Product",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -283,7 +283,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  ADMIN_BASE_URL: 'https://admin.shopify.com/store/marblebee/products/',\n  PRODUCT_BASE_URL: 'https://marblebee.myshopify.com/products/'\n};\n\n// ============================================\n// EXTRACT DATA\n// ============================================\nconst routeData = $('🔀 Route: Create or Update').first()?.json?.product ?? {};\nconst product = items[0]?.json?.product ?? {};\nconst variant = product.variants?.[0] ?? {};\n\n// ============================================\n// BUILD URLS\n// ============================================\nconst shopifyProductUrl = product.public_shopify_url || \n  `${CONFIG.PRODUCT_BASE_URL}${product.handle ?? ''}?variant=${variant.id ?? ''}`;\n\nconst shopifyUpdateUrl = product.admin_shopify_url || \n  `${CONFIG.ADMIN_BASE_URL}${product.id ?? ''}`;\n\n// ============================================\n// BUILD OUTPUT\n// ============================================\nreturn [{\n  json: {\n    sheet_name: routeData.sheet_name ?? '',\n    row_number: routeData.row_number ?? '',\n    'Title_Shopify': (product.title ?? '').trim(),\n    'Shopify_Product_URL': shopifyProductUrl,\n    'Shopify_Update_product_URL': shopifyUpdateUrl,\n    'Ready_to_post': 'no',\n    'Fields_to_update': '',\n    'create_time': $now\n  }\n}];"
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  ADMIN_BASE_URL: 'https://admin.shopify.com/store/marblebee/products/',\n  PRODUCT_BASE_URL: 'https://marblebee.myshopify.com/products/'\n};\n\n// ============================================\n// EXTRACT DATA\n// ============================================\nconst routeData = $('ð Route: Create or Update').first()?.json?.product ?? {};\nconst product = items[0]?.json?.product ?? {};\nconst variant = product.variants?.[0] ?? {};\n\n// ============================================\n// BUILD URLS\n// ============================================\nconst shopifyProductUrl = product.public_shopify_url || \n  `${CONFIG.PRODUCT_BASE_URL}${product.handle ?? ''}?variant=${variant.id ?? ''}`;\n\nconst shopifyUpdateUrl = product.admin_shopify_url || \n  `${CONFIG.ADMIN_BASE_URL}${product.id ?? ''}`;\n\n// ============================================\n// BUILD OUTPUT\n// ============================================\nreturn [{\n  json: {\n    sheet_name: routeData.sheet_name ?? '',\n    row_number: routeData.row_number ?? '',\n    'Title_Shopify': (product.title ?? '').trim(),\n    'Shopify_Product_URL': shopifyProductUrl,\n    'Shopify_Update_product_URL': shopifyUpdateUrl,\n    'Ready_to_post': 'no',\n    'Fields_to_update': '',\n    'create_time': $now\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -292,7 +292,7 @@
         2928
       ],
       "id": "db753597-186c-42e9-b3cf-294fe5ffbb16",
-      "name": "📦 Parse Create Response"
+      "name": "ð¦ Parse Create Response"
     },
     {
       "parameters": {
@@ -826,7 +826,7 @@
         2928
       ],
       "id": "5484ee2e-a8d0-4800-abd9-4a5031572b6a",
-      "name": "💾 Update Google Sheet",
+      "name": "ð¾ Update Google Sheet",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "credentials": {
@@ -838,7 +838,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get collection IDs from the Route node\nconst collectionIds = [\n  $('🔀 Route: Create or Update').item?.json?.collection_id1,\n  $('🔀 Route: Create or Update').item?.json?.collection_id2,\n  $('🔀 Route: Create or Update').item?.json?.collection_id3,\n].filter(id => id !== null && id !== undefined && id !== '');\n\n// Get product ID from current input\nconst productId = $input.first().json.product.id;\n\n// If no valid collections → do nothing\nif (collectionIds.length === 0) {\n  return [];\n}\n\n// Create one item per valid collection\nreturn collectionIds.map(collection_id => ({\n  collect: {\n    product_id: productId,\n    collection_id: String(collection_id),\n  }\n}));"
+        "jsCode": "// Get collection IDs from the Route node\nconst collectionIds = [\n  $('ð Route: Create or Update').item?.json?.collection_id1,\n  $('ð Route: Create or Update').item?.json?.collection_id2,\n  $('ð Route: Create or Update').item?.json?.collection_id3,\n].filter(id => id !== null && id !== undefined && id !== '');\n\n// Get product ID from current input\nconst productId = $input.first().json.product.id;\n\n// If no valid collections â do nothing\nif (collectionIds.length === 0) {\n  return [];\n}\n\n// Create one item per valid collection\nreturn collectionIds.map(collection_id => ({\n  collect: {\n    product_id: productId,\n    collection_id: String(collection_id),\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -847,7 +847,7 @@
         2688
       ],
       "id": "8043cd93-ce21-4fde-b036-342ad8b96451",
-      "name": "🔗 Build Collection Mappings"
+      "name": "ð Build Collection Mappings"
     },
     {
       "parameters": {
@@ -876,7 +876,7 @@
         2688
       ],
       "id": "367e314a-a083-4a0b-b2ee-1387c5618ed9",
-      "name": "➕ Shopify: Add to Collection",
+      "name": "â Shopify: Add to Collection",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -915,7 +915,7 @@
         2240
       ],
       "id": "78387725-c131-4dbc-9fa0-9991b61bcca6",
-      "name": "📥 Get Product Collections",
+      "name": "ð¥ Get Product Collections",
       "notesInFlow": false,
       "retryOnFail": false,
       "alwaysOutputData": true,
@@ -954,7 +954,7 @@
         2032
       ],
       "id": "a9644005-2a55-4928-a116-b64d4e55e6e6",
-      "name": "🗑️ Remove from Collections",
+      "name": "ðï¸ Remove from Collections",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -971,7 +971,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return $('📝 Format Update Request').item"
+        "jsCode": "return $('ð Format Update Request').item"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -980,7 +980,7 @@
         2256
       ],
       "id": "9fccea10-e0dd-4fa7-b7ac-ac0e9765f1bd",
-      "name": "🔗 Pass Update Request"
+      "name": "ð Pass Update Request"
     },
     {
       "parameters": {
@@ -1014,7 +1014,7 @@
         2240
       ],
       "id": "9cf55bdd-2307-4987-9542-a41d07fa7e5a",
-      "name": "❓ Has Existing Collections?"
+      "name": "â Has Existing Collections?"
     },
     {
       "parameters": {
@@ -1108,7 +1108,7 @@
         2336
       ],
       "id": "9c469afa-f5b9-4cb5-abed-e7204863f4ad",
-      "name": "❓Check if update request needed",
+      "name": "âCheck if update request needed",
       "alwaysOutputData": false
     },
     {
@@ -1143,11 +1143,11 @@
         2048
       ],
       "id": "4ab8f6ad-cd64-498e-814a-119639b5e11b",
-      "name": "❓Check for update or delete"
+      "name": "âCheck for update or delete"
     },
     {
       "parameters": {
-        "jsCode": "// ===== Get previous node data =====\nconst nodeData = $('📝 Format Update Request').item?.json || {};\n\n// ===== Get product_id safely =====\nconst product_id = $input.first()?.json?.collects?.[0]?.product_id ?? null;\n\n// ===== Source collection IDs (1,2,3) =====\nconst sourceCollectionIds = [\n  nodeData?.product?.collection_id1,\n  nodeData?.product?.collection_id2,\n  nodeData?.product?.collection_id3,\n]\n  .filter(v => v !== undefined && v !== null && String(v).trim() !== '')\n  .map(String);\n\n// ===== Input collects =====\nconst collects = $input.first()?.json?.collects || [];\nconst collectCollectionIds = collects\n  .map(c => c?.collection_id)\n  .filter(v => v !== undefined && v !== null)\n  .map(String);\n\n// ===== 1️⃣ DELETE =====\n// Exists in collects but NOT in sourceCollectionIds\nconst collection_id_for_delete = collects\n  .filter(c => c && !sourceCollectionIds.includes(String(c.collection_id)))\n  .map(c => ({\n    collect_id: String(c.id),\n    product_id: product_id\n  }));\n\n// ===== 2️⃣ UPDATE =====\n// Exists in sourceCollectionIds but NOT in collects\nconst collection_id_to_update = sourceCollectionIds\n  .filter(id => !collectCollectionIds.includes(id))\n  .map(id => ({\n    collect_id: id,\n    product_id: product_id\n  }));\n\n// ===== Build FINAL OUTPUT =====\nconst output = [];\n\n// ---- DELETE FORMAT ----\nif (collection_id_for_delete.length > 0) {\n  for (const c of collection_id_for_delete) {\n    output.push({\n      json: {\n        collect_id: c.collect_id\n      }\n    });\n  }\n}\n\n// ---- UPDATE FORMAT ----\nif (collection_id_to_update.length > 0) {\n  for (const c of collection_id_to_update) {\n    output.push({\n      json: {\n        collect: {\n          product_id: c.product_id,\n          collection_id: c.collect_id\n        }\n      }\n    });\n  }\n}\n\nreturn output;\n"
+        "jsCode": "// ===== Get previous node data =====\nconst nodeData = $('ð Format Update Request').item?.json || {};\n\n// ===== Get product_id safely =====\nconst product_id = $input.first()?.json?.collects?.[0]?.product_id ?? null;\n\n// ===== Source collection IDs (1,2,3) =====\nconst sourceCollectionIds = [\n  nodeData?.product?.collection_id1,\n  nodeData?.product?.collection_id2,\n  nodeData?.product?.collection_id3,\n]\n  .filter(v => v !== undefined && v !== null && String(v).trim() !== '')\n  .map(String);\n\n// ===== Input collects =====\nconst collects = $input.first()?.json?.collects || [];\nconst collectCollectionIds = collects\n  .map(c => c?.collection_id)\n  .filter(v => v !== undefined && v !== null)\n  .map(String);\n\n// ===== 1ï¸â£ DELETE =====\n// Exists in collects but NOT in sourceCollectionIds\nconst collection_id_for_delete = collects\n  .filter(c => c && !sourceCollectionIds.includes(String(c.collection_id)))\n  .map(c => ({\n    collect_id: String(c.id),\n    product_id: product_id\n  }));\n\n// ===== 2ï¸â£ UPDATE =====\n// Exists in sourceCollectionIds but NOT in collects\nconst collection_id_to_update = sourceCollectionIds\n  .filter(id => !collectCollectionIds.includes(id))\n  .map(id => ({\n    collect_id: id,\n    product_id: product_id\n  }));\n\n// ===== Build FINAL OUTPUT =====\nconst output = [];\n\n// ---- DELETE FORMAT ----\nif (collection_id_for_delete.length > 0) {\n  for (const c of collection_id_for_delete) {\n    output.push({\n      json: {\n        collect_id: c.collect_id\n      }\n    });\n  }\n}\n\n// ---- UPDATE FORMAT ----\nif (collection_id_to_update.length > 0) {\n  for (const c of collection_id_to_update) {\n    output.push({\n      json: {\n        collect: {\n          product_id: c.product_id,\n          collection_id: c.collect_id\n        }\n      }\n    });\n  }\n}\n\nreturn output;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1156,7 +1156,7 @@
         2048
       ],
       "id": "96e0bd7d-79b2-438b-bbe9-f750e7d63fb5",
-      "name": "🔧 Extract Collects to update or delete",
+      "name": "ð§ Extract Collects to update or delete",
       "alwaysOutputData": false
     },
     {
@@ -1211,7 +1211,7 @@
         2256
       ],
       "id": "24b536eb-20de-436e-8287-2270b3d9f781",
-      "name": "❓Check if update request needed1",
+      "name": "âCheck if update request needed1",
       "alwaysOutputData": false
     },
     {
@@ -1818,7 +1818,7 @@
         2256
       ],
       "id": "9c1c7b06-70e5-4ebc-9c10-56b7d0fb8d57",
-      "name": "💾 Update Google Sheet1",
+      "name": "ð¾ Update Google Sheet1",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "credentials": {
@@ -1851,7 +1851,7 @@
         1840
       ],
       "id": "1ac1e93f-f44e-4cfe-a9bb-b7dc4b7c0ca8",
-      "name": "📥 Get Existing Metafields",
+      "name": "ð¥ Get Existing Metafields",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -1868,7 +1868,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\n// Always safe unwrap (n8n sometimes wraps arrays)\nconst metafields = input.metafields || [];\n\n// IMPORTANT: only take fields that actually exist in update node\nconst productWrapper = $('📝 Format Update Request').item.json;\nconst product = productWrapper.product || {};\n\n// Only include fields that are actually present (not undefined)\nconst sheetData = {};\n\nif (product.hasOwnProperty('material_catalog_url')) {\n  sheetData.material_catalog_url = product.material_catalog_url;\n}\n\nif (product.hasOwnProperty('care_guide_url')) {\n  sheetData.care_guide_url = product.care_guide_url;\n}\n\nif (product.hasOwnProperty('cad_drawing_url')) {\n  sheetData.cad_drawing_url = product.cad_drawing_url;\n}\n\nconst operations = [];\n\n// Only iterate actual incoming fields\nfor (const [key, newValueRaw] of Object.entries(sheetData)) {\n\n  const newValue = (newValueRaw || '').toString().trim();\n\n  const existingField = metafields.find(\n    m => m.namespace === \"custom\" && m.key === key\n  );\n\n  // =========================\n  // DELETE (ONLY if explicitly empty string)\n  // =========================\n  if (newValue === '' && existingField) {\n    operations.push({\n      type: \"delete\",\n      id: existingField.id\n    });\n    continue;\n  }\n\n  // =========================\n  // CREATE\n  // =========================\n  if (newValue !== '' && !existingField) {\n    operations.push({\n      type: \"create\",\n      payload: {\n        metafield: {\n          namespace: \"custom\",\n          key,\n          type: \"url\",\n          value: newValue,\n          owner_id: product.id,\n          owner_resource: \"product\"\n        }\n      }\n    });\n    continue;\n  }\n\n  // =========================\n  // UPDATE\n  // =========================\n  if (\n    newValue !== '' &&\n    existingField &&\n    existingField.value !== newValue\n  ) {\n    operations.push({\n      type: \"update\",\n      id: existingField.id,\n      payload: {\n        metafield: {\n          id: existingField.id,\n          value: newValue,\n          type: \"url\"\n        }\n      }\n    });\n  }\n}\n\n// =========================\n// SAFE OUTPUT\n// =========================\nif (operations.length === 0) {\n  return [{ json: { message: \"No metafield changes detected\" } }];\n}\n\nreturn operations.map(op => ({ json: op }));"
+        "jsCode": "const input = $input.first().json;\n\n// Always safe unwrap (n8n sometimes wraps arrays)\nconst metafields = input.metafields || [];\n\n// IMPORTANT: only take fields that actually exist in update node\nconst productWrapper = $('ð Format Update Request').item.json;\nconst product = productWrapper.product || {};\n\n// Only include fields that are actually present (not undefined)\nconst sheetData = {};\n\nif (product.hasOwnProperty('material_catalog_url')) {\n  sheetData.material_catalog_url = product.material_catalog_url;\n}\n\nif (product.hasOwnProperty('care_guide_url')) {\n  sheetData.care_guide_url = product.care_guide_url;\n}\n\nif (product.hasOwnProperty('cad_drawing_url')) {\n  sheetData.cad_drawing_url = product.cad_drawing_url;\n}\n\nconst operations = [];\n\n// Only iterate actual incoming fields\nfor (const [key, newValueRaw] of Object.entries(sheetData)) {\n\n  const newValue = (newValueRaw || '').toString().trim();\n\n  const existingField = metafields.find(\n    m => m.namespace === \"custom\" && m.key === key\n  );\n\n  // =========================\n  // DELETE (ONLY if explicitly empty string)\n  // =========================\n  if (newValue === '' && existingField) {\n    operations.push({\n      type: \"delete\",\n      id: existingField.id\n    });\n    continue;\n  }\n\n  // =========================\n  // CREATE\n  // =========================\n  if (newValue !== '' && !existingField) {\n    operations.push({\n      type: \"create\",\n      payload: {\n        metafield: {\n          namespace: \"custom\",\n          key,\n          type: \"url\",\n          value: newValue,\n          owner_id: product.id,\n          owner_resource: \"product\"\n        }\n      }\n    });\n    continue;\n  }\n\n  // =========================\n  // UPDATE\n  // =========================\n  if (\n    newValue !== '' &&\n    existingField &&\n    existingField.value !== newValue\n  ) {\n    operations.push({\n      type: \"update\",\n      id: existingField.id,\n      payload: {\n        metafield: {\n          id: existingField.id,\n          value: newValue,\n          type: \"url\"\n        }\n      }\n    });\n  }\n}\n\n// =========================\n// SAFE OUTPUT\n// =========================\nif (operations.length === 0) {\n  return [{ json: { message: \"No metafield changes detected\" } }];\n}\n\nreturn operations.map(op => ({ json: op }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1877,7 +1877,7 @@
         1840
       ],
       "id": "de52e987-2568-4e79-8c89-034fa0444e29",
-      "name": "🧠 Sync Metafields (CREATE / UPDATE / DELETE)"
+      "name": "ð§  Sync Metafields (CREATE / UPDATE / DELETE)"
     },
     {
       "parameters": {
@@ -1995,7 +1995,7 @@
         1552
       ],
       "id": "f1a28848-ba16-4fd9-90fb-2a329bf58bb8",
-      "name": "➕ Shopify: Create Metafields",
+      "name": "â Shopify: Create Metafields",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -2037,7 +2037,7 @@
         1680
       ],
       "id": "615f3ec7-155d-4ee6-b5ca-8324917d5660",
-      "name": "🔄 Shopify: Update Metafields",
+      "name": "ð Shopify: Update Metafields",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -2076,7 +2076,7 @@
         1872
       ],
       "id": "6184a5bc-2bca-47e9-a76a-bd1ea6cdf831",
-      "name": "🗑️ Remove Metafields",
+      "name": "ðï¸ Remove Metafields",
       "notesInFlow": false,
       "retryOnFail": true,
       "maxTries": 2,
@@ -2161,7 +2161,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  METADATA_FIELDS: new Set([\n    'l_cm','w_cm','h_cm','d_cm','t_cm',\n    'l_in','w_in','h_in','d_in','t_in',\n    'opening_w_cm', 'opening_h_cm', 'opening_w_in', 'opening_h_in',\n    'material','description',\n    'weight','product_number',\n    'sheet_name','row_number',\n    'drain_diameter','radius',\n    'surface','signature',\n    'material_catalog_url',\n    'care_guide_url',\n    'cad_drawing_url',\n    'seo_title',\n    'seo_description'\n  ])\n};\n\n// ============================================\n// HELPERS\n// ============================================\nconst hasValue = (v) =>\n  v !== null &&\n  v !== undefined &&\n  v !== '' &&\n  v !== 0 &&\n  v !== '0';\n\n// ============================================\n// SEO NORMALIZER (IMPORTANT FIX)\n// ============================================\nconst getSeoTitle = (p) => {\n  return (\n    p?.seo_title ||\n    ''\n  );\n};\n\nconst getSeoDescription = (p) => {\n  return (\n    p?.seo_description ||\n    p?.description ||\n    ''\n  );\n};\n\n// ============================================\n// BUILD METAFIELDS\n// ============================================\nconst buildMetafields = (p) => {\n  const metafields = [];\n\n  // -------------------------\n  // Custom URLs\n  // -------------------------\n  if (hasValue(p.material_catalog_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"material_catalog_url\",\n      type: \"url\",\n      value: p.material_catalog_url\n    });\n  }\n\n  if (hasValue(p.care_guide_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"care_guide_url\",\n      type: \"url\",\n      value: p.care_guide_url\n    });\n  }\n\n  if (hasValue(p.cad_drawing_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"cad_drawing_url\",\n      type: \"url\",\n      value: p.cad_drawing_url\n    });\n  }\n\n  // -------------------------\n  // SEO FIELDS (ROBUST FIX)\n  // -------------------------\n  const seoTitle = getSeoTitle(p);\n  const seoDescription = getSeoDescription(p);\n\n  if (hasValue(seoTitle)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"title_tag\",\n      type: \"single_line_text_field\",\n      value: String(seoTitle).slice(0, 70)\n    });\n  }\n\n  if (hasValue(seoDescription)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"description_tag\",\n      type: \"multi_line_text_field\",\n      value: String(seoDescription).slice(0, 320)\n    });\n  }\n\n  return metafields;\n};\n\n// ============================================\n// BODY HTML BUILDER\n// ============================================\nconst field = (label, value, suffix = '') =>\n  hasValue(value)\n    ? `<p><strong>${label}:</strong> ${value}${suffix}</p>`\n    : '';\n\nconst buildDimLine = (items, unit) => {\n  const line = items\n    .filter(([, v]) => hasValue(v))\n    .map(([label, v]) => `<strong>${label}:</strong> ${v} ${unit}`)\n    .join('&nbsp;&nbsp;');\n\n  return hasValue(line) ? `<p>${line}</p>` : '';\n};\n\nconst buildBodyHtml = (p) => {\n  const sections = [];\n\n  const isFireplace = p.sheet_name === 'Fireplace'  || p.sheet_name === 'Test data';\n  const isWallCoverings = p.sheet_name === 'Wall-Coverings';\n  const isMarbleSlab = p.sheet_name === 'MarbleSlab';\n  const isMarbleRangeHood =\n    p.sheet_name === 'MarbleRangeHood';\n  const isMoulding =\n    p.sheet_name === 'Moulding';\n  const isStoneMosaicTile =\n    p.sheet_name === 'StoneMosaicTile';\n  const isMarbleMedallion =\n    p.sheet_name === 'MarbleMedallion';\n\n  const dimensionConfig = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : isFireplace || isMarbleRangeHood\n    ? [\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Depth', cm: p.d_cm, inch: p.d_in },\n      ]\n    : isMoulding\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in }\n      ];\n\n  const cmDims = buildDimLine(\n    dimensionConfig.map(d => [d.label, d.cm]),\n    'cm'\n  );\n\n  const inDims = buildDimLine(\n    dimensionConfig.map(d => [d.label, d.inch]),\n    'In'\n  );\n\n  if (cmDims || inDims) {\n    sections.push('<p><strong>Dimensions</strong></p>');\n    if (cmDims) sections.push(cmDims);\n    if (inDims) sections.push(inDims);\n  }\n\n  const openingSizeConfig = isFireplace\n    ? [\n        { label: 'Width', cm: p.opening_w_cm, inch: p.opening_w_in },\n        { label: 'Height', cm: p.opening_h_cm, inch: p.opening_h_in },\n      ]\n    : [];\n\n  const cmOpeningSize = buildDimLine(\n    openingSizeConfig.map(o => [o.label, o.cm]),\n    'cm'\n  );\n\n  const inOpeningSize = buildDimLine(\n    openingSizeConfig.map(o => [o.label, o.inch]),\n    'In'\n  );\n\n  if (cmOpeningSize || inOpeningSize) {\n    sections.push('<p><strong>Opening Size</strong></p>');\n    if (cmOpeningSize) sections.push(cmOpeningSize);\n    if (inOpeningSize) sections.push(inOpeningSize);\n  }\n\n  if (hasValue(p.material)) sections.push(field('Material', p.material));\n  if (hasValue(p.weight)) sections.push(field('Weight', p.weight, ' kg'));\n  if (hasValue(p.description)) sections.push(`<p>${p.description}</p>`);\n  if (hasValue(p.drain_diameter)) sections.push(field('Drain Diameter', p.drain_diameter));\n  if (hasValue(p.radius)) sections.push(field('Radius', p.radius));\n  if (hasValue(p.surface)) sections.push(field('Surface', p.surface));\n  if (hasValue(p.signature)) sections.push(p.signature);\n  if (hasValue(p.product_number)) sections.push(field('Product Number', p.product_number));\n\n  return sections.join('');\n};\n\n// ============================================\n// MAIN\n// ============================================\nconst product = items?.[0]?.json?.product;\nif (!product) return [];\n\nconst bodyHtml = buildBodyHtml(product);\nconst metafields = buildMetafields(product);\n\n// Safe handle fallback\nconst handleFallback =\n  product.handle ||\n  `${product.title || 'product'}-${product.material || ''}-${product.product_number || ''}`\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-|-$/g, '');\n\nconst cleanedProduct = Object.fromEntries(\n  Object.entries({\n    ...product,\n\n    handle: handleFallback,\n\n    ...(hasValue(bodyHtml) ? { body_html: bodyHtml } : {}),\n    ...(metafields.length > 0 ? { metafields } : {})\n  }).filter(([key]) => !CONFIG.METADATA_FIELDS.has(key))\n);\n\nreturn [\n  {\n    json: {\n      product: cleanedProduct\n    }\n  }\n];"
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  METADATA_FIELDS: new Set([\n    'l_cm','w_cm','h_cm','d_cm','t_cm',\n    'l_in','w_in','h_in','d_in','t_in',\n    'opening_w_cm', 'opening_h_cm', 'opening_w_in', 'opening_h_in',\n    'material','description',\n    'weight','product_number',\n    'sheet_name','row_number',\n    'drain_diameter','radius',\n    'surface','signature',\n    'material_catalog_url',\n    'care_guide_url',\n    'cad_drawing_url',\n    'seo_title',\n    'seo_description'\n  ])\n};\n\n// ============================================\n// HELPERS\n// ============================================\nconst hasValue = (v) =>\n  v !== null &&\n  v !== undefined &&\n  v !== '' &&\n  v !== 0 &&\n  v !== '0';\n\n// ============================================\n// SEO NORMALIZER (IMPORTANT FIX)\n// ============================================\nconst getSeoTitle = (p) => {\n  return (\n    p?.seo_title ||\n    ''\n  );\n};\n\nconst getSeoDescription = (p) => {\n  return (\n    p?.seo_description ||\n    p?.description ||\n    ''\n  );\n};\n\n// ============================================\n// BUILD METAFIELDS\n// ============================================\nconst buildMetafields = (p) => {\n  const metafields = [];\n\n  // -------------------------\n  // Custom URLs\n  // -------------------------\n  if (hasValue(p.material_catalog_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"material_catalog_url\",\n      type: \"url\",\n      value: p.material_catalog_url\n    });\n  }\n\n  if (hasValue(p.care_guide_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"care_guide_url\",\n      type: \"url\",\n      value: p.care_guide_url\n    });\n  }\n\n  if (hasValue(p.cad_drawing_url)) {\n    metafields.push({\n      namespace: \"custom\",\n      key: \"cad_drawing_url\",\n      type: \"url\",\n      value: p.cad_drawing_url\n    });\n  }\n\n  // -------------------------\n  // SEO FIELDS (ROBUST FIX)\n  // -------------------------\n  const seoTitle = getSeoTitle(p);\n  const seoDescription = getSeoDescription(p);\n\n  if (hasValue(seoTitle)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"title_tag\",\n      type: \"single_line_text_field\",\n      value: String(seoTitle).slice(0, 70)\n    });\n  }\n\n  if (hasValue(seoDescription)) {\n    metafields.push({\n      namespace: \"global\",\n      key: \"description_tag\",\n      type: \"multi_line_text_field\",\n      value: String(seoDescription).slice(0, 320)\n    });\n  }\n\n  return metafields;\n};\n\n// ============================================\n// BODY HTML BUILDER\n// ============================================\nconst field = (label, value, suffix = '') =>\n  hasValue(value)\n    ? `<p><strong>${label}:</strong> ${value}${suffix}</p>`\n    : '';\n\nconst buildDimLine = (items, unit) => {\n  const line = items\n    .filter(([, v]) => hasValue(v))\n    .map(([label, v]) => `<strong>${label}:</strong> ${v} ${unit}`)\n    .join('&nbsp;&nbsp;');\n\n  return hasValue(line) ? `<p>${line}</p>` : '';\n};\n\nconst buildBodyHtml = (p) => {\n  const sections = [];\n\n  const isFireplace = p.sheet_name === 'Fireplace'  || p.sheet_name === 'Test data';\n  const isWallCoverings = p.sheet_name === 'Wall-Coverings';\n  const isExteriorWallDecoration = p.sheet_name === 'Exterior-Wall-Decoration';\n  const isMarbleSlab = p.sheet_name === 'MarbleSlab';\n  const isMarbleRangeHood =\n    p.sheet_name === 'MarbleRangeHood';\n  const isMoulding =\n    p.sheet_name === 'Moulding';\n  const isStoneMosaicTile =\n    p.sheet_name === 'StoneMosaicTile';\n  const isMarbleMedallion =\n    p.sheet_name === 'MarbleMedallion';\n\n  const dimensionConfig = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : isFireplace || isMarbleRangeHood\n    ? [\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Depth', cm: p.d_cm, inch: p.d_in },\n      ]\n    : isMoulding\n    ? [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in },\n        { label: 'Thickness', cm: p.t_cm, inch: p.t_in }\n      ]\n    : [\n        { label: 'Length', cm: p.l_cm, inch: p.l_in },\n        { label: 'Width', cm: p.w_cm, inch: p.w_in },\n        { label: 'Height', cm: p.h_cm, inch: p.h_in }\n      ];\n\n  const cmDims = buildDimLine(\n    dimensionConfig.map(d => [d.label, d.cm]),\n    'cm'\n  );\n\n  const inDims = buildDimLine(\n    dimensionConfig.map(d => [d.label, d.inch]),\n    'In'\n  );\n\n  if (cmDims || inDims) {\n    sections.push('<p><strong>Dimensions</strong></p>');\n    if (cmDims) sections.push(cmDims);\n    if (inDims) sections.push(inDims);\n  }\n\n  const openingSizeConfig = isFireplace\n    ? [\n        { label: 'Width', cm: p.opening_w_cm, inch: p.opening_w_in },\n        { label: 'Height', cm: p.opening_h_cm, inch: p.opening_h_in },\n      ]\n    : [];\n\n  const cmOpeningSize = buildDimLine(\n    openingSizeConfig.map(o => [o.label, o.cm]),\n    'cm'\n  );\n\n  const inOpeningSize = buildDimLine(\n    openingSizeConfig.map(o => [o.label, o.inch]),\n    'In'\n  );\n\n  if (cmOpeningSize || inOpeningSize) {\n    sections.push('<p><strong>Opening Size</strong></p>');\n    if (cmOpeningSize) sections.push(cmOpeningSize);\n    if (inOpeningSize) sections.push(inOpeningSize);\n  }\n\n  if (hasValue(p.material)) sections.push(field('Material', p.material));\n  if (hasValue(p.weight)) sections.push(field('Weight', p.weight, ' kg'));\n  if (hasValue(p.description)) sections.push(`<p>${p.description}</p>`);\n  if (hasValue(p.drain_diameter)) sections.push(field('Drain Diameter', p.drain_diameter));\n  if (hasValue(p.radius)) sections.push(field('Radius', p.radius));\n  if (hasValue(p.surface)) sections.push(field('Surface', p.surface));\n  if (hasValue(p.signature)) sections.push(p.signature);\n  if (hasValue(p.product_number)) sections.push(field('Product Number', p.product_number));\n\n  return sections.join('');\n};\n\n// ============================================\n// MAIN\n// ============================================\nconst product = items?.[0]?.json?.product;\nif (!product) return [];\n\nconst bodyHtml = buildBodyHtml(product);\nconst metafields = buildMetafields(product);\n\n// Safe handle fallback\nconst handleFallback =\n  product.handle ||\n  `${product.title || 'product'}-${product.material || ''}-${product.product_number || ''}`\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-|-$/g, '');\n\nconst cleanedProduct = Object.fromEntries(\n  Object.entries({\n    ...product,\n\n    handle: handleFallback,\n\n    ...(hasValue(bodyHtml) ? { body_html: bodyHtml } : {}),\n    ...(metafields.length > 0 ? { metafields } : {})\n  }).filter(([key]) => !CONFIG.METADATA_FIELDS.has(key))\n);\n\nreturn [\n  {\n    json: {\n      product: cleanedProduct\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -2170,11 +2170,11 @@
         2928
       ],
       "id": "28ee8e9b-a8a8-4dad-8d4c-4d30b8a6a741",
-      "name": "📝 Format Create Request"
+      "name": "ð Format Create Request"
     }
   ],
   "pinData": {
-    "⏰ Daily Trigger at 9 AM": [
+    "â° Daily Trigger at 9 AM": [
       {
         "json": {
           "timestamp": "2026-04-07T09:00:09.003-04:00",
@@ -2200,36 +2200,36 @@
       "main": [
         [
           {
-            "node": "🔁 Process Each Product",
+            "node": "ð Process Each Product",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "⏰ Daily Trigger at 9 AM": {
+    "â° Daily Trigger at 9 AM": {
       "main": [
         [
           {
-            "node": "📋 Get Sheet Names",
+            "node": "ð Get Sheet Names",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📋 Get Sheet Names": {
+    "ð Get Sheet Names": {
       "main": [
         [
           {
-            "node": "🔄 Loop Through Sheets",
+            "node": "ð Loop Through Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔄 Loop Through Sheets": {
+    "ð Loop Through Sheets": {
       "main": [
         [
           {
@@ -2240,86 +2240,86 @@
         ],
         [
           {
-            "node": "📖 Read Sheet Data",
+            "node": "ð Read Sheet Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📖 Read Sheet Data": {
+    "ð Read Sheet Data": {
       "main": [
         [
           {
-            "node": "✅ Filter Unacknowledged & Ready to Post",
+            "node": "â Filter Unacknowledged & Ready to Post",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "✅ Filter Unacknowledged & Ready to Post": {
+    "â Filter Unacknowledged & Ready to Post": {
       "main": [
         [
           {
-            "node": "⏸️ Rate Limit (200ms)",
+            "node": "â¸ï¸ Rate Limit (200ms)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "⏸️ Rate Limit (200ms)": {
+    "â¸ï¸ Rate Limit (200ms)": {
       "main": [
         [
           {
-            "node": "🔄 Loop Through Sheets",
+            "node": "ð Loop Through Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔁 Process Each Product": {
+    "ð Process Each Product": {
       "main": [
         [],
         [
           {
-            "node": "🔀 Route: Create or Update",
+            "node": "ð Route: Create or Update",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔀 Route: Create or Update": {
+    "ð Route: Create or Update": {
       "main": [
         [
           {
-            "node": "📝 Format Update Request",
+            "node": "ð Format Update Request",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "📝 Format Create Request",
+            "node": "ð Format Create Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📝 Format Update Request": {
+    "ð Format Update Request": {
       "main": [
         [
           {
-            "node": "❓Check if update request needed1",
+            "node": "âCheck if update request needed1",
             "type": "main",
             "index": 0
           },
           {
-            "node": "❓Check if update request needed",
+            "node": "âCheck if update request needed",
             "type": "main",
             "index": 0
           },
@@ -2331,7 +2331,7 @@
         ]
       ]
     },
-    "🔄 Shopify: Update Product": {
+    "ð Shopify: Update Product": {
       "main": [
         [
           {
@@ -2342,45 +2342,45 @@
         ]
       ]
     },
-    "📦 Parse Update Response": {
+    "ð¦ Parse Update Response": {
       "main": [
         [
           {
-            "node": "💾 Update Google Sheet",
+            "node": "ð¾ Update Google Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "➕ Shopify: Create Product": {
+    "â Shopify: Create Product": {
       "main": [
         [
           {
-            "node": "🔗 Build Collection Mappings",
+            "node": "ð Build Collection Mappings",
             "type": "main",
             "index": 0
           },
           {
-            "node": "📦 Parse Create Response",
+            "node": "ð¦ Parse Create Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📦 Parse Create Response": {
+    "ð¦ Parse Create Response": {
       "main": [
         [
           {
-            "node": "💾 Update Google Sheet",
+            "node": "ð¾ Update Google Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "💾 Update Google Sheet": {
+    "ð¾ Update Google Sheet": {
       "main": [
         [
           {
@@ -2391,67 +2391,67 @@
         ]
       ]
     },
-    "🔗 Build Collection Mappings": {
+    "ð Build Collection Mappings": {
       "main": [
         [
           {
-            "node": "➕ Shopify: Add to Collection",
+            "node": "â Shopify: Add to Collection",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📥 Get Product Collections": {
+    "ð¥ Get Product Collections": {
       "main": [
         [
           {
-            "node": "❓ Has Existing Collections?",
+            "node": "â Has Existing Collections?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🗑️ Remove from Collections": {
+    "ðï¸ Remove from Collections": {
       "main": [
         []
       ]
     },
-    "🔗 Pass Update Request": {
+    "ð Pass Update Request": {
       "main": [
         [
           {
-            "node": "🔗 Build Collection Mappings",
+            "node": "ð Build Collection Mappings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "❓ Has Existing Collections?": {
+    "â Has Existing Collections?": {
       "main": [
         [
           {
-            "node": "🔧 Extract Collects to update or delete",
+            "node": "ð§ Extract Collects to update or delete",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "🔗 Pass Update Request",
+            "node": "ð Pass Update Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "❓Check if update request needed": {
+    "âCheck if update request needed": {
       "main": [
         [
           {
-            "node": "🔄 Shopify: Update Product",
+            "node": "ð Shopify: Update Product",
             "type": "main",
             "index": 0
           }
@@ -2465,40 +2465,40 @@
         ]
       ]
     },
-    "❓Check for update or delete": {
+    "âCheck for update or delete": {
       "main": [
         [
           {
-            "node": "🗑️ Remove from Collections",
+            "node": "ðï¸ Remove from Collections",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "➕ Shopify: Add to Collection",
+            "node": "â Shopify: Add to Collection",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🔧 Extract Collects to update or delete": {
+    "ð§ Extract Collects to update or delete": {
       "main": [
         [
           {
-            "node": "❓Check for update or delete",
+            "node": "âCheck for update or delete",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "❓Check if update request needed1": {
+    "âCheck if update request needed1": {
       "main": [
         [
           {
-            "node": "📥 Get Product Collections",
+            "node": "ð¥ Get Product Collections",
             "type": "main",
             "index": 0
           }
@@ -2509,14 +2509,14 @@
       "main": [
         [
           {
-            "node": "💾 Update Google Sheet1",
+            "node": "ð¾ Update Google Sheet1",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "🔁 Process Each Product",
+            "node": "ð Process Each Product",
             "type": "main",
             "index": 0
           }
@@ -2524,18 +2524,18 @@
         []
       ]
     },
-    "📥 Get Existing Metafields": {
+    "ð¥ Get Existing Metafields": {
       "main": [
         [
           {
-            "node": "🧠 Sync Metafields (CREATE / UPDATE / DELETE)",
+            "node": "ð§  Sync Metafields (CREATE / UPDATE / DELETE)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "🧠 Sync Metafields (CREATE / UPDATE / DELETE)": {
+    "ð§  Sync Metafields (CREATE / UPDATE / DELETE)": {
       "main": [
         [
           {
@@ -2550,21 +2550,21 @@
       "main": [
         [
           {
-            "node": "➕ Shopify: Create Metafields",
+            "node": "â Shopify: Create Metafields",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "🔄 Shopify: Update Metafields",
+            "node": "ð Shopify: Update Metafields",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "🗑️ Remove Metafields",
+            "node": "ðï¸ Remove Metafields",
             "type": "main",
             "index": 0
           }
@@ -2575,7 +2575,7 @@
       "main": [
         [
           {
-            "node": "📥 Get Existing Metafields",
+            "node": "ð¥ Get Existing Metafields",
             "type": "main",
             "index": 0
           },
@@ -2598,18 +2598,18 @@
       "main": [
         [
           {
-            "node": "📦 Parse Update Response",
+            "node": "ð¦ Parse Update Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📝 Format Create Request": {
+    "ð Format Create Request": {
       "main": [
         [
           {
-            "node": "➕ Shopify: Create Product",
+            "node": "â Shopify: Create Product",
             "type": "main",
             "index": 0
           }
@@ -2626,7 +2626,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "3d2cede0-cc13-434f-93ae-f9afaef53392",
+  "versionId": "05fc9cd6-810b-4444-b036-2cbab11f6091",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"

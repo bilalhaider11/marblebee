@@ -26,14 +26,14 @@
         "rule": {
           "interval": [
             {
-              "field": "weeks",
-              "weeksInterval": 1
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
             }
           ]
         }
       },
       "id": "node-trigger",
-      "name": "Weekly Trigger",
+      "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -71,9 +71,9 @@
             },
             {
               "id": "a5",
-              "name": "pinsPerDay",
-              "type": "number",
-              "value": 3
+              "name": "manualBlogsTab",
+              "type": "string",
+              "value": "Manual Blogs"
             },
             {
               "id": "a6",
@@ -85,7 +85,7 @@
               "id": "a7",
               "name": "postingHours",
               "type": "string",
-              "value": "9,13,17"
+              "value": "7,8,9,10,11,12,13,14,15,16,17,18,19,20,21"
             }
           ]
         },
@@ -180,7 +180,7 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1180,
+        1560,
         200
       ]
     },
@@ -195,7 +195,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1180,
+        1560,
         40
       ]
     },
@@ -217,20 +217,20 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1400,
+        1780,
         320
       ]
     },
     {
       "parameters": {
-        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst pinsPerDay = parseInt(cfg.pinsPerDay) || 3;\nconst hours = (cfg.postingHours || '9,13,17').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || '';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\n// Isolate our article content wrapper (.mb-blog-content) via balanced <div> matching\nfunction contentRegion(h){\n  const marker = h.indexOf('mb-blog-content');\n  if (marker < 0) return h;\n  const start = h.lastIndexOf('<div', marker);\n  if (start < 0) return h;\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = h.length;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return h.slice(start, end);\n}\nconst region = contentRegion(html);\n\n// Extract content image URLs (Shopify CDN or Google Drive), in order, deduped\nconst urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\nconst seen = new Set(); const images = [];\nfor (let raw of urls) {\n  let u = raw.replace(/&amp;/g,'&');\n  const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n  const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n  const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n  if (!(isShopify || isDrive || isExt)) continue;\n  let key;\n  if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n  else key = u.split('?')[0];\n  if (!seen.has(key)) { seen.add(key); images.push(u); }\n}\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\nlet board = ''; let boardId = ''; // chosen manually by the reviewer\n\nconst pins = images.map((img, i) => {\n  const day = Math.floor(i / pinsPerDay);\n  const hour = hours[(i % pinsPerDay) % hours.length] || 9;\n  const scheduledDate = $now.plus({ days: day + 1 }).set({ hour: hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, board, boardId, text, imageCount: images.length, pins } }];\n"
+        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\n// Isolate our article content wrapper (.mb-blog-content) via balanced <div> matching\nfunction contentRegion(h){\n  const marker = h.indexOf('mb-blog-content');\n  if (marker < 0) return h;\n  const start = h.lastIndexOf('<div', marker);\n  if (start < 0) return h;\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = h.length;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return h.slice(start, end);\n}\nconst region = contentRegion(html);\n\n// Extract content image URLs (Shopify CDN or Google Drive), in order, deduped\nconst urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\nconst seen = new Set(); const images = [];\nfor (let raw of urls) {\n  let u = raw.replace(/&amp;/g,'&');\n  u = u.replace(/[.,;:!?]+$/, '');\n  if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n    const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n    if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n    else continue;\n  }\n  const qi = u.indexOf('?');\n  if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n  const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n  const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n  const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n  if (!(isShopify || isDrive || isExt)) continue;\n  let key;\n  if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n  else key = u.split('?')[0];\n  if (!seen.has(key)) { seen.add(key); images.push(u); }\n}\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\nlet board = ''; let boardId = ''; // chosen manually by the reviewer\n\nconst pins = images.map((img, i) => {\n  const hour = hours[i % hours.length] || 9;\n  const scheduledDate = $now.plus({ days: 1 }).set({ hour: hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, board, boardId, text, imageCount: images.length, pins } }];\n"
       },
       "id": "node-extract",
       "name": "Extract & Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1620,
+        2000,
         320
       ]
     },
@@ -264,8 +264,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1840,
-        320
+        2440,
+        200
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -283,7 +283,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2060,
+        2660,
         320
       ]
     },
@@ -307,7 +307,7 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        2280,
+        2880,
         320
       ],
       "credentials": {
@@ -319,14 +319,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 240, 160)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': pin.board,\n    'Board ID': pin.boardId,\n    'Scheduled Date': pin.scheduledDate,\n    'Approval': '',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': pin.board,\n    'Board ID': pin.boardId,\n    'Scheduled Date': pin.scheduledDate,\n    'Approval': '',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
       },
       "id": "node-buildrow",
       "name": "Build Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2500,
+        3100,
         320
       ]
     },
@@ -355,8 +355,191 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        2720,
+        3320,
         320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nreturn [{ json: { ...item, _source: 'blogs' } }];"
+      },
+      "id": "node-mapregular",
+      "name": "Map Regular Blogs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Manual Blogs",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-getmanual",
+      "name": "Get Manual Blog Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        760,
+        480
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "m1",
+              "leftValue": "={{ ($json['Manual Blog URL'] || '').toString().trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "m2",
+              "leftValue": "={{ ($json['Pinterest Status'] || '').toString().trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-filtermanual",
+      "name": "Filter Manual Eligible",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nreturn [{ json: {\n  'BLog-URL': item['Manual Blog URL'] || '',\n  'Manual Blog URL': item['Manual Blog URL'] || '',\n  'Category': item['Category'] || '',\n  '_source': 'manual'\n} }];"
+      },
+      "id": "node-mapmanual",
+      "name": "Map Manual Blogs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "node-merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "if1",
+              "leftValue": "={{ $('Loop Over Blogs').item.json._source }}",
+              "rightValue": "manual",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-ifmanual",
+      "name": "IF Manual Blog",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Manual Blogs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Manual Blog URL"
+          ],
+          "value": {
+            "Manual Blog URL": "={{ $('Loop Over Blogs').item.json['Manual Blog URL'] }}",
+            "Pinterest Status": "Queued"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-updatemanual",
+      "name": "Update Manual Blog Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2440,
+        440
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -367,22 +550,16 @@
     }
   ],
   "connections": {
-    "Weekly Trigger": {
-      "main": [
-        [
-          {
-            "node": "Set Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Set Config": {
       "main": [
         [
           {
             "node": "Get Blog Rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Manual Blog Rows",
             "type": "main",
             "index": 0
           }
@@ -401,6 +578,61 @@
       ]
     },
     "Filter Eligible": {
+      "main": [
+        [
+          {
+            "node": "Map Regular Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Regular Blogs": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Manual Blog Rows": {
+      "main": [
+        [
+          {
+            "node": "Filter Manual Eligible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Manual Eligible": {
+      "main": [
+        [
+          {
+            "node": "Map Manual Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Manual Blogs": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
       "main": [
         [
           {
@@ -438,7 +670,36 @@
       "main": [
         [
           {
+            "node": "IF Manual Blog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Manual Blog": {
+      "main": [
+        [
+          {
+            "node": "Update Manual Blog Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Mark Blog Queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Manual Blog Row": {
+      "main": [
+        [
+          {
+            "node": "Split Pins",
             "type": "main",
             "index": 0
           }
@@ -494,6 +755,17 @@
         [
           {
             "node": "Loop Over Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
             "type": "main",
             "index": 0
           }
