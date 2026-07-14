@@ -15,23 +15,23 @@
       "typeVersion": 1.3,
       "position": [
         -1024,
-        -208
+        2736
       ],
       "id": "d13a8dd9-4f19-42c8-a950-bdef0961bf88",
-      "name": "\u23f0 Daily Schedule Trigger"
+      "name": "⏰ Daily Schedule Trigger"
     },
     {
       "parameters": {
-        "jsCode": "const GOOGLE_SHEETS = [\n  'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab',\n  '2026Instock', 'DoorSurround', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion'\n    // 'Test data'  // Uncomment for testing\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
+        "jsCode": "const GOOGLE_SHEETS = [\n  // 'Test data',  // Uncomment for testing\n  'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab',\n  '2026Instock', 'DoorSurround', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion'\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -752,
-        -208
+        -784,
+        2736
       ],
       "id": "435489da-d0ea-4f9f-a537-af8615c67a39",
-      "name": "\ud83d\udccb Load Target Sheet Names"
+      "name": "📋 Load Target Sheet Names"
     },
     {
       "parameters": {
@@ -40,24 +40,24 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -528,
-        -208
+        -544,
+        2736
       ],
       "id": "4a60d8cb-2f15-4ffb-b02a-cd1b0de059a5",
-      "name": "\ud83d\udd01 Iterate Sheets"
+      "name": "🔁 Iterate Sheets"
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = Object.freeze({\n  SHEET_NAME: $('\ud83d\udd01 Iterate Sheets').item.json.sheet_name ?? '',\n});\n\n// ============================================\n// PRODUCT META\n// ============================================\nconst PRODUCT_META = Object.freeze({\n  Statue: {\n    type: 'marble statue',\n    environment: 'garden or interior space',\n  },\n\n  Animal: {\n    type: 'animal sculpture',\n    environment: 'decorative space',\n  },\n\n  Bench: {\n    type: 'bench',\n    environment: 'garden or outdoor luxury space',\n  },\n\n  Planter: {\n    type: 'planter',\n    environment: 'terrace or garden space',\n  },\n\n  Fountain: {\n    type: 'fountain',\n    environment: 'luxury garden',\n  },\n\n  Lamppost: {\n    type: 'lamppost',\n    environment: 'garden pathway',\n  },\n\n  Bathtub: {\n    type: 'bathtub',\n    environment: 'luxury bathroom',\n  },\n\n  Sink: {\n    type: 'sink',\n    environment: 'bathroom vanity area',\n  },\n\n  Vanity: {\n    type: 'vanity',\n    environment: 'luxury bathroom interior',\n  },\n\n  Fireplace: {\n    type: 'fireplace',\n    environment: 'luxury interior living room',\n    introOverride:\n      `Identify fireplace style first (French, Modern, Classic, English).`,\n  },\n\n  Table: {\n    type: 'table',\n    environment: 'dining interior space',\n    introOverride:\n      `Identify table type and seating capacity (4, 6, 8).`,\n  },\n});\n\n// ============================================\n// UTILITIES\n// ============================================\nconst hasValue = (v) =>\n  v !== undefined &&\n  v !== null &&\n  String(v).trim() !== '';\n\nconst getProductMeta = (sheetName) =>\n  PRODUCT_META[sheetName] ?? {\n    type: 'product',\n    environment: 'luxury space',\n  };\n\n// ============================================\n// DIMENSIONS NORMALIZATION\n// ============================================\nconst normalizeDimensions = (data) => ({\n  length: data['Length Inch'] ?? '',\n  width: data['Width Inch'] ?? '',\n  height: data['Height Inch'] ?? '',\n  depth: data['Depth Inch'] ?? '',\n  thickness: data['Thickness Inch'] ?? '',\n});\n\n// ============================================\n// PROMPT BUILDER (JSON OUTPUT VERSION)\n// ============================================\nconst buildPrompt = ({\n  sheetName,\n  dimensions,\n  material,\n  keyword,\n  finish,\n  promptRules,\n}) => {\n\n  const {\n    type,\n    environment,\n    introOverride\n  } = getProductMeta(sheetName);\n\n  const intro =\n    introOverride ??\n    `Analyze the image and identify the product as a ${type}.`;\n\n  let prompt = `\n${intro}\n\nROLE:\nYou are a Shopify SEO copywriter for luxury marble products.\n\n================================================\nTASK 1\n================================================\n\nGenerate:\n\n- Version1 title + description\n- Version2 title + description\n\nRULES:\n- Descriptions around 80-120 words\n- Luxury tone only\n- Accurate visual description only\n- Do not hallucinate features\n- Keyword MUST be the first word(s) of each title and appear exactly once\n- Keyword must appear exactly once per description\n- Mention material naturally\n- Mention dimensions only if available\n\n================================================\nTASK 2 (SHOPIFY SEO)\n================================================\n\nGenerate:\n\n- SEO title\n- Meta description\n\nSEO TITLE RULES:\n- 50-60 characters ideal\n- Front-load important keywords\n- Use ONLY one best template internally\n\nSEO TITLE TEMPLATES:\nT1: [Style] Marble ${type} | [Feature] | [Material]\nT2: [Keyword] | [Feature] | [Material]\nT3: [Keyword] | [Material] | MarbleBee\n\nMETA DESCRIPTION RULES:\n- 140-160 characters ideal\n- Luxury ecommerce tone\n- Use ONLY one best template internally\n\nMETA DESCRIPTION TEMPLATES:\nT1: Shop [Keyword] handcrafted from marble with premium [Finish].\nT2: Discover [Keyword] made from natural marble for luxury interiors.\nT3: Bring elegance with [Keyword] crafted for luxury spaces.\nT4: Premium [Keyword] with [Finish] finish for interiors.\nT5: Explore [Keyword] for luxury homes and hotels.\n\n================================================\nDIMENSIONS\n================================================\n\nLength: ${dimensions.length}\nWidth: ${dimensions.width}\nHeight: ${dimensions.height}\nDepth: ${dimensions.depth}\nThickness: ${dimensions.thickness}\n\nRULES:\n- Use only available values\n- Never assume missing dimensions\n\n================================================\nPRODUCT INFO\n================================================\n\nKeyword: ${keyword}\nMaterial: ${material}\nFinish: ${finish || 'infer visually'}\nEnvironment: ${environment}\nProduct Type: ${type}\n\n================================================\nSTRICT RULES\n================================================\n\n- No markdown\n- No explanations\n- No reasoning\n- No template evaluation output\n- No extra text\n- No code fences\n- Output ONLY valid JSON\n\n================================================\nFINAL OUTPUT FORMAT (STRICT JSON ONLY)\n================================================\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`;\n\n  if (hasValue(promptRules)) {\n    prompt += `\n\n================================================\nEXTRA RULES\n================================================\n\n${promptRules}\n`;\n  }\n\n  return prompt.trim();\n};\n\n\n// ============================================\n// WALL COVERING PROMPT BUILDER\n// ============================================\nconst buildWallCoveringPrompt = ({ keyword, material, finish }) => {\n  const kw   = keyword  ? `\\nSupplied keyword: ${keyword}`  : '';\n  const mat  = material ? `\\nMaterial: ${material}`         : '';\n  const fin  = finish   ? `\\nFinish: ${finish}`             : '';\n\n  return `\n# Analyze Natural Stone Wall Covering & Generate Shopify SEO Content\n\nAnalyze the image and identify the type, surface, and architectural style of the natural stone wall covering.\n\n# ROLE\n\nYou are a Shopify SEO copywriter specializing in luxury natural stone wall coverings, architectural stone panels, and decorative marble surfaces.\nYour writing should reflect the vocabulary used by architects, interior designers, landscape designers, and stone manufacturers.\n\n# Product Categories\n\nThe wall covering belongs to ONE of the following categories:\n\n1. Marble Decorative Breeze Blocks (Carved openwork stone blocks.)\n\n2. Architectural Surface Systems\n   - Linear & Fluted Collections\n   - Geometric & Faceted Collections\n   - Sculptural & Parametric Panels\n\n3. Natural Stone Surface Finishes (flat panels with surface treatments)\n   - Polished, Honed, Leathered, Brushed, Axe-cut, Antique, Acid-Washed,\n     Bush-hammered, Sandblasted, Flamed, Split Face, Chiseled\n\n4. Mosaic / Pattern Wall Panels\n   KEY INDICATOR: The surface is made of MULTIPLE SEPARATE small tiles or pieces\n   assembled/joined together. Look for individual tiles, grout lines, or visible\n   joints between pieces.\n   Includes: stone mosaics, herringbone tile layouts, chevron patterns, basketweave,\n   hexagonal tiles, penny tiles, arabesque, fish scale, brick-bond stone tiles,\n   stacked tile arrangements, mixed-material mosaic panels, pebble mosaics.\n   IMPORTANT: Even if the mosaic tiles form a linear or geometric pattern, always\n   identify as Mosaic \u2014 not Architectural Surface Systems \u2014 if the surface is built\n   from individual assembled pieces. The key distinction is:\n   - Architectural Surface Systems = one continuous stone with carved/shaped texture\n   - Mosaic / Pattern Wall Panels = many separate pieces assembled together\n\n# Step 1 - Identify the Wall\n\nDetermine: Product Category, Surface Type, Surface Finish, Architectural Style, Material.\n\n# Step 2 - Professional Architectural Terminology\n\nIdentify the accepted architectural, interior design, or stone industry term.\nExamples: Fluted, Reeded, Cannelured, Ribbed, Grooved, Corrugated, Faceted, Tessellated,\nParametric, Bas-relief, High-relief, Scalloped, Chamfered, Split-face, Bush-hammered,\nLeathered, Sandblasted, Honed, Flamed, Chiseled.\nNever invent professional terminology.\n\n# Step 3 - Write 2 SEO Titles\n\nFormat: [Primary Keyword] + [Feature Description]\nRules: max 10 words, no duplicate words, use professional architectural terms.\n${kw}${mat}${fin}\n\n# Step 4 - Write 2 Product Descriptions (80-100 words each)\n\nRequirements:\n- Include the generated title naturally\n- Repeat the primary keyword once naturally\n- Mention the material whenever recognizable (marble, limestone, travertine, granite, sandstone, etc.)\n- Describe surface texture, visual appearance, craftsmanship, color, depth, relief, tactile quality\n- Explain how the surface interacts with light and shadow throughout the day\n- Describe how the texture contributes to: visual rhythm, depth, movement, spatial perception, warmth, timeless elegance\n- Elegant, luxurious, architectural tone for a premium Shopify product page\n\nAlso generate:\n- SEO title: 50-60 characters, front-load keyword\n- Meta description: 140-160 characters, luxury ecommerce tone\n\n# STRICT OUTPUT RULES\n\n- No markdown, no explanations, no reasoning, no code fences\n- Output ONLY valid JSON\n\n# FINAL OUTPUT FORMAT (STRICT JSON ONLY)\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`.trim();\n};\n\n\n// ============================================\n// FIREPLACE PROMPT BUILDER\n// ============================================\nconst buildFireplacePrompt = ({ keyword, material, dimensions, finish }) => {\n  const dim = [];\n  if (dimensions.length)    dim.push(`Length: ${dimensions.length}`);\n  if (dimensions.width)     dim.push(`Width: ${dimensions.width}`);\n  if (dimensions.height)    dim.push(`Height: ${dimensions.height}`);\n  if (dimensions.depth)     dim.push(`Depth: ${dimensions.depth}`);\n  if (dimensions.thickness) dim.push(`Thickness: ${dimensions.thickness}`);\n  const dimBlock = dim.length ? dim.join('\\n') : 'Not provided';\n\n  return `\nAnalyze the fireplace image and generate product copy.\n\nROLE\n\nYou are a Shopify SEO copywriter specializing in natural stone fireplaces.\n\n================================================\nSTEP 1\n================================================\n\nIdentify the one or two most distinctive visible architectural features of the fireplace.\n\nExamples:\n- Fluted pilasters\n- Arched opening\n- Straight legs\n- Curved legs\n- Scroll carving\n- Floral carving\n- Relief carving\n- Plain frieze\n- Stepped surround\n- Beveled edges\n- Column supports\n- Minimalist design\n- Geometric lines\n- Curved mantel shelf\n- Rectangular opening\n- Layered molding\n\nRules:\n- Use ONLY features clearly visible in the image.\n- Prefer describing visible architectural features over naming a design style.\n- If several features are visible, select the one or two most distinctive.\n\n================================================\nTASK 1\n================================================\n\nGenerate:\n\nVersion 1\n- Title\n- Description\n\nVersion 2\n- Title\n- Description\n\n================================================\nTITLE RULES\n================================================\n\nFormat:\nKeyword + Material + Primary Feature\n\nVersion 1: Keyword + Material + Primary Feature\nVersion 2: Keyword + Material + Primary Feature + Secondary Feature\n\nRules:\n- The Keyword MUST appear exactly as provided.\n- The Keyword MUST be the first words of the title.\n- Use only visible features.\n- Use the provided Material.\n- Do not invent information.\n- Do not use promotional adjectives.\n- Do not use marketing words.\n- Keep titles concise and natural.\n\nForbidden words include:\nLuxury, Elegant, Beautiful, Premium, Exquisite, Timeless, Sophisticated,\nStunning, Unique, Handcrafted, Designer, High-end, Magnificent\n\n================================================\nDESCRIPTION RULES\n================================================\n\n- 80\u2013120 words.\n- The generated title MUST appear exactly once as the first sentence.\n- Describe only what is visible.\n- Mention the material naturally.\n- Mention the identified architectural feature(s).\n- Mention the surface finish if it can be inferred visually.\n- Mention dimensions only if provided.\n- Do not repeat the title.\n- Do not invent information.\n- Do not describe emotions or lifestyle.\n- Do not use promotional adjectives or marketing language.\n\n================================================\nPRODUCT INFO\n================================================\n\nKeyword: ${keyword}\nMaterial: ${material}\nFinish: ${finish || 'infer visually'}\n\n================================================\nDIMENSIONS\n================================================\n\n${dimBlock}\n\nRules:\n- Use only available values.\n- Never assume missing dimensions.\n\n================================================\nTASK 2 (SHOPIFY SEO)\n================================================\n\nGenerate:\n- SEO title\n- Meta description\n\nSEO TITLE RULES:\n- 50-60 characters ideal\n- Must start with the keyword\n- Front-load important keywords\n\nMETA DESCRIPTION RULES:\n- 140-160 characters ideal\n- Factual ecommerce tone\n- No promotional adjectives\n- No forbidden words\n\n================================================\nSTRICT RULES\n================================================\n\n- No markdown\n- No explanations\n- No reasoning\n- No extra text\n- No code fences\n- Output ONLY valid JSON\n\n================================================\nFINAL OUTPUT FORMAT (STRICT JSON ONLY)\n================================================\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`.trim();\n};\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\nconst outputItems = items\n  .map(({ json }) => {\n\n    if (\n      !json ||\n      json.Generate_Title_Description !== 'yes' ||\n      (\n        json.Title_Shopify &&\n        json.Description_Shopify\n      )\n    ) {\n      return null;\n    }\n\n    const keyword =\n      json['Keywords (Luna)'] ?? '';\n\n    const dimensions =\n      normalizeDimensions(json);\n\n    return {\n      json: {\n        row_number:\n          json.row_number ?? 0,\n\n        sheet_name:\n          CONFIG.SHEET_NAME,\n\n        keyword,\n\n        Image_Url:\n          json['IMAGE URL3'],\n\n        material:\n          json.Material ?? '',\n\n        finish:\n          json.Finish ?? '',\n\n        dimensions,\n\n        prompt: CONFIG.SHEET_NAME === 'Wall-Coverings' || CONFIG.SHEET_NAME === 'Exterior-Wall-Decoration'\n          ? buildWallCoveringPrompt({\n              keyword,\n              material: json.Material ?? '',\n              finish:   json.Finish   ?? '',\n            })\n          : CONFIG.SHEET_NAME === 'Fireplace'\n          ? buildFireplacePrompt({\n              keyword,\n              material:   json.Material   ?? '',\n              finish:     json.Finish     ?? '',\n              dimensions,\n            })\n          : buildPrompt({\n              sheetName:   CONFIG.SHEET_NAME,\n              dimensions,\n              material:    json.Material ?? '',\n              keyword,\n              finish:      json.Finish   ?? '',\n              promptRules: json.Prompt_Rules ?? '',\n            }),\n      },\n    };\n\n  })\n  .filter(Boolean);\n\nreturn outputItems.length\n  ? outputItems\n  : null;"
+        "jsCode": "const sheetName = $('🔁 Iterate Sheets').item.json.sheet_name ?? '';\n\nconst normalizeDimensions = (data) => ({\n  length:    data['Length Inch']    ?? '',\n  width:     data['Width Inch']     ?? '',\n  height:    data['Height Inch']    ?? '',\n  depth:     data['Depth Inch']     ?? '',\n  thickness: data['Thickness Inch'] ?? '',\n});\n\nreturn items\n  .map(({ json }) => {\n    const imageUrl = (json['IMAGE URL3'] ?? '').toString().trim();\n    if (\n      !json ||\n      json.Generate_Title_Description !== 'yes' ||\n      (json.Title_Shopify && json.Description_Shopify) ||\n      !imageUrl.startsWith('http')\n    ) return null;\n\n    return {\n      json: {\n        row_number: json.row_number ?? 0,\n        sheet_name: sheetName,\n        keyword:    json['Keywords (Luna)'] ?? '',\n        material:   json.Material ?? '',\n        finish:     json.Finish   ?? '',\n        dimensions: normalizeDimensions(json),\n        Image_Url:  json['IMAGE URL3'],\n        promptRules: json.Prompt_Rules ?? '',\n      },\n    };\n  })\n  .filter(Boolean);"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -32,
-        -32
+        128,
+        2752
       ],
       "id": "d7031f18-7f44-4af1-80ae-6e7556d34a50",
-      "name": "\ud83e\udde0 Build AI Prompt from Product Data",
+      "name": "🧹 Prepare & Filter Product Data",
       "alwaysOutputData": true
     },
     {
@@ -66,16 +66,16 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
+            "typeValidation": "loose",
             "version": 3
           },
           "conditions": [
             {
               "id": "618b8903-999a-41ba-a5f5-d58f15e25268",
-              "leftValue": "={{ $json }}",
+              "leftValue": "={{ $json.Image_Url }}",
               "rightValue": "",
               "operator": {
-                "type": "object",
+                "type": "string",
                 "operation": "notEmpty",
                 "singleValue": true
               }
@@ -88,11 +88,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -272,
-        -224
+        -592,
+        2512
       ],
       "id": "1d34b23a-e957-4ea3-b4ef-172d4d3456e3",
-      "name": "\ud83e\uddf9 Filter Rows for Image AI"
+      "name": "🧹 Filter Rows for Image AI"
     },
     {
       "parameters": {
@@ -101,11 +101,11 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -16,
-        -240
+        -352,
+        2496
       ],
       "id": "0fc69e4b-470c-4252-bf90-d0071a2cbca6",
-      "name": "\ud83d\udd01 Iterate Products for AI Analysis"
+      "name": "🔁 Iterate Products for AI Analysis"
     },
     {
       "parameters": {
@@ -114,11 +114,11 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        208,
-        -32
+        784,
+        3184
       ],
       "id": "f8c92a3f-4d90-4641-a0cc-44f10f183961",
-      "name": "\u23f8\ufe0f Throttle Sheet Processing (200ms)",
+      "name": "⏸️ Throttle Sheet Processing (200ms)",
       "webhookId": "fd9ab9a4-171f-443a-b98e-b0f99561bfb7"
     },
     {
@@ -140,30 +140,32 @@
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1,
       "position": [
-        240,
-        -224
+        -112,
+        2512
       ],
       "id": "08c47aba-1c5c-4312-b1cf-9d90a2f8b7a7",
-      "name": "\ud83d\uddbc\ufe0f Analyze Product Image with AI (Gemini)",
+      "name": "🖼️ Analyze Product Image with AI (Gemini)",
       "credentials": {
         "googlePalmApi": {
           "id": "YLL6T5HbTFpyXNbx",
           "name": "Google Gemini"
         }
-      }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONTEXT\n// ============================================\nconst { sheet_name, row_number } =\n  $('\ud83d\udd01 Iterate Products for AI Analysis').item.json;\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst cleanText = (text = '') =>\n  String(text)\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n// ============================================\n// MAIN\n// ============================================\n\nconst outputItems = items\n  .map(({ json }) => {\n\n    // ----------------------------------------\n    // RAW AI OUTPUT\n    // ----------------------------------------\n    const raw =\n      json?.content?.parts?.[0]?.text?.trim();\n\n    if (!raw) return null;\n\n    let parsed;\n\n    try {\n\n      // ----------------------------------------\n      // SAFETY CLEANING\n      // Handles accidental ```json fences\n      // ----------------------------------------\n      const cleaned = raw\n        .replace(/```json/g, '')\n        .replace(/```/g, '')\n        .trim();\n\n      parsed = JSON.parse(cleaned);\n\n    } catch (err) {\n\n      // ----------------------------------------\n      // RETURN DEBUG INFO IF PARSING FAILS\n      // ----------------------------------------\n      return {\n        json: {\n          sheet_name,\n          row_number,\n          parsing_error: true,\n          parsing_error_message: err.message,\n          raw_output: raw\n        }\n      };\n    }\n\n    // ========================================\n    // SUCCESS OUTPUT\n    // ========================================\n    return {\n      json: {\n\n        sheet_name,\n        row_number,\n\n        // ------------------------------------\n        // SHOPIFY\n        // ------------------------------------\n        Title_Shopify: cleanText(\n          parsed?.version1?.title\n        ),\n\n        Description_Shopify: cleanText(\n          parsed?.version1?.description\n        ),\n\n        // ------------------------------------\n        // ETSY\n        // ------------------------------------\n        Title_Etsy: cleanText(\n          parsed?.version2?.title\n        ),\n\n        Description_Etsy: cleanText(\n          parsed?.version2?.description\n        ),\n\n        // ------------------------------------\n        // SEO\n        // ------------------------------------\n        Shopify_SEO_Title: cleanText(\n          parsed?.seo?.title\n        ),\n\n        Shopify_SEO_Description: cleanText(\n          parsed?.seo?.meta_description\n        ),\n\n        // ------------------------------------\n        // STATUS\n        // ------------------------------------\n        Generate_Title_Description: 'no'\n      }\n    };\n\n  })\n  .filter(Boolean);\n\nreturn outputItems;"
+        "jsCode": "// ============================================\n// CONTEXT\n// ============================================\nconst { sheet_name, row_number } =\n  $('🔁 Iterate Products for AI Analysis').item.json;\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst cleanText = (text = '') =>\n  String(text)\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n// ============================================\n// MAIN\n// ============================================\n\nconst outputItems = items\n  .map(({ json }) => {\n\n    // ----------------------------------------\n    // RAW AI OUTPUT\n    // ----------------------------------------\n    const raw =\n      json?.content?.parts?.[0]?.text?.trim();\n\n    if (!raw) return null;\n\n    let parsed;\n\n    try {\n\n      // ----------------------------------------\n      // SAFETY CLEANING\n      // Handles accidental ```json fences\n      // ----------------------------------------\n      const cleaned = raw\n        .replace(/```json/g, '')\n        .replace(/```/g, '')\n        .trim();\n\n      parsed = JSON.parse(cleaned);\n\n    } catch (err) {\n\n      // ----------------------------------------\n      // RETURN DEBUG INFO IF PARSING FAILS\n      // ----------------------------------------\n      return {\n        json: {\n          sheet_name,\n          row_number,\n          parsing_error: true,\n          parsing_error_message: err.message,\n          raw_output: raw\n        }\n      };\n    }\n\n    // ========================================\n    // SUCCESS OUTPUT\n    // ========================================\n    return {\n      json: {\n\n        sheet_name,\n        row_number,\n\n        // ------------------------------------\n        // SHOPIFY\n        // ------------------------------------\n        Title_Shopify: cleanText(\n          parsed?.version1?.title\n        ),\n\n        Description_Shopify: cleanText(\n          parsed?.version1?.description\n        ),\n\n        // ------------------------------------\n        // ETSY\n        // ------------------------------------\n        Title_Etsy: cleanText(\n          parsed?.version2?.title\n        ),\n\n        Description_Etsy: cleanText(\n          parsed?.version2?.description\n        ),\n\n        // ------------------------------------\n        // SEO\n        // ------------------------------------\n        Shopify_SEO_Title: cleanText(\n          parsed?.seo?.title\n        ),\n\n        Shopify_SEO_Description: cleanText(\n          parsed?.seo?.meta_description\n        ),\n\n        // ------------------------------------\n        // STATUS\n        // ------------------------------------\n        Generate_Title_Description: 'no'\n      }\n    };\n\n  })\n  .filter(Boolean);\n\nreturn outputItems;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        -224
+        128,
+        2512
       ],
       "id": "c0b6ffb0-c540-4ed0-85cc-1e751d71901c",
-      "name": "\ud83e\uddfe Parse AI Titles & Descriptions"
+      "name": "🧾 Parse AI Titles & Descriptions"
     },
     {
       "parameters": {
@@ -745,11 +747,11 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        688,
-        -224
+        368,
+        2512
       ],
       "id": "f62e54ce-9582-4341-b24c-6cabfc29a95c",
-      "name": "\ud83d\udcbe Write AI Content Back to Sheet",
+      "name": "💾 Write AI Content Back to Sheet",
       "alwaysOutputData": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -765,11 +767,11 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        912,
-        -224
+        608,
+        2512
       ],
       "id": "10ee6576-c29a-4547-8932-d6c91705c224",
-      "name": "\u23f8\ufe0f Throttle Sheet Updates",
+      "name": "⏸️ Throttle Sheet Updates",
       "webhookId": "fd9ab9a4-171f-443a-b98e-b0f99561bfb7"
     },
     {
@@ -799,11 +801,11 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -256,
-        -32
+        -144,
+        2752
       ],
       "id": "48127139-80df-4229-92f7-b0c17938c531",
-      "name": "\ud83d\udcd6 Read Product Rows from Sheet",
+      "name": "📖 Read Product Rows from Sheet",
       "alwaysOutputData": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -811,10 +813,157 @@
           "name": "Template_control"
         }
       }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw1",
+                    "leftValue": "={{ $json.sheet_name }}",
+                    "rightValue": "Wall-Coverings",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false,
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw2",
+                    "leftValue": "={{ $json.sheet_name }}",
+                    "rightValue": "Fireplace",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false,
+              "outputKey": "1"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "sw3",
+                    "leftValue": "={{ $json.sheet_name }}",
+                    "rightValue": "StoneMosaicTile",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false,
+              "outputKey": "2"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "node-switch-sheet",
+      "name": "📊 Route by Sheet Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -32,
+        3120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const buildWallCoveringPrompt = ({ keyword, material, finish }) => {\n  const kw   = keyword  ? `\\nSupplied keyword: ${keyword}`  : '';\n  const mat  = material ? `\\nMaterial: ${material}`         : '';\n  const fin  = finish   ? `\\nFinish: ${finish}`             : '';\n\n  return `\n# Analyze Natural Stone Wall Covering & Generate Shopify SEO Content\n\nAnalyze the image and identify the type, surface, and architectural style of the natural stone wall covering.\n\n# ROLE\n\nYou are a Shopify SEO copywriter specializing in luxury natural stone wall coverings, architectural stone panels, and decorative marble surfaces.\nYour writing should reflect the vocabulary used by architects, interior designers, landscape designers, and stone manufacturers.\n\n# Product Categories\n\nThe wall covering belongs to ONE of the following categories:\n\n1. Marble Decorative Breeze Blocks (Carved openwork stone blocks.)\n\n2. Architectural Surface Systems\n   - Linear & Fluted Collections\n   - Geometric & Faceted Collections\n   - Sculptural & Parametric Panels\n\n3. Natural Stone Surface Finishes (flat panels with surface treatments)\n   - Polished, Honed, Leathered, Brushed, Axe-cut, Antique, Acid-Washed,\n     Bush-hammered, Sandblasted, Flamed, Split Face, Chiseled\n\n4. Mosaic / Pattern Wall Panels\n   KEY INDICATOR: The surface is made of MULTIPLE SEPARATE small tiles or pieces\n   assembled/joined together. Look for individual tiles, grout lines, or visible\n   joints between pieces.\n   Includes: stone mosaics, herringbone tile layouts, chevron patterns, basketweave,\n   hexagonal tiles, penny tiles, arabesque, fish scale, brick-bond stone tiles,\n   stacked tile arrangements, mixed-material mosaic panels, pebble mosaics.\n   IMPORTANT: Even if the mosaic tiles form a linear or geometric pattern, always\n   identify as Mosaic — not Architectural Surface Systems — if the surface is built\n   from individual assembled pieces. The key distinction is:\n   - Architectural Surface Systems = one continuous stone with carved/shaped texture\n   - Mosaic / Pattern Wall Panels = many separate pieces assembled together\n\n# Step 1 - Identify the Wall\n\nDetermine: Product Category, Surface Type, Surface Finish, Architectural Style, Material.\n\n# Step 2 - Professional Architectural Terminology\n\nIdentify the accepted architectural, interior design, or stone industry term.\nExamples: Fluted, Reeded, Cannelured, Ribbed, Grooved, Corrugated, Faceted, Tessellated,\nParametric, Bas-relief, High-relief, Scalloped, Chamfered, Split-face, Bush-hammered,\nLeathered, Sandblasted, Honed, Flamed, Chiseled.\nNever invent professional terminology.\n\n# Step 3 - Write 2 SEO Titles\n\nFormat: [Primary Keyword] + [Feature Description]\nRules: max 10 words, no duplicate words, use professional architectural terms.\n${kw}${mat}${fin}\n\n# Step 4 - Write 2 Product Descriptions (80-100 words each)\n\nRequirements:\n- Include the generated title naturally\n- Repeat the primary keyword once naturally\n- Mention the material whenever recognizable (marble, limestone, travertine, granite, sandstone, etc.)\n- Describe surface texture, visual appearance, craftsmanship, color, depth, relief, tactile quality\n- Explain how the surface interacts with light and shadow throughout the day\n- Describe how the texture contributes to: visual rhythm, depth, movement, spatial perception, warmth, timeless elegance\n- Elegant, luxurious, architectural tone for a premium Shopify product page\n\nAlso generate:\n- SEO title: 50-60 characters, front-load keyword\n- Meta description: 140-160 characters, luxury ecommerce tone\n\n# STRICT OUTPUT RULES\n\n- No markdown, no explanations, no reasoning, no code fences\n- Output ONLY valid JSON\n\n# FINAL OUTPUT FORMAT (STRICT JSON ONLY)\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`.trim();\n};\n\nreturn items.flatMap(({ json }) => {\n  if (!(json.Image_Url ?? '').toString().trim().startsWith('http')) return [];\n  return [{ json: {\n    ...json,\n    prompt: buildWallCoveringPrompt({\n      keyword:  json.keyword  ?? '',\n      material: json.material ?? '',\n      finish:   json.finish   ?? '',\n    }),\n  } }];\n});"
+      },
+      "id": "node-build-wall",
+      "name": "📝 Build Wall Covering Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        2880
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const buildFireplacePrompt = ({ keyword, material, dimensions, finish }) => {\n  const dim = [];\n  if (dimensions.length)    dim.push(`Length: ${dimensions.length}`);\n  if (dimensions.width)     dim.push(`Width: ${dimensions.width}`);\n  if (dimensions.height)    dim.push(`Height: ${dimensions.height}`);\n  if (dimensions.depth)     dim.push(`Depth: ${dimensions.depth}`);\n  if (dimensions.thickness) dim.push(`Thickness: ${dimensions.thickness}`);\n  const dimBlock = dim.length ? dim.join('\\n') : 'Not provided';\n\n  return `\nAnalyze the fireplace image and generate product copy.\n\nROLE\n\nYou are a Shopify SEO copywriter specializing in natural stone fireplaces.\n\n================================================\nSTEP 1\n================================================\n\nIdentify the one or two most distinctive visible architectural features of the fireplace.\n\nExamples:\n- Fluted pilasters\n- Arched opening\n- Straight legs\n- Curved legs\n- Scroll carving\n- Floral carving\n- Relief carving\n- Plain frieze\n- Stepped surround\n- Beveled edges\n- Column supports\n- Minimalist design\n- Geometric lines\n- Curved mantel shelf\n- Rectangular opening\n- Layered molding\n\nRules:\n- Use ONLY features clearly visible in the image.\n- Prefer describing visible architectural features over naming a design style.\n- If several features are visible, select the one or two most distinctive.\n\n================================================\nTASK 1\n================================================\n\nGenerate:\n\nVersion 1\n- Title\n- Description\n\nVersion 2\n- Title\n- Description\n\n================================================\nTITLE RULES\n================================================\n\nFormat:\nKeyword + Material + Primary Feature\n\nVersion 1: Keyword + Material + Primary Feature\nVersion 2: Keyword + Material + Primary Feature + Secondary Feature\n\nRules:\n- The Keyword MUST appear exactly as provided.\n- The Keyword MUST be the first words of the title.\n- Use only visible features.\n- Use the provided Material.\n- Do not invent information.\n- Do not use promotional adjectives.\n- Do not use marketing words.\n- Keep titles concise and natural.\n\nForbidden words include:\nLuxury, Elegant, Beautiful, Premium, Exquisite, Timeless, Sophisticated,\nStunning, Unique, Handcrafted, Designer, High-end, Magnificent\n\n================================================\nDESCRIPTION RULES\n================================================\n\n- 80–120 words.\n- The generated title MUST appear exactly once as the first sentence.\n- Describe only what is visible.\n- Mention the material naturally.\n- Mention the identified architectural feature(s).\n- Mention the surface finish if it can be inferred visually.\n- Mention dimensions only if provided.\n- Do not repeat the title.\n- Do not invent information.\n- Do not describe emotions or lifestyle.\n- Do not use promotional adjectives or marketing language.\n\n================================================\nPRODUCT INFO\n================================================\n\nKeyword: ${keyword}\nMaterial: ${material}\nFinish: ${finish || 'infer visually'}\n\n================================================\nDIMENSIONS\n================================================\n\n${dimBlock}\n\nRules:\n- Use only available values.\n- Never assume missing dimensions.\n\n================================================\nTASK 2 (SHOPIFY SEO)\n================================================\n\nGenerate:\n- SEO title\n- Meta description\n\nSEO TITLE RULES:\n- 50-60 characters ideal\n- Must start with the keyword\n- Front-load important keywords\n\nMETA DESCRIPTION RULES:\n- 140-160 characters ideal\n- Factual ecommerce tone\n- No promotional adjectives\n- No forbidden words\n\n================================================\nSTRICT RULES\n================================================\n\n- No markdown\n- No explanations\n- No reasoning\n- No extra text\n- No code fences\n- Output ONLY valid JSON\n\n================================================\nFINAL OUTPUT FORMAT (STRICT JSON ONLY)\n================================================\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`.trim();\n};\n\n\n// ============================================\n\nconst EMPTY_DIM = { length: '', width: '', height: '', depth: '', thickness: '' };\n\nreturn items.flatMap(({ json }) => {\n  if (!(json.Image_Url ?? '').toString().trim().startsWith('http')) return [];\n  return [{ json: {\n    ...json,\n    prompt: buildFireplacePrompt({\n      keyword:    json.keyword  ?? '',\n      material:   json.material ?? '',\n      finish:     json.finish   ?? '',\n      dimensions: json.dimensions ?? EMPTY_DIM,\n    }),\n  } }];\n});"
+      },
+      "id": "node-build-fireplace",
+      "name": "📝 Build Fireplace Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        3072
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const buildMosaicTilePrompt = ({ keyword }) => {\n  const kw = keyword ? '\\nKeyword: ' + keyword : '';\n\n  return (`\nAnalyze the uploaded mosaic tile image and generate one precise product title and one professional product description.\n\nROLE\n\nYou are an architectural surface designer and Shopify SEO copywriter specializing in natural stone mosaic tiles, including marble, limestone, travertine, granite, onyx, and other natural stone mosaics.\n\nYour objective is to identify the mosaic accurately from the image using professional architectural and tile-design terminology. Never use vague descriptions when a recognized industry term exists.\n\nSTEP 1 — IDENTIFY THE MATERIAL\n\nIdentify the most likely visible material.\n\nPossible materials include:\n- Marble Mosaic Tile\n- Travertine Mosaic Tile\n- Limestone Mosaic Tile\n- Granite Mosaic Tile\n- Onyx Mosaic Tile\n- Natural Stone Mosaic Tile\n\nOnly identify a specific stone variety (Carrara, Calacatta, Thassos, Crema Marfil, etc.) when it can be reasonably determined from the image.\nNever invent a stone name simply because of the color.\n\nSTEP 2 — IDENTIFY THE MOSAIC SHAPE OR PATTERN\n\nFirst compare the image with these recognized architectural and tile-design patterns.\n\n- Herringbone\n- Chevron\n- Basketweave\n- Hexagon\n- Penny Round\n- Subway\n- Brick\n- Running Bond\n- Versailles Pattern\n- Fan\n- Arabesque\n- Fish Scale\n- Scallop\n- Diamond\n- Rhombus\n- Windmill\n- Pinwheel\n- Octagon and Dot\n- Square\n- Rectangle\n- Linear\n- Random Strip\n- Stacked\n- Grid\n- Interlocking\n- Geometric\n- Floral\n- Medallion\n\nImportant distinctions:\n- Herringbone uses rectangular pieces arranged in an offset zigzag.\n- Chevron uses angled pieces meeting in continuous V-shapes.\n- Running Bond uses staggered rectangular pieces.\n- Basketweave resembles woven strips, often with small square inserts.\n- Penny Round consists of small circular pieces.\n- Fish Scale and Scallop use overlapping curved forms.\n- Subway generally refers to elongated rectangular pieces.\n\nIf the mosaic does not match anything above, identify it using the most accurate professional architectural or interior-design terminology.\nNever invent decorative marketing names.\n\nSTEP 3 — IDENTIFY THE COLOR\n\nIdentify the dominant visible color.\n\nPossible colors include:\n- White\n- Warm White\n- Ivory\n- Cream\n- Beige\n- Light Beige\n- Gray\n- Light Gray\n- Dark Gray\n- Black\n- Brown\n- Taupe\n- Green\n- Blue\n- Pink\n- Red\n- Gold\n- Multicolor\n\nIf appropriate, also describe visible veining or tonal variation, for example:\n- Soft gray veining\n- Warm beige variation\n- High-contrast black and white\n- Subtle tonal variation\n- Mixed natural stone shades\n\nDo not describe heavily veined stone as pure white.\n\nSTEP 4 — IDENTIFY THE SURFACE FINISH\n\nIdentify the visible finish.\n\nPossible finishes:\n- Polished\n- Honed\n- Tumbled\n- Brushed\n- Antiqued\n- Natural\n- Split-Face\n- Textured\n- Matte\n- Mixed Finish\n\nGuidelines:\n- Polished = glossy and reflective.\n- Honed = smooth with low sheen.\n- Tumbled = aged appearance with softened edges.\n- Brushed = lightly textured.\n- Antiqued = intentionally aged or distressed.\n- Natural = minimally processed.\n- Split-Face = rough dimensional texture.\n- Mixed Finish = more than one finish is visible.\n\nIf the finish cannot be confidently determined, use:\nNatural Stone Finish\ninstead of guessing.\n\nOUTPUT 1 — PRODUCT TITLE\n\nGenerate one precise SEO-friendly title.\n\nTitle structure:\nKeyword + Color + Material + Shape or Pattern – Surface Finish\n\nExamples:\n- Marble Mosaic White Marble Herringbone – Honed\n- Stone Mosaic White Marble Penny Round – Polished\n- Stone Mosaic tile Beige Travertine Versailles – Tumbled\n- Green Marble Hexagon Mosaic Tile – Honed\n- Gray Limestone Linear Mosaic Tile – Natural Stone Finish\n\nTitle requirements:\n- Use Keyword first\n- Include material.\n- Include color.\n- Include exact pattern or shape.\n- Include surface finish.\n- Keep the title factual and commercially useful.\n- Do not include promotional words.\n- Do not include unsupported claims.\n- Do not mention dimensions unless provided.\n` + kw + `\n\nOUTPUT 2 — PRODUCT DESCRIPTION\n\nUse the information already identified in the product title and expand it into one professional paragraph of approximately 90–140 words.\nThe description must remain completely consistent with the title.\n\nIf the title is:\nWhite Marble Herringbone Mosaic Tile – Honed\n\nthe description should expand the same information in this order:\n1. White marble\n2. Herringbone pattern\n3. Honed finish\n4. Recommended application locations\n5. Design effect and compatible interior styles\n\nNever introduce a different material, color, pattern, or finish from the title.\n\nDESCRIPTION STRUCTURE\n\nSentence 1\nExpand the complete product title naturally.\nExplain:\n- material\n- color\n- pattern\n- surface finish\n\nSentences 2–3\nExplain where the mosaic is most suitable.\nPrioritize practical applications such as:\n\nWall Applications:\n- Kitchen backsplash\n- Bathroom wall\n- Shower wall\n- Shower niche\n- Vanity backsplash\n- Powder room wall\n- Feature wall\n- Fireplace surround\n- Bar backsplash\n- Laundry room backsplash\n- Entryway wall\n- Decorative wall panel\n- Hotel feature wall\n- Commercial reception wall\n\nFloor Applications:\n- Bathroom floor\n- Shower floor\n- Powder room floor\n- Entryway floor\n- Kitchen floor\n- Hallway floor\n- Decorative floor inset\n- Border accent\n- Interior floor\n\nMention only the applications that appear appropriate for the visible mosaic size and finish.\nApplication locations are more important than design style.\nAt least half of the description should discuss where the product can be used.\nDo not simply list locations.\nExplain naturally why the mosaic works in those spaces.\n\nSentence 4\nExplain how the combination of:\n- shape\n- color\n- finish\naffects the space.\n\nExamples:\n- creates visual movement\n- introduces geometric rhythm\n- visually lengthens a backsplash\n- reflects more light\n- creates a soft matte appearance\n- adds subtle texture\n- creates a decorative focal point\n\nSentence 5\nBriefly mention one to three compatible interior styles.\n\nExamples:\n- Modern\n- Contemporary\n- Minimalist\n- Transitional\n- Traditional\n- Classic\n- Art Deco\n- Mediterranean\n- Coastal\n- Organic Modern\n- Rustic\n- French\n- European\n\nKeep this section brief.\nApplication locations should remain the primary focus.\n\nAPPLICATION RULES\n\n- Recommend wall applications whenever appropriate.\n- Recommend floor applications only when the visible mosaic format and finish appear suitable.\n- Small mosaics with additional grout joints may be appropriate for shower floors, but do not guarantee slip resistance.\n- Be cautious when recommending polished mosaics for wet floors.\n- Never recommend Split-Face mosaics for walking surfaces.\n- Never claim:\n  - Slip resistant\n  - Waterproof\n  - Frost resistant\n  - Heat resistant\n  - Stain resistant\n  - Outdoor suitable\n  - Pool suitable\n  - Steam room suitable\n  unless those specifications are provided separately.\n- Do not use phrases like:\n  - Perfect for any space\n  - Suitable for every application\n  - Fits every design\n\nWRITING STYLE\n\n- Expand the title naturally into a product description.\n- Keep the writing product-focused.\n- Use professional architectural and interior-design language.\n- Avoid storytelling.\n- Avoid repeating the title verbatim.\n- Avoid unsupported assumptions.\n- Avoid exaggerated marketing language such as:\n  - stunning\n  - gorgeous\n  - luxurious\n  - exquisite\n  - breathtaking\n\nUse natural SEO phrases whenever appropriate, including:\n- marble mosaic tile\n- natural stone mosaic\n- mosaic backsplash\n- bathroom mosaic tile\n- shower wall mosaic\n- mosaic floor tile\n- decorative wall tile\n\nSTRICT RULES\n\n- No markdown\n- No explanations\n- No reasoning\n- No code fences\n- Output ONLY valid JSON\n\nFINAL OUTPUT FORMAT (STRICT JSON ONLY)\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n\nversion1: Your primary product title + description following all rules above.\nversion2: A slight variation of the title and description (suitable for Etsy — professional tone, no promotional language).\nseo.title: 50-60 character SEO title starting with keyword.\nseo.meta_description: 140-160 character meta description in factual ecommerce tone.\n`).trim();\n};\n\nreturn items.flatMap(({ json }) => {\n  if (!(json.Image_Url ?? '').toString().trim().startsWith('http')) return [];\n  return [{ json: { ...json, prompt: buildMosaicTilePrompt({ keyword: json.keyword ?? '' }) } }];\n});"
+      },
+      "id": "node-build-mosaic",
+      "name": "📝 Build Mosaic Tile Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        3264
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const PRODUCT_META = Object.freeze({\n  Statue: {\n    type: 'marble statue',\n    environment: 'garden or interior space',\n  },\n\n  Animal: {\n    type: 'animal sculpture',\n    environment: 'decorative space',\n  },\n\n  Bench: {\n    type: 'bench',\n    environment: 'garden or outdoor luxury space',\n  },\n\n  Planter: {\n    type: 'planter',\n    environment: 'terrace or garden space',\n  },\n\n  Fountain: {\n    type: 'fountain',\n    environment: 'luxury garden',\n  },\n\n  Lamppost: {\n    type: 'lamppost',\n    environment: 'garden pathway',\n  },\n\n  Bathtub: {\n    type: 'bathtub',\n    environment: 'luxury bathroom',\n  },\n\n  Sink: {\n    type: 'sink',\n    environment: 'bathroom vanity area',\n  },\n\n  Vanity: {\n    type: 'vanity',\n    environment: 'luxury bathroom interior',\n  },\n\n  Fireplace: {\n    type: 'fireplace',\n    environment: 'luxury interior living room',\n    introOverride:\n      `Identify fireplace style first (French, Modern, Classic, English).`,\n  },\n\n  Table: {\n    type: 'table',\n    environment: 'dining interior space',\n    introOverride:\n      `Identify table type and seating capacity (4, 6, 8).`,\n  },\n});\n\n// ============================================\n// UTILITIES\n// ============================================\nconst hasValue = (v) =>\n  v !== undefined &&\n  v !== null &&\n  String(v).trim() !== '';\n\nconst getProductMeta = (sheetName) =>\n  PRODUCT_META[sheetName] ?? {\n    type: 'product',\n    environment: 'luxury space',\n  };\n\n// ============================================\n// DIMENSIONS NORMALIZATION\n// ============================================\nconst normalizeDimensions = (data) => ({\n  length: data['Length Inch'] ?? '',\n  width: data['Width Inch'] ?? '',\n  height: data['Height Inch'] ?? '',\n  depth: data['Depth Inch'] ?? '',\n  thickness: data['Thickness Inch'] ?? '',\n});\n\n// ============================================\n// PROMPT BUILDER (JSON OUTPUT VERSION)\n// ============================================\n\nconst buildPrompt = ({\n  sheetName,\n  dimensions,\n  material,\n  keyword,\n  finish,\n  promptRules,\n}) => {\n\n  const {\n    type,\n    environment,\n    introOverride\n  } = getProductMeta(sheetName);\n\n  const intro =\n    introOverride ??\n    `Analyze the image and identify the product as a ${type}.`;\n\n  let prompt = `\n${intro}\n\nROLE:\nYou are a Shopify SEO copywriter for luxury marble products.\n\n================================================\nTASK 1\n================================================\n\nGenerate:\n\n- Version1 title + description\n- Version2 title + description\n\nRULES:\n- Descriptions around 80-120 words\n- Luxury tone only\n- Accurate visual description only\n- Do not hallucinate features\n- Keyword MUST be the first word(s) of each title and appear exactly once\n- Keyword must appear exactly once per description\n- Mention material naturally\n- Mention dimensions only if available\n\n================================================\nTASK 2 (SHOPIFY SEO)\n================================================\n\nGenerate:\n\n- SEO title\n- Meta description\n\nSEO TITLE RULES:\n- 50-60 characters ideal\n- Front-load important keywords\n- Use ONLY one best template internally\n\nSEO TITLE TEMPLATES:\nT1: [Style] Marble ${type} | [Feature] | [Material]\nT2: [Keyword] | [Feature] | [Material]\nT3: [Keyword] | [Material] | MarbleBee\n\nMETA DESCRIPTION RULES:\n- 140-160 characters ideal\n- Luxury ecommerce tone\n- Use ONLY one best template internally\n\nMETA DESCRIPTION TEMPLATES:\nT1: Shop [Keyword] handcrafted from marble with premium [Finish].\nT2: Discover [Keyword] made from natural marble for luxury interiors.\nT3: Bring elegance with [Keyword] crafted for luxury spaces.\nT4: Premium [Keyword] with [Finish] finish for interiors.\nT5: Explore [Keyword] for luxury homes and hotels.\n\n================================================\nDIMENSIONS\n================================================\n\nLength: ${dimensions.length}\nWidth: ${dimensions.width}\nHeight: ${dimensions.height}\nDepth: ${dimensions.depth}\nThickness: ${dimensions.thickness}\n\nRULES:\n- Use only available values\n- Never assume missing dimensions\n\n================================================\nPRODUCT INFO\n================================================\n\nKeyword: ${keyword}\nMaterial: ${material}\nFinish: ${finish || 'infer visually'}\nEnvironment: ${environment}\nProduct Type: ${type}\n\n================================================\nSTRICT RULES\n================================================\n\n- No markdown\n- No explanations\n- No reasoning\n- No template evaluation output\n- No extra text\n- No code fences\n- Output ONLY valid JSON\n\n================================================\nFINAL OUTPUT FORMAT (STRICT JSON ONLY)\n================================================\n\n{\n  \"version1\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"version2\": {\n    \"title\": \"\",\n    \"description\": \"\"\n  },\n  \"seo\": {\n    \"title\": \"\",\n    \"meta_description\": \"\"\n  }\n}\n`;\n\n  if (hasValue(promptRules)) {\n    prompt += `\n\n================================================\nEXTRA RULES\n================================================\n\n${promptRules}\n`;\n  }\n\n  return prompt.trim();\n};\n\nconst EMPTY_DIM = { length: '', width: '', height: '', depth: '', thickness: '' };\n\nreturn items.flatMap(({ json }) => {\n  if (!(json.Image_Url ?? '').toString().trim().startsWith('http')) return [];\n  return [{ json: {\n    ...json,\n    prompt: buildPrompt({\n      sheetName:   json.sheet_name  ?? '',\n      keyword:     json.keyword     ?? '',\n      material:    json.material    ?? '',\n      finish:      json.finish      ?? '',\n      dimensions:  json.dimensions  ?? EMPTY_DIM,\n      promptRules: json.promptRules ?? '',\n    }),\n  } }];\n});"
+      },
+      "id": "node-build-generic",
+      "name": "📝 Build Generic Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        3456
+      ],
+      "alwaysOutputData": true
     }
   ],
   "pinData": {
-    "\u23f0 Daily Schedule Trigger": [
+    "⏰ Daily Schedule Trigger": [
       {
         "json": {
           "timestamp": "2026-02-26T05:19:08.443-05:00",
@@ -836,140 +985,216 @@
     ]
   },
   "connections": {
-    "\u23f0 Daily Schedule Trigger": {
+    "⏰ Daily Schedule Trigger": {
       "main": [
         [
           {
-            "node": "\ud83d\udccb Load Target Sheet Names",
+            "node": "📋 Load Target Sheet Names",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83d\udccb Load Target Sheet Names": {
+    "📋 Load Target Sheet Names": {
       "main": [
         [
           {
-            "node": "\ud83d\udd01 Iterate Sheets",
+            "node": "🔁 Iterate Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83d\udd01 Iterate Sheets": {
+    "🔁 Iterate Sheets": {
       "main": [
         [
           {
-            "node": "\ud83e\uddf9 Filter Rows for Image AI",
+            "node": "🧹 Filter Rows for Image AI",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "\ud83d\udcd6 Read Product Rows from Sheet",
+            "node": "📖 Read Product Rows from Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83e\udde0 Build AI Prompt from Product Data": {
+    "🧹 Filter Rows for Image AI": {
       "main": [
         [
           {
-            "node": "\u23f8\ufe0f Throttle Sheet Processing (200ms)",
+            "node": "🔁 Iterate Products for AI Analysis",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83e\uddf9 Filter Rows for Image AI": {
-      "main": [
-        [
-          {
-            "node": "\ud83d\udd01 Iterate Products for AI Analysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "\ud83d\udd01 Iterate Products for AI Analysis": {
+    "🔁 Iterate Products for AI Analysis": {
       "main": [
         [],
         [
           {
-            "node": "\ud83d\uddbc\ufe0f Analyze Product Image with AI (Gemini)",
+            "node": "🖼️ Analyze Product Image with AI (Gemini)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\u23f8\ufe0f Throttle Sheet Processing (200ms)": {
+    "⏸️ Throttle Sheet Processing (200ms)": {
       "main": [
         [
           {
-            "node": "\ud83d\udd01 Iterate Sheets",
+            "node": "🔁 Iterate Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83d\uddbc\ufe0f Analyze Product Image with AI (Gemini)": {
+    "🖼️ Analyze Product Image with AI (Gemini)": {
       "main": [
         [
           {
-            "node": "\ud83e\uddfe Parse AI Titles & Descriptions",
+            "node": "🧾 Parse AI Titles & Descriptions",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83e\uddfe Parse AI Titles & Descriptions": {
+    "🧾 Parse AI Titles & Descriptions": {
       "main": [
         [
           {
-            "node": "\ud83d\udcbe Write AI Content Back to Sheet",
+            "node": "💾 Write AI Content Back to Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83d\udcbe Write AI Content Back to Sheet": {
+    "💾 Write AI Content Back to Sheet": {
       "main": [
         [
           {
-            "node": "\u23f8\ufe0f Throttle Sheet Updates",
+            "node": "⏸️ Throttle Sheet Updates",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\u23f8\ufe0f Throttle Sheet Updates": {
+    "⏸️ Throttle Sheet Updates": {
       "main": [
         [
           {
-            "node": "\ud83d\udd01 Iterate Products for AI Analysis",
+            "node": "🔁 Iterate Products for AI Analysis",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "\ud83d\udcd6 Read Product Rows from Sheet": {
+    "📖 Read Product Rows from Sheet": {
       "main": [
         [
           {
-            "node": "\ud83e\udde0 Build AI Prompt from Product Data",
+            "node": "🧹 Prepare & Filter Product Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧹 Prepare & Filter Product Data": {
+      "main": [
+        [
+          {
+            "node": "📊 Route by Sheet Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📊 Route by Sheet Type": {
+      "main": [
+        [
+          {
+            "node": "📝 Build Wall Covering Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📝 Build Fireplace Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📝 Build Mosaic Tile Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📝 Build Generic Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Build Wall Covering Prompt": {
+      "main": [
+        [
+          {
+            "node": "⏸️ Throttle Sheet Processing (200ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Build Fireplace Prompt": {
+      "main": [
+        [
+          {
+            "node": "⏸️ Throttle Sheet Processing (200ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Build Mosaic Tile Prompt": {
+      "main": [
+        [
+          {
+            "node": "⏸️ Throttle Sheet Processing (200ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Build Generic Prompt": {
+      "main": [
+        [
+          {
+            "node": "⏸️ Throttle Sheet Processing (200ms)",
             "type": "main",
             "index": 0
           }
@@ -986,7 +1211,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "43f20baa-18e1-4ef5-b295-44e67f2cd62a",
+  "versionId": "49968000-ec33-4791-a044-6cf4e7cbd290",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
