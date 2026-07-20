@@ -1,44 +1,36 @@
 {
   "name": "Pinterest WF2 - Publish via Tailwind",
-  "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "pinData": {},
   "nodes": [
     {
       "parameters": {
         "content": "## Pinterest – Workflow 2: Publish approved pins (daily)\n\nReads the **Pinterest Pins** tab, takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from Tailwind Boards), and schedules each pin in **Tailwind** at its **Scheduled Date** (Tailwind publishes it then). Writes back Status / Pin URL / Error / Pinned Time.\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials. Set accountId in Set Config.",
-        "height": 300,
+        "height": 396,
         "width": 420
       },
-      "id": "sticky",
+      "id": "78b79f84-0052-4a45-9ab1-5bed7e789785",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -380,
-        -120
+        -560,
+        -112
       ]
     },
     {
       "parameters": {
         "rule": {
           "interval": [
-            {
-              "field": "days",
-              "daysInterval": 1
-            }
+            {}
           ]
         }
       },
-      "id": "n-trig",
+      "id": "4b5b516f-c8bf-412a-9198-d1080587d0e5",
       "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        160,
-        200
+        0,
+        96
       ]
     },
     {
@@ -73,13 +65,13 @@
         },
         "options": {}
       },
-      "id": "n-cfg",
+      "id": "3e10eeec-0782-4ecf-9abd-144a362debed",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        360,
-        200
+        224,
+        96
       ]
     },
     {
@@ -96,21 +88,21 @@
         },
         "options": {}
       },
-      "id": "n-getpins",
+      "id": "2f5c7c55-1ab6-4c66-9509-e1cbe640345d",
       "name": "Get Pins",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        560,
-        200
+        448,
+        96
       ],
+      "executeOnce": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
-      },
-      "executeOnce": true
+      }
     },
     {
       "parameters": {
@@ -126,33 +118,33 @@
         },
         "options": {}
       },
-      "id": "n-getboards",
+      "id": "1717566e-5fb0-42e2-8ed2-ede3599e86a8",
       "name": "Get Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        760,
-        200
+        672,
+        96
       ],
+      "executeOnce": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
-      },
-      "executeOnce": true
+      }
     },
     {
       "parameters": {
-        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[‐-―]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Pinterest Board'] || r['Board Name'] || r['Board'] || ''; }\nfunction bId(r){ return r['Tailwind Board ID'] || r['Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  let dt = DateTime.fromISO(s);\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm');\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  if (norm(pin['Status']) !== 'review') continue;\n  const boardId = resolveBoardId(pin);\n  const sendAt = toSendAt(pin['Scheduled Date']);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) { ready=false; reason='Scheduled time must be 15+ min in the future'; }\n  out.push({ json: {\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt\n  } });\n}\nreturn out;\n"
+        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[\\u2013-\\u2015]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Pinterest Board'] || r['Board Name'] || r['Board'] || ''; }\nfunction bId(r){ return r['Tailwind Board ID'] || r['Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  let dt = DateTime.fromISO(s);\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm');\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  if (norm(pin['Status']) !== 'review') continue;\n  const boardId = resolveBoardId(pin);\n  const sendAt = toSendAt(pin['Scheduled Date']);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) { ready=false; reason='Scheduled time must be 15+ min in the future'; }\n  out.push({ json: {\n    row_number: pin['row_number'],\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt\n  } });\n}\nreturn out;\n"
       },
-      "id": "n-prep",
+      "id": "d52939cc-d33c-4131-83b7-f61f2023cf00",
       "name": "Prepare",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        960,
-        200
+        896,
+        96
       ]
     },
     {
@@ -160,7 +152,8 @@
         "conditions": {
           "options": {
             "caseSensitive": true,
-            "typeValidation": "loose",
+            "leftValue": "",
+            "typeValidation": "strict",
             "version": 2
           },
           "conditions": [
@@ -179,13 +172,13 @@
         },
         "options": {}
       },
-      "id": "n-if",
+      "id": "d5f017fe-f63a-4fa5-bf2a-d099a4bff883",
       "name": "IF Ready",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1180,
-        200
+        1120,
+        96
       ]
     },
     {
@@ -199,47 +192,33 @@
         "jsonBody": "={{ JSON.stringify({ mediaUrl: $json.mediaUrl, title: $json.title, description: $json.description, url: $json.url, boardId: $json.boardId, altText: $json.altText, sendAt: $json.sendAt }) }}",
         "options": {}
       },
-      "id": "n-create",
+      "id": "588b8934-f17d-45b4-92dc-66dec6466826",
       "name": "Create Pin",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1400,
-        120
+        1344,
+        0
       ],
       "credentials": {
         "httpBearerAuth": {
-          "id": "TAILWIND_CRED_ID",
+          "id": "04bNNmDkPyRmwKce",
           "name": "Tailwind App"
         }
       },
-      "continueOnFail": true,
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const pin = $('Prepare').item.json;\nconst r = $json || {};\nlet status, err='', tw='';\nif (r.error) { status='Error'; err = (typeof r.error === 'string') ? r.error : (r.error.message || JSON.stringify(r.error)); err = String(err).slice(0,300); }\nelse { status='Scheduled'; const o = Array.isArray(r)?(r[0]||{}):r; const postId = o.id || (o.data && (o.data.id || o.data.postId || (o.data.post && o.data.post.id))) || ''; tw = postId ? String(postId) : ''; }\nreturn [{ json: { 'Pin ID': pin.pinId, 'Status': status, 'Tailwind Post ID': tw, 'Error': err } }];"
+        "jsCode": "// Each input item is one Tailwind API response from \"Create Pin\",\n// in the same order as the pins that fed it. The pin metadata\n// (Pin ID, row_number, blog url) lives on \"IF Ready\", not on the\n// HTTP response, so pull it from there by index.\nconst responses = $input.all();\nconst pins = $('IF Ready').all();\n\nreturn responses.map((item, index) => {\n  const response = item.json || {};\n  const pin = (pins[index] && pins[index].json) || {};\n  const post = (response.data && response.data.post) || {};\n  const ok = !!post.id;\n\n  return {\n    json: {\n      \"Row Number\": pin.row_number,\n      \"Pin ID\": pin.pinId,\n      \"Pin URL\": pin.url,\n      \"Status\": ok ? \"Scheduled\" : \"Error\",\n      \"Tailwind Post ID\": post.id || \"\",\n      \"Error\": ok ? \"\" : (response.message || response.error || \"Tailwind API error\")\n    }\n  };\n});"
       },
-      "id": "n-res",
+      "id": "641ea9e2-d791-4857-a707-67f1b1eec1ea",
       "name": "Build Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1620,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const p = $json;\nreturn [{ json: { 'Pin ID': p.pinId, 'Status': 'Review', 'Tailwind Post ID': '', 'Error': p.reason || 'Not ready' } }];"
-      },
-      "id": "n-err",
-      "name": "Build Error",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1400,
-        300
+        1568,
+        0
       ]
     },
     {
@@ -257,34 +236,300 @@
         },
         "columns": {
           "mappingMode": "defineBelow",
-          "matchingColumns": [
-            "Pin ID"
-          ],
           "value": {
-            "Pin ID": "={{ $json['Pin ID'] }}",
             "Status": "={{ $json['Status'] }}",
             "Error": "={{ $json['Error'] }}",
-            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}"
-          }
+            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}",
+            "row_number": "={{ $json['Row Number'] }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Pin ID",
+              "displayName": "Pin ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Blog No.",
+              "displayName": "Blog No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Blog Title",
+              "displayName": "Blog Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Type",
+              "displayName": "Pin Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 1",
+              "displayName": "Preview 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 2",
+              "displayName": "Preview 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 3",
+              "displayName": "Preview 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 1 URL",
+              "displayName": "Image 1 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 2 URL",
+              "displayName": "Image 2 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 3 URL",
+              "displayName": "Image 3 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Title",
+              "displayName": "Pin Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Description",
+              "displayName": "Pin Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Alt Text",
+              "displayName": "Alt Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Blog Link",
+              "displayName": "Blog Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Board",
+              "displayName": "Board",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Board ID",
+              "displayName": "Board ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Approval",
+              "displayName": "Approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tailwind Post ID",
+              "displayName": "Tailwind Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pin URL",
+              "displayName": "Pin URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created Time",
+              "displayName": "Created Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pinned Time",
+              "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "n-upd",
+      "id": "0888bb37-efc7-49c5-94e4-8792de7c8e6b",
       "name": "Update Pin Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1840,
-        200
+        1792,
+        96
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Emit one row per not-ready pin (runs once for all items).\nreturn $input.all().map(item => {\n  const p = item.json || {};\n  return {\n    json: {\n      'Row Number': p.row_number,\n      'Pin ID': p.pinId,\n      'Status': 'Review',\n      'Tailwind Post ID': '',\n      'Error': p.reason || 'Not ready'\n    }\n  };\n});"
+      },
+      "id": "e378df58-4703-405d-a40f-d8d94678d11b",
+      "name": "Build Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        192
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Daily Trigger": {
       "main": [
@@ -392,5 +637,22 @@
         ]
       ]
     }
-  }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a5699de6-3eaa-4056-8915-8bacfb15899f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "0wT1zMsQIcJcaSDh",
+  "tags": []
 }
