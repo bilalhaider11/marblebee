@@ -1,0 +1,1449 @@
+{
+  "name": "Pinterest WF0 - Prepare Product Photo Pins",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest WF0 — Prepare Product Photo Pins (daily)\n\n**What it does:** scans the `23Auto pinterest photo` Drive folder (Root → Category → images), matches each image filename to a Product No. in the matching category tab of the main product sheet, uploads new (not-yet-pinned) images to Shopify Files for a stable CDN URL, has AI write a Pinterest title/description/alt per photo, and appends review rows to the **Pinterest2:3 Pins** tab — linking to the live **Shopify product page** instead of a blog post. Board is auto-assigned from the `Tailwind Boards` tab, and `Approval` is set to `Approved` automatically -- no manual review step before Tailwind picks these up.",
+        "height": 332,
+        "width": 480
+      },
+      "id": "sticky-readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3776,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "n-trig",
+      "name": "⏰ Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3216,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "driveRootFolderId",
+              "type": "string",
+              "value": "1y2rGt-5NR0w37RTWXk_eQ_qEsl0xNvmN"
+            },
+            {
+              "id": "c2",
+              "name": "productSheetId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            },
+            {
+              "id": "c3",
+              "name": "pinterestSheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "c4",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
+            },
+            {
+              "id": "c6",
+              "name": "failedImagesTab",
+              "type": "string",
+              "value": "Failed Images"
+            },
+            {
+              "id": "c7",
+              "name": "categories",
+              "type": "string",
+              "value": "Animal,Bench,Planter,Fountain,Lamppost,Bathtub,Sink,Vanity,Fireplace,Table,Statue,MarbleSlab,2026Instock,DoorSurround,Wall-Coverings,Exterior-Wall-Decoration,MarbleRangeHood,Moulding,StoneMosaicTile,MarbleMedallion"
+            },
+            {
+              "id": "c8",
+              "name": "perProductDailyCap",
+              "type": "number",
+              "value": 10
+            },
+            {
+              "id": "c10",
+              "name": "shop",
+              "type": "string",
+              "value": "marblebee.myshopify.com"
+            },
+            {
+              "id": "c11",
+              "name": "apiVersion",
+              "type": "string",
+              "value": "2025-01"
+            },
+            {
+              "id": "c12",
+              "name": "openAiModel",
+              "type": "string",
+              "value": "gpt-4o"
+            },
+            {
+              "id": "c13",
+              "name": "maxUploadAttempts",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "c14",
+              "name": "pinsPerDay",
+              "type": "number",
+              "value": 10
+            },
+            {
+              "id": "c15",
+              "name": "scheduleHourSpacing",
+              "type": "number",
+              "value": 2
+            },
+            {
+              "id": "c16",
+              "name": "scheduleDayStartHour",
+              "type": "number",
+              "value": 4
+            },
+            {
+              "id": "c17",
+              "name": "tailwindBoardsTab",
+              "type": "string",
+              "value": "Tailwind Boards"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "⚙️ Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2992,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getpins",
+      "name": "📌 Get Existing Pin Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2768,
+        288
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.failedImagesTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getfailed",
+      "name": "🚫 Get Failed Images",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2544,
+        288
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('⚙️ Set Config').first().json.driveRootFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "id": "n-listfolders",
+      "name": "📂 List All Drive Folders",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2096,
+        288
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst sd = $getWorkflowStaticData('global');\n// Clear any leftover state from a previous (possibly interrupted) run\nsd.candidates = [];\nsd.unmatchedImages = [];\nsd.skippedNoUrlCount = 0;\nsd.skippedAlreadyFailedCount = 0;\nsd.skippedCategories = [];\n\nconst folders = $input.all().map(i => i.json);\nconst categories = (cfg.categories || '').split(',').map(s => s.trim()).filter(Boolean);\n\nfunction norm(s) {\n  return String(s || '')\n    .toLowerCase()\n    .replace(/[\\s_-]+/g, '')\n    .trim();\n}\n\nconst out = [];\nfor (const category of categories) {\n  const target = norm(category);\n  const match = folders.find(f => norm(f.name) === target);\n  if (!match) {\n    sd.skippedCategories.push(category);\n    continue;\n  }\n  out.push({ json: { category, folderId: match.id } });\n}\nreturn out;\n"
+      },
+      "id": "n-resolvecats",
+      "name": "🧭 Resolve Category Folders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1872,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "n-itercats",
+      "name": "🔁 Iterate Category Folders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1648,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.folderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "id": "n-listimages",
+      "name": "🗃️ List Images in Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1584,
+        624
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter(({ json }) => /\\.(png|jpe?g|webp)$/i.test(json.name || ''))\n  .map(({ json }) => ({ json: { id: json.id, name: json.name, mimeType: json.mimeType || '' } }));\n"
+      },
+      "id": "n-filterimages",
+      "name": "🖼️ Filter Image Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.productSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('🔁 Iterate Category Folders').item.json.category }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getproducts",
+      "name": "📄 Get Product Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1136,
+        624
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst category = $('🔁 Iterate Category Folders').item.json.category;\n\n// Some category tabs have a plain single-row header (row 1 = real headers,\n// data from row 2). Others have a 2-row header (row 1 = assorted notes/labels,\n// row 2 = the real headers, data from row 3) -- the same layout already known\n// from the Wall-Coverings tab. Rather than hardcode which tabs use which\n// layout (fragile -- a single miscategorized tab silently returns zero\n// matches), detect it directly from the data: if 'Product No.' isn't already\n// a usable key, find the row whose VALUES contain 'Product No.' literally --\n// that's the real header row -- and remap every row after it accordingly.\nfunction remapProductRows(rows) {\n  const alreadyGood = rows.some(r => Object.prototype.hasOwnProperty.call(r, 'Product No.') && String(r['Product No.'] || '').trim());\n  if (alreadyGood) return rows;\n\n  const headerRowIndex = rows.findIndex(r => Object.values(r).some(v => String(v ?? '').trim() === 'Product No.'));\n  if (headerRowIndex === -1) return []; // headers not found in any layout -- nothing usable for this tab\n\n  const headerRow = rows[headerRowIndex];\n  const keyToRealHeader = {};\n  for (const [key, value] of Object.entries(headerRow)) {\n    const label = String(value ?? '').trim();\n    if (label) keyToRealHeader[key] = label;\n  }\n\n  return rows.slice(headerRowIndex + 1).map(r => {\n    const remapped = {};\n    for (const [key, value] of Object.entries(r)) {\n      remapped[keyToRealHeader[key] || key] = value;\n    }\n    return remapped;\n  });\n}\n\nconst productRows = remapProductRows($input.all().map(i => i.json));\nconst images = $('🖼️ Filter Image Files').all().map(i => i.json);\n\nconst sd = $getWorkflowStaticData('global');\n\nconst pinnedFileIds = new Set(\n  $('📌 Get Existing Pin Rows').all()\n    .map(i => String(i.json['Image File ID'] || '').trim())\n    .filter(Boolean)\n);\n\nconst failedAttempts = new Map();\nfor (const row of $('🚫 Get Failed Images').all()) {\n  const fid = String(row.json['Image File ID'] || '').trim();\n  const count = parseInt(row.json['Attempt Count'], 10) || 0;\n  if (fid) failedAttempts.set(fid, count);\n}\n\n// Build product lookup: every Product No. in this tab, whether or not it has a Shopify URL yet\nconst productMap = new Map();       // canonical Product No. -> {shopifyUrl, material, keyword}\nconst productNoByUpper = new Map(); // UPPERCASE(Product No.) -> canonical Product No. (for exact lookup)\nfor (const row of productRows) {\n  const no = String(row['Product No.'] || '').trim();\n  if (!no) continue;\n  productMap.set(no, {\n    shopifyUrl: String(row['Shopify_Product_URL'] || '').trim(),\n    material:   row['Material'] || '',\n    keyword:    row['Keywords (Luna)'] || '',\n  });\n  productNoByUpper.set(no.toUpperCase(), no);\n}\n\n// The Product No. is the leading alphanumeric token of the filename\n// (e.g. \"LSBLD178- (1)_2x3.jpg\" -> \"LSBLD178\"). Matched by EXACT equality\n// against the sheet's Product No. values -- no substring/\"contains\" logic,\n// so \"LSBLD178\" can never accidentally match \"LSBLD17\" or vice versa.\nfunction matchProductNo(fileName) {\n  const m = String(fileName || '').match(/^[A-Za-z0-9]+/);\n  if (!m) return null;\n  return productNoByUpper.get(m[0].toUpperCase()) || null;\n}\n\nconst groups = {};\nlet skippedNoUrlCount = 0;\nlet skippedAlreadyFailedCount = 0;\nconst unmatchedImages = [];\n\nfor (const img of images) {\n  const productNo = matchProductNo(img.name || '');\n  if (!productNo) { unmatchedImages.push({ category, name: img.name }); continue; }\n\n  const info = productMap.get(productNo);\n  if (!info.shopifyUrl) { skippedNoUrlCount++; continue; }\n\n  if (pinnedFileIds.has(img.id)) continue; // already pinned -- the actual dedup guarantee\n\n  const attempts = failedAttempts.get(img.id) || 0;\n  if (attempts >= (cfg.maxUploadAttempts || 3)) { skippedAlreadyFailedCount++; continue; }\n\n  if (!groups[productNo]) {\n    groups[productNo] = {\n      productNo, category,\n      shopifyUrl: info.shopifyUrl,\n      material: info.material,\n      keyword: info.keyword,\n      images: [],\n    };\n  }\n  groups[productNo].images.push(img);\n}\n\nfunction naturalCompare(a, b) {\n  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });\n}\n\nconst perProductCap = cfg.perProductDailyCap || 10;\nconst entries = Object.values(groups).map(g => {\n  g.images.sort((a, b) => naturalCompare(a.name, b.name));\n  g.images = g.images.slice(0, perProductCap);\n  return g;\n}).filter(g => g.images.length > 0);\n\nsd.candidates = (sd.candidates || []).concat(entries);\nsd.unmatchedImages = (sd.unmatchedImages || []).concat(unmatchedImages);\nsd.skippedNoUrlCount = (sd.skippedNoUrlCount || 0) + skippedNoUrlCount;\nsd.skippedAlreadyFailedCount = (sd.skippedAlreadyFailedCount || 0) + skippedAlreadyFailedCount;\n\nreturn [{ json: { category, matchedProducts: entries.length, imagesQueued: entries.reduce((n, e) => n + e.images.length, 0) } }];\n"
+      },
+      "id": "n-matchfilter",
+      "name": "🔎 Match & Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst candidates = sd.candidates || [];\n\nconst pinnedRows = $('📌 Get Existing Pin Rows').all().map(i => i.json);\n\n// Fairness ordering: products with fewest ALREADY-PUBLISHED-OR-QUEUED images\n// (from actual Pinterest Pins history) go first, so no product gets starved\n// while others pile up.\nfunction pinnedCountFor(productNo) {\n  return pinnedRows.filter(r => String(r['Product No.'] || '').trim() === productNo).length;\n}\n\nconst sorted = [...candidates].sort((a, b) => {\n  const diff = pinnedCountFor(a.productNo) - pinnedCountFor(b.productNo);\n  if (diff !== 0) return diff;\n  return a.productNo.localeCompare(b.productNo);\n});\n\n// Round-robin flatten: one image at a time from each product in priority\n// order, cycling until EVERY eligible image is included (not capped to a\n// subset) -- a product with 2 images now always gets 2 rows, just possibly\n// scheduled on different days.\nconst pointers = sorted.map(() => 0);\nconst flatList = [];\nlet progressed = true;\nwhile (progressed) {\n  progressed = false;\n  for (let i = 0; i < sorted.length; i++) {\n    const group = sorted[i];\n    if (pointers[i] >= group.images.length) continue;\n    const img = group.images[pointers[i]];\n    pointers[i]++;\n    progressed = true;\n    flatList.push({\n      productNo: group.productNo, category: group.category,\n      shopifyUrl: group.shopifyUrl, material: group.material, keyword: group.keyword,\n      fileId: img.id, fileName: img.name, mimeType: img.mimeType,\n    });\n  }\n}\n\n// Clear accumulated state now that it's been consumed\nsd.candidates = [];\n\n// -- Scheduling: pinsPerDay new pins per day, each scheduleHourSpacing hours\n// apart, continuing from whatever slot the last already-scheduled\n// product-photo pin used (so re-running this daily extends the schedule\n// further out instead of double-booking the same slots).\nconst pinsPerDay = cfg.pinsPerDay || 10;\nconst hourSpacing = cfg.scheduleHourSpacing || 2;\nconst dayStartHour = cfg.scheduleDayStartHour || 4;\n\nconst existingScheduled = pinnedRows\n  .filter(r => String(r['Source'] || '').trim() === 'product-photo')\n  .map(r => String(r['Scheduled Date'] || '').trim())\n  .filter(Boolean)\n  .map(s => DateTime.fromFormat(s, 'yyyy-LL-dd HH:mm'))\n  .filter(d => d.isValid);\n\nconst tomorrowStart = $now.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 });\n\nlet cursor = existingScheduled.length ? DateTime.max(...existingScheduled).plus({ hours: hourSpacing }) : tomorrowStart;\nif (cursor < tomorrowStart) cursor = tomorrowStart; // never schedule earlier than tomorrow\n\n// If the last existing slot wasn't day-aligned to pinsPerDay (e.g. config\n// changed), just keep incrementing by hourSpacing and roll to the next\n// day's start hour once a day's quota is filled from THIS point forward.\nconst finalList = flatList.map((item, idx) => {\n  if (idx > 0) {\n    const daySlot = idx % pinsPerDay;\n    cursor = daySlot === 0\n      ? cursor.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 })\n      : cursor.plus({ hours: hourSpacing });\n  }\n  return { json: { ...item, scheduledDate: cursor.toFormat('yyyy-LL-dd HH:mm') } };\n});\n\nconsole.log(JSON.stringify({\n  totalProducts: sorted.length,\n  totalImagesScheduled: finalList.length,\n  daysSpanned: Math.ceil(finalList.length / pinsPerDay),\n  firstScheduledDate: finalList[0] ? finalList[0].json.scheduledDate : null,\n  lastScheduledDate: finalList.length ? finalList[finalList.length - 1].json.scheduledDate : null,\n  unmatchedImages: sd.unmatchedImages,\n  skippedNoUrlCount: sd.skippedNoUrlCount,\n  skippedAlreadyFailedCount: sd.skippedAlreadyFailedCount,\n  skippedCategories: sd.skippedCategories,\n}));\n\nreturn finalList.length ? finalList : [{ json: { _noImagesToProcess: true } }];\n"
+      },
+      "id": "n-roundrobin",
+      "name": "🗓️ Schedule All Pins (Round Robin)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1408,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has1",
+              "leftValue": "={{ $json.fileId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n-ifhasimages",
+      "name": "🚦 IF Has Images",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1184,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "n-iterimages",
+      "name": "🔁 Iterate Final Images",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -704,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "fileName": "={{ $json.fileName }}"
+        }
+      },
+      "id": "n-download",
+      "name": "⬇️ Download from Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -368,
+        496
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation stagedUploadsCreate($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }', variables: { input: [{ resource: 'IMAGE', filename: $('🔁 Iterate Final Images').item.json.fileName, mimeType: $('🔁 Iterate Final Images').item.json.mimeType || 'image/jpeg', httpMethod: 'POST' }] } }) }}",
+        "options": {}
+      },
+      "id": "n-stagedcreate",
+      "name": "🎯 Staged Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -384,
+        272
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].url }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[0].value }}"
+            },
+            {
+              "name": "success_action_status",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[1].value }}"
+            },
+            {
+              "name": "acl",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[2].value }}"
+            },
+            {
+              "name": "key",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[3].value }}"
+            },
+            {
+              "name": "x-goog-date",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[4].value }}"
+            },
+            {
+              "name": "x-goog-credential",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[5].value }}"
+            },
+            {
+              "name": "x-goog-algorithm",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[6].value }}"
+            },
+            {
+              "name": "x-goog-signature",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[7].value }}"
+            },
+            {
+              "name": "policy",
+              "value": "={{ $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].parameters[8].value }}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-uploadstorage",
+      "name": "☁️ Upload to Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        336,
+        288
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('🔁 Iterate Final Images').item.json.productNo, contentType: 'IMAGE', originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
+        "options": {}
+      },
+      "id": "n-filecreate",
+      "name": "📎 File Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        288
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "n-wait15",
+      "name": "⏳ Wait 15s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        288
+      ],
+      "webhookId": "ed35756e-146f-4eb4-b75a-c79e57bdeaaf"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query getFiles($ids: [ID!]!) { nodes(ids: $ids) { ... on GenericFile { id alt fileStatus url } ... on MediaImage { id alt fileStatus image { url width height } } } }', variables: { ids: [ ($('📎 File Create').item.json.data && $('📎 File Create').item.json.data.fileCreate && $('📎 File Create').item.json.data.fileCreate.files && $('📎 File Create').item.json.data.fileCreate.files[0] && $('📎 File Create').item.json.data.fileCreate.files[0].id) || '' ] } }) }}",
+        "options": {}
+      },
+      "id": "n-getcdn",
+      "name": "🔗 Get CDN URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('🔁 Iterate Final Images').item.json;\nconst staged = $('🎯 Staged Create').item.json;\nconst uploadResp = $('☁️ Upload to Storage').item.json;\nconst fileCreateResp = $('📎 File Create').item.json;\nconst cdnResp = $json; // Get CDN URL output\n\nfunction errText(r) {\n  if (!r) return '';\n  if (r.error) return typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\n  const ue = r.data && (r.data.stagedUploadsCreate || r.data.fileCreate);\n  if (ue && ue.userErrors && ue.userErrors.length) return ue.userErrors.map(e => e.message).join('; ');\n  return '';\n}\n\nlet error = errText(staged) || errText(uploadResp) || errText(fileCreateResp) || errText(cdnResp);\n\nconst fileId = fileCreateResp?.data?.fileCreate?.files?.[0]?.id;\nlet cdnUrl = '';\nif (!error && fileId) {\n  const nodesArr = cdnResp?.data?.nodes || [];\n  const node = nodesArr.find(n => n && n.id === fileId);\n  cdnUrl = node?.url || node?.image?.url || '';\n  if (!cdnUrl) error = 'No CDN URL returned';\n}\n\nconst success = !error && !!cdnUrl;\n\n// Resolve candidate boards for this pin's category from the Tailwind Boards tab.\n// A board's Category cell can list more than one category (e.g. \"Bathtub | Fireplace\"),\n// so split on \"|\" (and \",\" as a safety net) rather than requiring an exact single match.\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Tailwind Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Pinterest Board'] || '').trim(), id: String(row['Tailwind Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst needsBoardChoice = success && candidateBoards.length > 1;\nconst boardInstruction = needsBoardChoice\n  ? ('\\n\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): '\n    + candidateBoards.map(b => b.name).join(' | '))\n  : '';\nconst jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\nconst promptText = success\n  ? ('You are a Pinterest SEO copywriter for a luxury natural stone product. Look at the image and return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Category: ' + ctx.category + '\\nMaterial: ' + (ctx.material || 'natural stone') + '\\nKeyword: ' + (ctx.keyword || '')\n    + '\\nThis pin links to the product page: ' + ctx.shopifyUrl\n    + boardInstruction)\n  : '';\n\nreturn [{\n  json: {\n    ...ctx,\n    success,\n    cdnUrl,\n    errorMessage: error,\n    promptText,\n    candidateBoards,\n  },\n}];\n"
+      },
+      "id": "n-checkupload",
+      "name": "🧩 Check Upload Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ok1",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n-ifsuccess",
+      "name": "✅ IF Upload Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "={{ $('⚙️ Set Config').first().json.openAiModel }}",
+          "cachedResultName": "gpt-4o"
+        },
+        "text": "={{ $json.promptText }}",
+        "imageUrls": "={{ $json.cdnUrl }}",
+        "options": {}
+      },
+      "id": "n-aivision",
+      "name": "🧠 AI Vision Copy",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        592,
+        -224
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('🧩 Check Upload Result').item.json;\nconst resp = $json;\nlet content = resp.content || resp.text || (resp.message && resp.message.content) || '';\nif (!content && resp.choices && resp.choices[0] && resp.choices[0].message) content = resp.choices[0].message.content || '';\ncontent = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\nlet ai = {};\ntry { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\nfunction preview(u) { return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\n\n// Resolve the board: single candidate -> use it directly; multiple candidates ->\n// use the AI's pick (falling back to the first one if the AI's answer doesn't match\n// any candidate name exactly); zero candidates -> leave blank for manual assignment.\nconst candidateBoards = ctx.candidateBoards || [];\nlet board = '', boardId = '';\nif (candidateBoards.length === 1) {\n  board = candidateBoards[0].name;\n  boardId = candidateBoards[0].id;\n} else if (candidateBoards.length > 1) {\n  const aiChoice = String(ai.board || '').trim().toLowerCase();\n  const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n  const chosen = matched || candidateBoards[0];\n  board = chosen.name;\n  boardId = chosen.id;\n}\n\nreturn [{\n  json: {\n    'Pin ID': ctx.productNo + '-' + ctx.fileId,\n    'Product No.': ctx.productNo,\n    'Image File ID': ctx.fileId,\n    'Source': 'product-photo',\n    'Blog No.': '',\n    'Blog Title': '',\n    'Pin Type': 'single',\n    'Preview 1': preview(ctx.cdnUrl),\n    'Image 1 URL': ctx.cdnUrl,\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': ctx.shopifyUrl,\n    // Auto-filled from the Tailwind Boards tab by category (AI-picked when a category\n    // has more than one candidate board); left blank only if this category has none yet --\n    // WF2 will correctly hold those rows as not-ready ('Board not found') until a board\n    // is added for that category, even though Approval is auto-set below.\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': ctx.scheduledDate || '',\n    'Approval': 'Approved',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': '',\n  },\n}];\n"
+      },
+      "id": "n-buildpinrow",
+      "name": "🏗️ Build Pin Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Pin ID",
+              "displayName": "Pin ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog No.",
+              "displayName": "Blog No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog Title",
+              "displayName": "Blog Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Type",
+              "displayName": "Pin Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Preview 1",
+              "displayName": "Preview 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Image 1 URL",
+              "displayName": "Image 1 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Title",
+              "displayName": "Pin Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Description",
+              "displayName": "Pin Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Alt Text",
+              "displayName": "Alt Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog Link",
+              "displayName": "Blog Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Board",
+              "displayName": "Board",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Board ID",
+              "displayName": "Board ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Approval",
+              "displayName": "Approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tailwind Post ID",
+              "displayName": "Tailwind Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin URL",
+              "displayName": "Pin URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Created Time",
+              "displayName": "Created Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pinned Time",
+              "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "n-appendpin",
+      "name": "📤 Append Pin Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        -224
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $json; // Check Upload Result output, false branch\nconst existing = $('🚫 Get Failed Images').all().map(i => i.json);\nconst prior = existing.find(r => String(r['Image File ID'] || '').trim() === ctx.fileId);\nconst attemptCount = (prior ? (parseInt(prior['Attempt Count'], 10) || 0) : 0) + 1;\n\nreturn [{\n  json: {\n    'Image File ID': ctx.fileId,\n    'Product No.': ctx.productNo,\n    'Last Error': ctx.errorMessage || 'Unknown error',\n    'Attempt Count': attemptCount,\n    'Last Attempt': $now.toISO(),\n  },\n}];\n"
+      },
+      "id": "n-buildfailrow",
+      "name": "🧯 Build Failure Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.failedImagesTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Image File ID"
+          ],
+          "value": {
+            "Image File ID": "={{ $json['Image File ID'] }}",
+            "Product No.": "={{ $json['Product No.'] }}",
+            "Last Error": "={{ $json['Last Error'] }}",
+            "Attempt Count": "={{ $json['Attempt Count'] }}",
+            "Last Attempt": "={{ $json['Last Attempt'] }}"
+          },
+          "schema": [
+            {
+              "id": "Image File ID",
+              "displayName": "Image File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product No.",
+              "displayName": "Product No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Error",
+              "displayName": "Last Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Attempt Count",
+              "displayName": "Attempt Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Attempt",
+              "displayName": "Last Attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "n-upsertfail",
+      "name": "📥 Upsert Failed Image Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        928,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.tailwindBoardsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "n-getboards",
+      "name": "🗂️ Get Tailwind Boards",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2320,
+        288
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "n-mergebinary",
+      "name": "🔀 Merge Binary + Staged",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -80,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Runs once per loop iteration (Iterate Final Images has batchSize 1).\n// After the Merge (append mode) the paired-item lineage is broken, so read\n// each source node with .first() instead of .item, and re-anchor pairedItem\n// to input item 0 (the Staged Create branch of the merge) so downstream nodes\n// that reference $('🎯 Staged Create').item / $('🔁 Iterate Final Images').item\n// can still resolve.\nconst staged = $('🎯 Staged Create').first().json;\nconst downloadItem = $('⬇️ Download from Drive').first();\nreturn [{ json: staged, binary: downloadItem.binary, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "n-attachbinary",
+      "name": "🧷 Attach Binary to Staged Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        288
+      ]
+    }
+  ],
+  "connections": {
+    "⏰ Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Set Config": {
+      "main": [
+        [
+          {
+            "node": "📌 Get Existing Pin Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📌 Get Existing Pin Rows": {
+      "main": [
+        [
+          {
+            "node": "🚫 Get Failed Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🚫 Get Failed Images": {
+      "main": [
+        [
+          {
+            "node": "🗂️ Get Tailwind Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 List All Drive Folders": {
+      "main": [
+        [
+          {
+            "node": "🧭 Resolve Category Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧭 Resolve Category Folders": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Category Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔁 Iterate Category Folders": {
+      "main": [
+        [
+          {
+            "node": "🗓️ Schedule All Pins (Round Robin)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🗃️ List Images in Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗃️ List Images in Folder": {
+      "main": [
+        [
+          {
+            "node": "🖼️ Filter Image Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🖼️ Filter Image Files": {
+      "main": [
+        [
+          {
+            "node": "📄 Get Product Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📄 Get Product Rows": {
+      "main": [
+        [
+          {
+            "node": "🔎 Match & Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Match & Filter": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Category Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🚦 IF Has Images": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Final Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔁 Iterate Final Images": {
+      "main": [
+        [],
+        [
+          {
+            "node": "⬇️ Download from Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🎯 Staged Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⬇️ Download from Drive": {
+      "main": [
+        [
+          {
+            "node": "🔀 Merge Binary + Staged",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "🎯 Staged Create": {
+      "main": [
+        [
+          {
+            "node": "🔀 Merge Binary + Staged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "☁️ Upload to Storage": {
+      "main": [
+        [
+          {
+            "node": "📎 File Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📎 File Create": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 15s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait 15s": {
+      "main": [
+        [
+          {
+            "node": "🔗 Get CDN URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔗 Get CDN URL": {
+      "main": [
+        [
+          {
+            "node": "🧩 Check Upload Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Check Upload Result": {
+      "main": [
+        [
+          {
+            "node": "✅ IF Upload Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✅ IF Upload Success": {
+      "main": [
+        [
+          {
+            "node": "🧠 AI Vision Copy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🧯 Build Failure Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧠 AI Vision Copy": {
+      "main": [
+        [
+          {
+            "node": "🏗️ Build Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🏗️ Build Pin Row": {
+      "main": [
+        [
+          {
+            "node": "📤 Append Pin Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📤 Append Pin Row": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Final Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧯 Build Failure Row": {
+      "main": [
+        [
+          {
+            "node": "📥 Upsert Failed Image Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Upsert Failed Image Row": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Final Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗓️ Schedule All Pins (Round Robin)": {
+      "main": [
+        [
+          {
+            "node": "🚦 IF Has Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗂️ Get Tailwind Boards": {
+      "main": [
+        [
+          {
+            "node": "📂 List All Drive Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Merge Binary + Staged": {
+      "main": [
+        [
+          {
+            "node": "🧷 Attach Binary to Staged Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧷 Attach Binary to Staged Upload": {
+      "main": [
+        [
+          {
+            "node": "☁️ Upload to Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "versionId": "819a2ffb-b2a5-4591-b7a4-22fb1d912f42",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "tEDt7Gwm32baaXNo",
+  "tags": []
+}

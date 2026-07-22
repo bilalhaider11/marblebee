@@ -1,24 +1,29 @@
 {
   "name": "Pinterest WF1 - Prepare Pins",
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
   "pinData": {},
   "nodes": [
     {
       "parameters": {
-        "content": "## Pinterest – Workflow 1: Prepare Pins (runs weekly)\n\n**What it does:** finds newly Posted blogs, reads the blog page, pulls all content images, plans pins (1 carousel of 3 hero images + single pins for the rest, 3/month), AI writes title/description/alt, writes review rows to the **Pinterest Pins** tab.\n\n**Setup:**\n1. Credentials: Google Sheets OAuth2 + OpenAI API key on the relevant nodes.\n2. Create tabs: **Pinterest Pins** and **Board Map** (Category → Pinterest Board).\n3. Add **Pinterest Status** column to Blogs.\n4. Check **Set Config** values.\n\n**Note:** the image-extraction selector (Extract & Plan) may need tuning to your live blog HTML.",
-        "height": 320,
+        "content": "## Pinterest – Workflow 1: Prepare Pins (runs weekly)\n\n**What it does:** finds newly Posted blogs, reads the blog page, pulls all content images, plans pins (1 carousel of 3 hero images + single pins for the rest, 3/month), AI writes title/description/alt, auto-assigns Board from the Tailwind Boards tab by Category (AI picks the best fit when a category has more than one board), auto-sets Approval = Approved, and writes review rows to the Pinterest Pins tab -- no manual board pick or approval step.\n\n**Setup:**\n1. Credentials: Google Sheets OAuth2 + OpenAI API key on the relevant nodes.\n2. Make sure the Tailwind Boards tab has a Category column filled in for the categories you want auto-assigned (a board's Category cell can list more than one, e.g. `Bathtub | Fireplace`).\n3. Add Pinterest Status column to Blogs.\n4. Check Set Config values.\n\n**Note:** the image-extraction selector (Extract & Plan) may need tuning to your live blog HTML.",
+        "height": 736,
         "width": 420
       },
-      "id": "sticky1",
+      "id": "ab9086e0-7d76-4ca6-b52a-2db17ebcf0ca",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -380,
-        -120
+        38656,
+        8704
       ]
     },
     {
@@ -32,13 +37,13 @@
           ]
         }
       },
-      "id": "node-trigger",
+      "id": "47c6f212-0ee2-440d-a26f-cbc8b2b40e79",
       "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        160,
-        200
+        39200,
+        9024
       ]
     },
     {
@@ -65,9 +70,9 @@
             },
             {
               "id": "a4",
-              "name": "boardMapTab",
+              "name": "tailwindBoardsTab",
               "type": "string",
-              "value": "Board Map"
+              "value": "Tailwind Boards"
             },
             {
               "id": "a5",
@@ -91,13 +96,13 @@
         },
         "options": {}
       },
-      "id": "node-config",
+      "id": "64bee1ba-aca9-4ecc-a379-67a34cfe7c25",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        360,
-        200
+        39408,
+        9024
       ]
     },
     {
@@ -114,20 +119,21 @@
         },
         "options": {}
       },
-      "id": "node-getblogs",
+      "id": "f5281687-aa8d-49d1-af6c-f83c27297c39",
       "name": "Get Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        760,
-        200
+        39904,
+        9024
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
-      }
+      },
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -135,7 +141,8 @@
           "options": {
             "caseSensitive": false,
             "typeValidation": "loose",
-            "version": 2
+            "version": 2,
+            "leftValue": ""
           },
           "conditions": [
             {
@@ -162,26 +169,26 @@
         },
         "options": {}
       },
-      "id": "node-filter",
+      "id": "10ec6ab0-8b87-4088-865d-786048f85110",
       "name": "Filter Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        960,
-        200
+        40112,
+        9024
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "node-loop",
+      "id": "edc79196-0730-40bc-9175-2ff6bfe3ccb8",
       "name": "Loop Over Blogs",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1560,
-        200
+        40864,
+        9040
       ]
     },
     {
@@ -190,18 +197,17 @@
         "height": 120,
         "width": 160
       },
-      "id": "sticky2",
+      "id": "8ad343c6-e0e8-4bd8-a553-3b59dbc7ff38",
       "name": "All Prepared",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1560,
-        40
+        40832,
+        8864
       ]
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "={{ $json['BLog-URL'] }}",
         "options": {
           "response": {
@@ -212,26 +218,26 @@
           }
         }
       },
-      "id": "node-fetch",
+      "id": "ee31a36e-3780-4112-86f8-166c2ca00079",
       "name": "Fetch Blog Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1780,
-        320
+        41088,
+        9184
       ]
     },
     {
       "parameters": {
-        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\n// Isolate our article content wrapper (.mb-blog-content) via balanced <div> matching\nfunction contentRegion(h){\n  const marker = h.indexOf('mb-blog-content');\n  if (marker < 0) return h;\n  const start = h.lastIndexOf('<div', marker);\n  if (start < 0) return h;\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = h.length;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return h.slice(start, end);\n}\nconst region = contentRegion(html);\n\n// Extract content image URLs (Shopify CDN or Google Drive), in order, deduped\nconst urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\nconst seen = new Set(); const images = [];\nfor (let raw of urls) {\n  let u = raw.replace(/&amp;/g,'&');\n  u = u.replace(/[.,;:!?]+$/, '');\n  if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n    const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n    if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n    else continue;\n  }\n  const qi = u.indexOf('?');\n  if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n  const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n  const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n  const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n  if (!(isShopify || isDrive || isExt)) continue;\n  let key;\n  if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n  else key = u.split('?')[0];\n  if (!seen.has(key)) { seen.add(key); images.push(u); }\n}\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\nlet board = ''; let boardId = ''; // chosen manually by the reviewer\n\nconst pins = images.map((img, i) => {\n  const hour = hours[i % hours.length] || 9;\n  const scheduledDate = $now.plus({ days: 1 }).set({ hour: hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, board, boardId, text, imageCount: images.length, pins } }];\n"
+        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst rowNo = blog['row_number'];\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\nfunction contentRegion(h){\n  const marker = h.indexOf('mb-blog-content');\n  if (marker < 0) return h;\n  const start = h.lastIndexOf('<div', marker);\n  if (start < 0) return h;\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = h.length;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return h.slice(start, end);\n}\nconst region = contentRegion(html);\n\nconst urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\nconst seen = new Set(); const images = [];\nfor (let raw of urls) {\n  let u = raw.replace(/&amp;/g,'&');\n  u = u.replace(/[.,;:!?]+$/, '');\n  if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n    const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n    if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n    else continue;\n  }\n  const qi = u.indexOf('?');\n  if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n  const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n  const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n  const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n  if (!(isShopify || isDrive || isExt)) continue;\n  let key;\n  if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n  else key = u.split('?')[0];\n  if (!seen.has(key)) { seen.add(key); images.push(u); }\n}\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\nconst pins = images.map((img, i) => {\n  const hour = hours[i % hours.length] || 9;\n  const scheduledDate = $now.plus({ days: 1 }).set({ hour: hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, text, imageCount: images.length, pins, row_number: rowNo } }];\n"
       },
-      "id": "node-extract",
+      "id": "72cff634-bae1-4d2d-a65b-18cdd9ea1cfe",
       "name": "Extract & Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2000,
-        320
+        41296,
+        9184
       ]
     },
     {
@@ -249,42 +255,166 @@
         },
         "columns": {
           "mappingMode": "defineBelow",
+          "value": {
+            "Blog.No.": "={{ $('Extract & Plan').item.json.blogNo }}",
+            "Pinterest Status": "Queued",
+            "row_number": 0
+          },
           "matchingColumns": [
             "Blog.No."
           ],
-          "value": {
-            "Blog.No.": "={{ $('Extract & Plan').item.json.blogNo }}",
-            "Pinterest Status": "Queued"
-          }
+          "schema": [
+            {
+              "id": "Blog.No.",
+              "displayName": "Blog.No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Blog-Article",
+              "displayName": "Blog-Article",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category (name)",
+              "displayName": "Category (name)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category( Link)",
+              "displayName": "Category( Link)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Folder_url",
+              "displayName": "Folder_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "BLog-URL",
+              "displayName": "BLog-URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Admin BLog-URL",
+              "displayName": "Admin BLog-URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Update Status",
+              "displayName": "Update Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Update Time",
+              "displayName": "Update Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pinterest Update Statue",
+              "displayName": "Pinterest Update Statue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pinterest Status",
+              "displayName": "Pinterest Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "node-markqueued",
+      "id": "d6d67707-3174-41bf-8e15-acbdd6d508f5",
       "name": "Mark Blog Queued",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        2440,
-        200
+        41760,
+        9344
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Extract & Plan').item.json;\nconst out = [];\n(ctx.pins || []).forEach((p, idx) => {\n  const prompt = 'You are a Pinterest SEO copywriter. Look at the image(s) and the article context, then return ONLY a JSON object with keys: title, description, alt. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Blog title: ' + ctx.blogTitle + '\\nCategory: ' + ctx.category + '\\nArticle context: ' + (ctx.text || '')\n    + '\\nThis is ' + (p.type === 'carousel' ? 'a carousel made of these images.' : 'a single image.')\n    + '\\nThe pin links to: ' + ctx.blogUrl;\n  out.push({ json: {\n    blogNo: ctx.blogNo, blogTitle: ctx.blogTitle, blogUrl: ctx.blogUrl,\n    category: ctx.category, board: ctx.board, boardId: ctx.boardId,\n    type: p.type, images: p.images, scheduledDate: p.scheduledDate,\n    pinIndex: idx + 1, promptText: prompt\n  } });\n});\nreturn out;\n"
+        "jsCode": "const ctx = $('Extract & Plan').item.json;\n\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Tailwind Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Pinterest Board'] || '').trim(), id: String(row['Tailwind Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst out = [];\n(ctx.pins || []).forEach((p, idx) => {\n  const needsBoardChoice = candidateBoards.length > 1;\n  const boardInstruction = needsBoardChoice\n    ? ('\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): ' + candidateBoards.map(b => b.name).join(' | '))\n    : '';\n  const jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\n  const prompt = 'You are a Pinterest SEO copywriter. Look at the image(s) and the article context, then return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Blog title: ' + ctx.blogTitle + '\\nCategory: ' + ctx.category + '\\nArticle context: ' + (ctx.text || '')\n    + '\\nThis is ' + (p.type === 'carousel' ? 'a carousel made of these images.' : 'a single image.')\n    + '\\nThe pin links to: ' + ctx.blogUrl\n    + boardInstruction;\n  out.push({ json: {\n    blogNo: ctx.blogNo, blogTitle: ctx.blogTitle, blogUrl: ctx.blogUrl,\n    category: ctx.category, candidateBoards,\n    type: p.type, images: p.images, scheduledDate: p.scheduledDate,\n    pinIndex: idx + 1, promptText: prompt\n  } });\n});\nreturn out;\n"
       },
-      "id": "node-split",
+      "id": "9ce46671-bb43-4921-a9d5-17025b14e72d",
       "name": "Split Pins",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2660,
-        320
+        42032,
+        9184
       ]
     },
     {
@@ -298,36 +428,35 @@
           "cachedResultName": "gpt-4o"
         },
         "text": "={{ $json.promptText }}",
-        "inputType": "url",
         "imageUrls": "={{ ($json.images || []).join(',') }}",
         "options": {}
       },
-      "id": "node-ai",
+      "id": "fc0a3e11-befa-4fe2-b0ee-b31eda2ea49b",
       "name": "AI Vision Copy",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        2880,
-        320
+        42256,
+        9184
       ],
       "credentials": {
         "openAiApi": {
-          "id": "OPENAI_CRED_ID",
-          "name": "OpenAi account"
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': pin.board,\n    'Board ID': pin.boardId,\n    'Scheduled Date': pin.scheduledDate,\n    'Approval': '',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
+        "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n\n  const candidateBoards = pin.candidateBoards || [];\n  let board = '', boardId = '';\n  if (candidateBoards.length === 1) {\n    board = candidateBoards[0].name;\n    boardId = candidateBoards[0].id;\n  } else if (candidateBoards.length > 1) {\n    const aiChoice = String(ai.board || '').trim().toLowerCase();\n    const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n    const chosen = matched || candidateBoards[0];\n    board = chosen.name;\n    boardId = chosen.id;\n  }\n\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': pin.scheduledDate,\n    'Approval': 'Approved',\n    'Status': 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
       },
-      "id": "node-buildrow",
+      "id": "bf7074f5-5b38-4012-8b19-1cb31142c528",
       "name": "Build Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3100,
-        320
+        42448,
+        9184
       ]
     },
     {
@@ -344,38 +473,284 @@
           "mode": "name"
         },
         "columns": {
-          "mappingMode": "autoMapInputData"
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Pin ID",
+              "displayName": "Pin ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog No.",
+              "displayName": "Blog No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog Title",
+              "displayName": "Blog Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Type",
+              "displayName": "Pin Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Preview 1",
+              "displayName": "Preview 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Image 1 URL",
+              "displayName": "Image 1 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Title",
+              "displayName": "Pin Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin Description",
+              "displayName": "Pin Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Alt Text",
+              "displayName": "Alt Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Blog Link",
+              "displayName": "Blog Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Board",
+              "displayName": "Board",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Board ID",
+              "displayName": "Board ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Approval",
+              "displayName": "Approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tailwind Post ID",
+              "displayName": "Tailwind Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pin URL",
+              "displayName": "Pin URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Created Time",
+              "displayName": "Created Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Pinned Time",
+              "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Preview 2",
+              "displayName": "Preview 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Preview 3",
+              "displayName": "Preview 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Image 2 URL",
+              "displayName": "Image 2 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Image 3 URL",
+              "displayName": "Image 3 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {
           "cellFormat": "USER_ENTERED"
         }
       },
-      "id": "node-append",
+      "id": "eb357fe0-6a14-4cc3-b68b-f9896e94e744",
       "name": "Append Pin Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        3320,
-        320
+        42656,
+        9184
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.item.json;\nreturn [{ json: { ...item, _source: 'blogs' } }];"
+        "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: { ...i.json, _source: 'blogs' } }));"
       },
-      "id": "node-mapregular",
+      "id": "6f1b17ed-b063-416b-9f21-9ad767a42515",
       "name": "Map Regular Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
-        100
+        40352,
+        9024
       ]
     },
     {
@@ -392,20 +767,21 @@
         },
         "options": {}
       },
-      "id": "node-getmanual",
+      "id": "f1126c8a-8f5e-4013-8a36-4df4e594fc38",
       "name": "Get Manual Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        760,
-        480
+        39920,
+        9312
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
-      }
+      },
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -413,7 +789,8 @@
           "options": {
             "caseSensitive": false,
             "typeValidation": "loose",
-            "version": 2
+            "version": 2,
+            "leftValue": ""
           },
           "conditions": [
             {
@@ -441,39 +818,37 @@
         },
         "options": {}
       },
-      "id": "node-filtermanual",
+      "id": "2ee245db-a11b-4eed-8f3c-201bec245291",
       "name": "Filter Manual Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        960,
-        480
+        40128,
+        9312
       ]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.item.json;\nreturn [{ json: {\n  'BLog-URL': item['Manual Blog URL'] || '',\n  'Manual Blog URL': item['Manual Blog URL'] || '',\n  'Category': item['Category'] || '',\n  '_source': 'manual'\n} }];"
+        "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: {\n  row_number: i.json['row_number'],\n  'BLog-URL': i.json['Manual Blog URL'] || '',\n  'Manual Blog URL': i.json['Manual Blog URL'] || '',\n  'Category': i.json['Category'] || '',\n  '_source': 'manual'\n} }));"
       },
-      "id": "node-mapmanual",
+      "id": "d1051186-b850-4c8e-b2c2-9430841ec3ea",
       "name": "Map Manual Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1160,
-        480
+        40320,
+        9312
       ]
     },
     {
-      "parameters": {
-        "mode": "append"
-      },
-      "id": "node-merge",
+      "parameters": {},
+      "id": "588de0c8-efef-4655-a208-1e8a1fde2435",
       "name": "Merge",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        1360,
-        300
+        40640,
+        9040
       ]
     },
     {
@@ -482,7 +857,8 @@
           "options": {
             "caseSensitive": false,
             "typeValidation": "loose",
-            "version": 2
+            "version": 2,
+            "leftValue": ""
           },
           "conditions": [
             {
@@ -499,13 +875,13 @@
         },
         "options": {}
       },
-      "id": "node-ifmanual",
+      "id": "acba5d20-3f6b-4c17-941f-ee4f9bd86f2f",
       "name": "IF Manual Blog",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2220,
-        320
+        41520,
+        9184
       ]
     },
     {
@@ -524,27 +900,101 @@
         "columns": {
           "mappingMode": "defineBelow",
           "matchingColumns": [
-            "Manual Blog URL"
+            "row_number"
           ],
           "value": {
-            "Manual Blog URL": "={{ $('Loop Over Blogs').item.json['Manual Blog URL'] }}",
+            "row_number": "={{ $('Loop Over Blogs').item.json['row_number'] }}",
             "Pinterest Status": "Queued"
-          }
+          },
+          "schema": [
+            {
+              "id": "Manual Blog URL",
+              "displayName": "Manual Blog URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pinterest Status",
+              "displayName": "Pinterest Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "node-updatemanual",
+      "id": "9b361837-cb82-4140-969c-9b2f15cabbe3",
       "name": "Update Manual Blog Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        2440,
-        440
+        41744,
+        9040
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CRED_ID",
-          "name": "Google Sheets account"
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.tailwindBoardsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "df9e036f-706d-4e33-ae4d-1864c9d2c76a",
+      "name": "🗂️ Get Tailwind Boards",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        39600,
+        9024
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
         }
       }
     }
@@ -554,12 +1004,7 @@
       "main": [
         [
           {
-            "node": "Get Blog Rows",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Get Manual Blog Rows",
+            "node": "🗂️ Get Tailwind Boards",
             "type": "main",
             "index": 0
           }
@@ -771,6 +1216,30 @@
           }
         ]
       ]
+    },
+    "🗂️ Get Tailwind Boards": {
+      "main": [
+        [
+          {
+            "node": "Get Blog Rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Manual Blog Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
-  }
+  },
+  "versionId": "aa2b4fc4-57b3-479a-af9e-9c00e565a45a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "T08oNsE4lWpyIqsa",
+  "tags": []
 }

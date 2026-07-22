@@ -3,8 +3,8 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Pinterest – Workflow 3: Verify published pins (daily)\n\nReads rows where **Status = Scheduled** (with a Tailwind Post ID), calls Tailwind **Get Post**, and when the post is **published** (status = sent), writes the real **Pinterest URL** into **Pin URL** and sets **Status = Published** + actual **Pinned Time**.\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials; accountId in Set Config.",
-        "height": 380,
+        "content": "## Pinterest – Workflow 3: Verify published pins\n\nReads rows where **Status = Scheduled** (with a Tailwind Post ID) from **both** the **Pinterest Pins** tab (blog-sourced) and the **Pinterest2:3 Pins** tab (product-photo-sourced), calls Tailwind **Get Post**, and when the post is **published** (status = sent), writes the real **Pinterest URL** into **Pin URL** and sets **Status = Published** + actual **Pinned Time** back to whichever tab that row came from (tracked internally as `_sourceTab`).\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials; accountId, pinsTab, and pinsTab2 in Set Config.",
+        "height": 476,
         "width": 420
       },
       "id": "f655c399-06d4-460a-909f-615906a6a447",
@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -544,
-        -256
+        832,
+        -16
       ]
     },
     {
@@ -32,8 +32,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        0,
-        0
+        1344,
+        112
       ]
     },
     {
@@ -57,6 +57,24 @@
               "name": "pinsTab",
               "type": "string",
               "value": "Pinterest Pins"
+            },
+            {
+              "id": "a4",
+              "name": "pinsTab2",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
+            },
+            {
+              "id": "a5",
+              "name": "maxRetries",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "a6",
+              "name": "retryHours",
+              "type": "string",
+              "value": "9,10"
             }
           ]
         },
@@ -67,8 +85,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        224,
-        0
+        1568,
+        112
       ]
     },
     {
@@ -80,7 +98,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Pinterest Pins",
+          "value": "={{ $('Set Config').first().json.pinsTab }}",
           "mode": "name"
         },
         "options": {}
@@ -90,8 +108,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        448,
-        0
+        1792,
+        112
       ],
       "executeOnce": true,
       "credentials": {
@@ -103,15 +121,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).trim().toLowerCase(); }\nconst out = [];\nfor (const p of pins) {\n  if (norm(p['Status']) !== 'scheduled') continue;\n  const postId = (p['Tailwind Post ID']==null?'':String(p['Tailwind Post ID'])).trim();\n  if (!postId) continue;\n  out.push({ json: { rowPinId: p['Pin ID'], postId, row_number: p['row_number'] } });\n}\nreturn out;\n"
+        "jsCode": "const pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nfunction norm(s){ return (s==null?'':String(s)).trim().toLowerCase(); }\nconst out = [];\nfor (const p of pins) {\n  if (norm(p['Status']) !== 'scheduled') continue;\n  const postId = (p['Tailwind Post ID']==null?'':String(p['Tailwind Post ID'])).trim();\n  if (!postId) continue;\n  out.push({ json: { rowPinId: p['Pin ID'], postId, row_number: p['row_number'], sourceTab: p._sourceTab, retryCount: parseInt(p['Retry Count'], 10) || 0 } });\n}\nreturn out;\n"
       },
       "id": "3c90ff26-8193-4ca3-acd5-39cde2126587",
       "name": "Select Scheduled",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        0
+        2176,
+        112
       ]
     },
     {
@@ -126,8 +144,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        896,
-        0
+        2400,
+        112
       ],
       "credentials": {
         "httpBearerAuth": {
@@ -139,15 +157,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const responses = $input.all();\nconst sel = $('Select Scheduled').all();\nfunction pick(r){ const o = Array.isArray(r)?(r[0]||{}):r; return (o && o.data && (o.data.post || o.data)) || (o && o.post) || o || {}; }\nfunction toIso(ts){ if(ts==null||ts==='') return ''; let n=Number(ts); if(isNaN(n)) return ''; if(n < 1e12) n=n*1000; const dt=DateTime.fromMillis(n).toUTC(); return dt.isValid ? dt.toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : ''; }\nconst out = [];\nfor (let i=0;i<responses.length;i++){\n  const post = pick(responses[i].json || {});\n  const rowPinId = (sel[i] && sel[i].json.rowPinId) || '';\n  const rowNumber = (sel[i] && sel[i].json.row_number);\n  if (!rowPinId) continue;\n  const status = (post.status||'').toString().toLowerCase();\n  const pinId = post.pinId || '';\n  if (pinId && (status === 'sent' || status === '')) {\n    out.push({ json: {\n      'row_number': rowNumber,\n      'Pin ID': rowPinId,\n      'Status': 'Published',\n      'Pin URL': 'https://www.pinterest.com/pin/' + pinId + '/',\n      'Pinned Time': toIso(post.sentAt) || toIso(post.sendAt)\n    } });\n  }\n}\nreturn out;\n"
+        "jsCode": "const responses = $input.all();\nconst sel = $('Select Scheduled').all();\nconst cfg = $('Set Config').first().json;\nconst maxRetries = cfg.maxRetries || 3;\nconst retryHours = (cfg.retryHours || '9,10').split(',').map(h => parseInt(h.trim(), 10)).filter(h => !isNaN(h)).sort((a, b) => a - b);\n\nfunction nextRetrySlot() {\n  const nowPlus15 = $now.plus({ minutes: 15 });\n  for (const h of retryHours) {\n    const slot = $now.set({ hour: h, minute: 0, second: 0, millisecond: 0 });\n    if (slot > nowPlus15) return slot;\n  }\n  // none of today's configured hours are far enough out -- use the earliest one tomorrow\n  return $now.plus({ days: 1 }).set({ hour: retryHours[0], minute: 0, second: 0, millisecond: 0 });\n}\n\nfunction pick(r){ const o = Array.isArray(r)?(r[0]||{}):r; return (o && o.data && (o.data.post || o.data)) || (o && o.post) || o || {}; }\nfunction toIso(ts){ if(ts==null||ts==='') return ''; let n=Number(ts); if(isNaN(n)) return ''; if(n < 1e12) n=n*1000; const dt=DateTime.fromMillis(n).toUTC(); return dt.isValid ? dt.toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : ''; }\n\nconst out = [];\nfor (let i=0;i<responses.length;i++){\n  const post = pick(responses[i].json || {});\n  const rowPinId = (sel[i] && sel[i].json.rowPinId) || '';\n  const rowNumber = (sel[i] && sel[i].json.row_number);\n  const sourceTab = (sel[i] && sel[i].json.sourceTab);\n  const retryCount = (sel[i] && sel[i].json.retryCount) || 0;\n  const postId = (sel[i] && sel[i].json.postId) || '';\n  if (!rowPinId) continue;\n  const status = (post.status||'').toString().toLowerCase();\n  const pinId = post.pinId || '';\n\n  if (pinId && (status === 'sent' || status === '')) {\n    out.push({ json: {\n      'row_number': rowNumber,\n      '_sourceTab': sourceTab,\n      'Pin ID': rowPinId,\n      'Status': 'Published',\n      'Pin URL': 'https://www.pinterest.com/pin/' + pinId + '/',\n      'Pinned Time': toIso(post.sentAt) || toIso(post.sendAt),\n      'Error': '',\n      'Tailwind Post ID': postId,\n      'Retry Count': retryCount,\n      'Scheduled Date': ''\n    } });\n  } else if (status === 'failed') {\n    const reason = String(post.failureReason || post.error || post.reason || 'Tailwind reported this post as failed');\n    const newRetryCount = retryCount + 1;\n    if (newRetryCount <= maxRetries) {\n      // Auto-retry: hand it back to WF2 as a fresh Review row, with the stale Tailwind\n      // Post ID cleared and a new near-future Scheduled Date (otherwise WF2 would\n      // immediately reject it again for having a past-due schedule instead of actually\n      // retrying it).\n      out.push({ json: {\n        'row_number': rowNumber,\n        '_sourceTab': sourceTab,\n        'Pin ID': rowPinId,\n        'Status': 'Review',\n        'Pin URL': '',\n        'Pinned Time': '',\n        'Tailwind Post ID': '',\n        'Retry Count': newRetryCount,\n        'Scheduled Date': nextRetrySlot().toFormat('yyyy-LL-dd HH:mm'),\n        'Error': reason.slice(0, 250) + ' (retry ' + newRetryCount + '/' + maxRetries + ')'\n      } });\n    } else {\n      // Exhausted retries -- leave it as a terminal error for manual review\n      out.push({ json: {\n        'row_number': rowNumber,\n        '_sourceTab': sourceTab,\n        'Pin ID': rowPinId,\n        'Status': 'Error',\n        'Pin URL': '',\n        'Pinned Time': '',\n        'Tailwind Post ID': '',\n        'Retry Count': newRetryCount,\n        'Scheduled Date': '',\n        'Error': reason.slice(0, 250) + ' (gave up after ' + maxRetries + ' retries)'\n      } });\n    }\n  }\n  // any other status (queued, processing, etc.) is still pending -- skip, checked again next run\n}\nreturn out;\n"
       },
       "id": "c1a09832-64dc-4a7d-98b3-73d1c3a1e117",
       "name": "Build Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
-        0
+        2624,
+        112
       ]
     },
     {
@@ -160,7 +178,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Pinterest Pins",
+          "value": "={{ $json._sourceTab }}",
           "mode": "name"
         },
         "columns": {
@@ -170,7 +188,11 @@
             "Pin ID": "={{ $json['Pin ID'] }}",
             "Status": "={{ $json['Status'] }}",
             "Pin URL": "={{ $json['Pin URL'] }}",
-            "Pinned Time": "={{ $json['Pinned Time'] }}"
+            "Pinned Time": "={{ $json['Pinned Time'] }}",
+            "Error": "={{ $json['Error'] }}",
+            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}",
+            "Retry Count": "={{ $json['Retry Count'] }}",
+            "Scheduled Date": "={{ $json['Scheduled Date'] }}"
           },
           "matchingColumns": [
             "row_number"
@@ -342,8 +364,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "Approval",
@@ -371,8 +392,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "Pin URL",
@@ -390,8 +410,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "Created Time",
@@ -421,6 +440,15 @@
               "type": "number",
               "canBeUsedToMatch": true,
               "readOnly": true
+            },
+            {
+              "id": "Retry Count",
+              "displayName": "Retry Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -433,9 +461,39 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1344,
-        0
+        2848,
+        112
       ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "b1c2d3e4-0002-4000-8000-000000000002",
+      "name": "Get Pins 2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1984,
+        112
+      ],
+      "executeOnce": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -472,7 +530,7 @@
       "main": [
         [
           {
-            "node": "Select Scheduled",
+            "node": "Get Pins 2",
             "type": "main",
             "index": 0
           }
@@ -511,6 +569,17 @@
           }
         ]
       ]
+    },
+    "Get Pins 2": {
+      "main": [
+        [
+          {
+            "node": "Select Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -522,7 +591,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "9931e808-5ddb-481c-9558-60a5e2d7ae09",
+  "versionId": "12e01168-c383-4db0-8d15-95c0bec1462d",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"

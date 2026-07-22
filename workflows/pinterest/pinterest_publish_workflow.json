@@ -3,8 +3,8 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Pinterest – Workflow 2: Publish approved pins (daily)\n\nReads the **Pinterest Pins** tab, takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from Tailwind Boards), and schedules each pin in **Tailwind** at its **Scheduled Date** (Tailwind publishes it then). Writes back Status / Pin URL / Error / Pinned Time.\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials. Set accountId in Set Config.",
-        "height": 396,
+        "content": "## Pinterest – Workflow 2: Publish approved pins (daily)\n\nReads **both** the **Pinterest Pins** tab (blog-sourced) and the **Pinterest2:3 Pins** tab (product-photo-sourced), takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from Tailwind Boards), and schedules each pin in **Tailwind** at its **Scheduled Date** (Tailwind publishes it then). Writes back Status / Pin URL / Error / Pinned Time to whichever tab that row came from (tracked internally as `_sourceTab`).\n\n**Setup:** Google Sheets + Tailwind (Bearer) credentials. Set accountId, pinsTab, and pinsTab2 in Set Config.",
+        "height": 492,
         "width": 420
       },
       "id": "78b79f84-0052-4a45-9ab1-5bed7e789785",
@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -560,
-        -112
+        736,
+        576
       ]
     },
     {
@@ -29,8 +29,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        0,
-        96
+        1216,
+        784
       ]
     },
     {
@@ -60,6 +60,12 @@
               "name": "boardsTab",
               "type": "string",
               "value": "Tailwind Boards"
+            },
+            {
+              "id": "a5",
+              "name": "pinsTab2",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
             }
           ]
         },
@@ -70,8 +76,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        224,
-        96
+        1440,
+        784
       ]
     },
     {
@@ -83,7 +89,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Pinterest Pins",
+          "value": "={{ $('Set Config').first().json.pinsTab }}",
           "mode": "name"
         },
         "options": {}
@@ -93,8 +99,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        448,
-        96
+        1648,
+        784
       ],
       "executeOnce": true,
       "credentials": {
@@ -123,8 +129,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        672,
-        96
+        2048,
+        784
       ],
       "executeOnce": true,
       "credentials": {
@@ -136,15 +142,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const pins = $('Get Pins').all().map(i => i.json);\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[\\u2013-\\u2015]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Pinterest Board'] || r['Board Name'] || r['Board'] || ''; }\nfunction bId(r){ return r['Tailwind Board ID'] || r['Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  let dt = DateTime.fromISO(s);\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm');\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  if (norm(pin['Status']) !== 'review') continue;\n  const boardId = resolveBoardId(pin);\n  const sendAt = toSendAt(pin['Scheduled Date']);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) { ready=false; reason='Scheduled time must be 15+ min in the future'; }\n  out.push({ json: {\n    row_number: pin['row_number'],\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt\n  } });\n}\nreturn out;\n"
+        "jsCode": "const cfg = $('Set Config').first().json;\nconst pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[\\u2013-\\u2015]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Pinterest Board'] || r['Board Name'] || r['Board'] || ''; }\nfunction bId(r){ return r['Tailwind Board ID'] || r['Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  let dt = DateTime.fromISO(s);\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss');\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm');\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  if (norm(pin['Status']) !== 'review') continue;\n  const boardId = resolveBoardId(pin);\n  const sendAt = toSendAt(pin['Scheduled Date']);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) { ready=false; reason='Scheduled time must be 15+ min in the future'; }\n  out.push({ json: {\n    row_number: pin['row_number'],\n    sourceTab: pin._sourceTab,\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt\n  } });\n}\nreturn out;\n"
       },
       "id": "d52939cc-d33c-4131-83b7-f61f2023cf00",
       "name": "Prepare",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        96
+        2272,
+        784
       ]
     },
     {
@@ -177,8 +183,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1120,
-        96
+        2496,
+        784
       ]
     },
     {
@@ -197,8 +203,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1344,
-        0
+        2720,
+        768
       ],
       "credentials": {
         "httpBearerAuth": {
@@ -210,15 +216,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Each input item is one Tailwind API response from \"Create Pin\",\n// in the same order as the pins that fed it. The pin metadata\n// (Pin ID, row_number, blog url) lives on \"IF Ready\", not on the\n// HTTP response, so pull it from there by index.\nconst responses = $input.all();\nconst pins = $('IF Ready').all();\n\nreturn responses.map((item, index) => {\n  const response = item.json || {};\n  const pin = (pins[index] && pins[index].json) || {};\n  const post = (response.data && response.data.post) || {};\n  const ok = !!post.id;\n\n  return {\n    json: {\n      \"Row Number\": pin.row_number,\n      \"Pin ID\": pin.pinId,\n      \"Pin URL\": pin.url,\n      \"Status\": ok ? \"Scheduled\" : \"Error\",\n      \"Tailwind Post ID\": post.id || \"\",\n      \"Error\": ok ? \"\" : (response.message || response.error || \"Tailwind API error\")\n    }\n  };\n});"
+        "jsCode": "// Each input item is one Tailwind API response from \"Create Pin\",\n// in the same order as the pins that fed it. The pin metadata\n// (Pin ID, row_number, blog url) lives on \"IF Ready\", not on the\n// HTTP response, so pull it from there by index.\nconst responses = $input.all();\nconst pins = $('IF Ready').all();\n\nreturn responses.map((item, index) => {\n  const response = item.json || {};\n  const pin = (pins[index] && pins[index].json) || {};\n  const post = (response.data && response.data.post) || {};\n  const ok = !!post.id;\n\n  return {\n    json: {\n      \"Row Number\": pin.row_number,\n      \"_sourceTab\": pin.sourceTab,\n      \"Pin ID\": pin.pinId,\n      \"Pin URL\": pin.url,\n      \"Status\": ok ? \"Scheduled\" : \"Error\",\n      \"Tailwind Post ID\": post.id || \"\",\n      \"Error\": ok ? \"\" : (response.message || response.error || \"Tailwind API error\")\n    }\n  };\n});"
       },
       "id": "641ea9e2-d791-4857-a707-67f1b1eec1ea",
       "name": "Build Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
-        0
+        2944,
+        768
       ]
     },
     {
@@ -231,7 +237,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Pinterest Pins",
+          "value": "={{ $json._sourceTab }}",
           "mode": "name"
         },
         "columns": {
@@ -505,8 +511,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1792,
-        96
+        3216,
+        768
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -517,16 +523,46 @@
     },
     {
       "parameters": {
-        "jsCode": "// Emit one row per not-ready pin (runs once for all items).\nreturn $input.all().map(item => {\n  const p = item.json || {};\n  return {\n    json: {\n      'Row Number': p.row_number,\n      'Pin ID': p.pinId,\n      'Status': 'Review',\n      'Tailwind Post ID': '',\n      'Error': p.reason || 'Not ready'\n    }\n  };\n});"
+        "jsCode": "// Emit one row per not-ready pin (runs once for all items).\nreturn $input.all().map(item => {\n  const p = item.json || {};\n  return {\n    json: {\n      'Row Number': p.row_number,\n      '_sourceTab': p.sourceTab,\n      'Pin ID': p.pinId,\n      'Status': 'Review',\n      'Tailwind Post ID': '',\n      'Error': p.reason || 'Not ready'\n    }\n  };\n});"
       },
       "id": "e378df58-4703-405d-a40f-d8d94678d11b",
       "name": "Build Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
-        192
+        2848,
+        976
       ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Get Pins 2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1856,
+        784
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -557,7 +593,7 @@
       "main": [
         [
           {
-            "node": "Get Boards",
+            "node": "Get Pins 2",
             "type": "main",
             "index": 0
           }
@@ -636,6 +672,17 @@
           }
         ]
       ]
+    },
+    "Get Pins 2": {
+      "main": [
+        [
+          {
+            "node": "Get Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -647,7 +694,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "a5699de6-3eaa-4056-8915-8bacfb15899f",
+  "versionId": "fc05a463-4522-489d-9942-8079c40f23c2",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
