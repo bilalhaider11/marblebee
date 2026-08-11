@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const GOOGLE_SHEETS = [\n  // 'Test data',  // Uncomment for testing\n  'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab',\n  '2026Instock', 'DoorSurround', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion', 'Columns', 'MarbleBasin', 'MarbleConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs'\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
+        "jsCode": "const GOOGLE_SHEETS = [\n  // 'Test data',  // Uncomment for testing\n  'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab',\n  '2026Instock', 'DoorSurround', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion', 'Columns', 'MarbleBasin', 'MarbleConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
