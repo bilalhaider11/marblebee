@@ -79,7 +79,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const SHEETS = [\n'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity', 'Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround', 'MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'Columns', 'MarbleBasin', 'MarbleConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
+        "jsCode": "const SHEETS = [\n'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity', 'Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround', 'MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'Columns', 'Marble+ Basin', 'Marble+ ConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
       },
       "id": "cc7050c3-2315-4bd2-8531-fd3e6a57bf1d",
       "name": "📋 Load Sheet Names",
