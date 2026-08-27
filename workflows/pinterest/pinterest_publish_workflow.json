@@ -202,6 +202,8 @@
       "name": "Create Pin",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "position": [
         2720,
         768
