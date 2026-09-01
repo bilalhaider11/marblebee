@@ -855,8 +855,8 @@
               "removed": false
             },
             {
-              "id": "Tailwind Post ID",
-              "displayName": "Tailwind Post ID",
+              "id": "Metricool Post ID",
+              "displayName": "Metricool Post ID",
               "required": false,
               "defaultMatch": false,
               "display": true,

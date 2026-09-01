@@ -1,0 +1,205 @@
+{
+  "name": "Metricool - List Boards Helper",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Metricool – List Boards helper (run as needed)\n\nPulls every Pinterest board name + ID from Metricool into the **Tailwind Boards** tab (kept under its original name — board IDs are native to Pinterest, so nothing else needs to change), for new boards you want to add to the Category map.\n\n**Setup:** Google Sheets + Metricool (Header Auth, X-Mc-Auth) credentials. Set userId and blogId in Set Config. Then click Execute — it appends every board it finds, so review for duplicates before copying rows into use.",
+        "height": 280,
+        "width": 420
+      },
+      "id": "sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-trig",
+      "name": "Run Once",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "a2",
+              "name": "boardsTab",
+              "type": "string",
+              "value": "Tailwind Boards"
+            },
+            {
+              "id": "a3",
+              "name": "userId",
+              "type": "string",
+              "value": "2803097"
+            },
+            {
+              "id": "a4",
+              "name": "blogId",
+              "type": "string",
+              "value": "3535389"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-cfg",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://app.metricool.com/api/v2/scheduler/boards/pinterest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "blogId",
+              "value": "={{ $json.blogId }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-boards",
+      "name": "Get Pinterest Boards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Metricool API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $json;\nconst boards = resp.data || resp || [];\nif (!Array.isArray(boards)) {\n  throw new Error('Unexpected boards response shape: ' + JSON.stringify(resp).slice(0, 500));\n}\nreturn boards.map(b => ({ json: {\n  'Pinterest Account': (b.owner && b.owner.username) || '',\n  'Board Name': b.name || '',\n  'Board ID': (b.id || '').toString()\n} }));\n"
+      },
+      "id": "n-flat",
+      "name": "Flatten Boards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Tailwind Boards",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "n-write",
+      "name": "Write Boards",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Once": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Get Pinterest Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pinterest Boards": {
+      "main": [
+        [
+          {
+            "node": "Flatten Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Boards": {
+      "main": [
+        [
+          {
+            "node": "Write Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
