@@ -3,17 +3,17 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Drive → Shopify Image Sync\n\n**Two-phase architecture (no nested loops):**\n\n**Phase 1 → Collect** (Iterate Sheets loop)\n`Load Sheet Names → Iterate Sheets → Read Sheet Rows → Collect to Static Data`\nReads all 19 sheets one at a time using the dedicated Google Sheets node.\nFiltered product rows are accumulated in workflow static data.\n\n**Phase 2 → Process** (Iterate Products loop)\n`Get Collected Products → Iterate Products → Drive lookups → Upload → Update Sheet`\nStarts only after Phase 1 finishes. Processes the flat list of products one at a time.\n\n**Image naming (case-insensitive before extension):**\n- Filename ending `-P` → IMAGE URL1 + Picture column\n- Filename ending `-S` → IMAGE URL2\n- All others → IMAGE URL3, IMAGE URL4 …\n\n**Setup:** Connect Google Drive OAuth2 and Shopify OAuth2 credentials.\nGoogle Sheets (`Template_control`) is already wired.",
-        "height": 784,
+        "content": "## Drive → Shopify Image Sync\n\n**Two-phase architecture (no nested loops):**\n\n**Phase 1 → Collect** (Iterate Sheets loop)\n`Load Sheet Names → Iterate Sheets → Read Sheet Rows → Collect to Static Data`\nReads all 19 sheets one at a time using the dedicated Google Sheets node.\nFiltered product rows are accumulated in workflow static data.\n\n**Phase 2 → Process** (Iterate Products loop)\n`Get Collected Products → Iterate Products → Drive lookups → Upload → Update Sheet`\nStarts only after Phase 1 finishes. Processes the flat list of products one at a time.\n\n**Image naming (case-insensitive before extension):**\n- Filename ending `-P` → IMAGE URL1 + Picture column\n- Filename ending `-S` → IMAGE URL2\n- All others → IMAGE URL3, IMAGE URL4 …\n\n**Setup:** Connect Google Drive OAuth2 and Shopify OAuth2 credentials.\nGoogle Sheets (`Template_control`) is already wired.\n\n**Self-healing (Phase 1.5):** after each sheet is read, every existing\n`IMAGE URL1-10` is HEAD-checked on the Shopify CDN. A 404/410 is only a *suspect* -- Shopify's CDN has a documented\npropagation delay after uploads/renames/deletes, so a single miss isn't proof.\nSuspects are re-checked once more after 45s; only ones still dead are re-queued\nfor a full fresh upload from Drive (Drive is the source of truth).\n\n**Upload safety:** images over 4800 px / 24 MP are downscaled before upload\n(Shopify rejects >25 MP); `fileCreate` errors and FAILED processing fail the run\nloudly instead of silently leaving slots empty; URLs are only written once every\nfile is READY *and* the exact URL has been confirmed live on the CDN (HEAD 200) --\nShopify can rename a file during processing (`_1`/uuid suffix), which would\notherwise leave a broken link in the sheet.",
+        "height": 984,
         "width": 620
       },
-      "id": "ada8b572-98d8-4c4a-9364-a2399e462628",
+      "id": "ee75c221-7b48-4c7b-aaca-d70c8cbe053b",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        4992,
-        352
+        30112,
+        9616
       ]
     },
     {
@@ -27,13 +27,13 @@
           ]
         }
       },
-      "id": "c23bda57-b259-4a7a-a520-c4d0a42ec48b",
+      "id": "b42e430b-8c01-49de-b034-4a879e6cab00",
       "name": "⏰ Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        5920,
-        752
+        30880,
+        10016
       ]
     },
     {
@@ -68,39 +68,39 @@
         },
         "options": {}
       },
-      "id": "7cc44ce1-bf72-47df-a71f-0864b028c8b3",
+      "id": "72de8578-cd8b-449f-8305-888d08b32926",
       "name": "⚙️ Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        6144,
-        752
+        31104,
+        10016
       ]
     },
     {
       "parameters": {
-        "jsCode": "const SHEETS = [\n'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity', 'Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround', 'MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'Columns', 'Marble+ Basin', 'Marble+ ConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
+        "jsCode": "const SHEETS = [\n'Animal','Bench','Planter','Fountain','Lamppost','Bathtub','Sink','Vanity','Fireplace','Table','Statue','MarbleSlab','2026Instock','DoorSurround','MarbleRangeHood','Moulding','StoneMosaicTile','MarbleMedallion', 'Wall-Coverings', 'Exterior-Wall-Decoration', 'Columns', 'Marble+ Basin', 'Marble+ ConsoleTable', 'Carving','WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
       },
-      "id": "265a8fba-0157-416b-8cc4-7da3209cc8f1",
+      "id": "5db4c62f-dab8-457e-a3c7-7ff0ff48f9e9",
       "name": "📋 Load Sheet Names",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6368,
-        752
+        31296,
+        10016
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "52a08498-79dc-4b00-baf6-3c98d5a6cba6",
+      "id": "e2a104d4-b554-494b-8ed1-a2144ec35fa2",
       "name": "🔁 Iterate Sheets",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        6592,
-        752
+        31536,
+        10016
       ]
     },
     {
@@ -127,14 +127,14 @@
           }
         }
       },
-      "id": "3353b3cd-29ed-4752-99ac-0d7283a5d39b",
+      "id": "ae80767b-a464-427c-ade8-6d463ca38be4",
       "name": "📖 Read Sheet Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "alwaysOutputData": true,
       "position": [
-        6832,
-        928
+        31568,
+        10272
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -147,26 +147,26 @@
       "parameters": {
         "jsCode": "// Filter rows that need images and store them in workflow static data.\n// Returns a marker item so the Iterate Sheets loop continues.\nconst sheetName = $('🔁 Iterate Sheets').item.json.sheet_name;\nconst hasValue  = v => v !== undefined && v !== null && String(v).trim() !== '';\n\nconst products = items\n  .map(({ json }) => json)\n  .filter(r => hasValue(r['Product No.']) && !hasValue(r['IMAGE URL1']))\n  .map(r => ({ ...r, sheet_name: sheetName }));\n\nconst sd = $getWorkflowStaticData('global');\nif (!Array.isArray(sd.allProducts)) sd.allProducts = [];\nsd.allProducts.push(...products);\n\nreturn [{ json: { _sheetDone: true, sheet: sheetName, added: products.length } }];"
       },
-      "id": "6b2603f3-553c-4427-9bd8-7a15d50f0606",
+      "id": "b1b47639-a86f-43d7-809d-a95ae62fa554",
       "name": "📥 Collect to Static Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        7024,
-        928
+        31744,
+        10272
       ]
     },
     {
       "parameters": {
         "jsCode": "// Phase 1 complete. Read the accumulated product list and reset for next run.\nconst sd = $getWorkflowStaticData('global');\nconst products = Array.isArray(sd.allProducts) ? [...sd.allProducts] : [];\nsd.allProducts = [];\nreturn [{ json: { products, total: products.length } }];"
       },
-      "id": "7ba332c6-14a0-4400-8e0c-7a844298ce81",
+      "id": "229dd40f-3073-4457-a7dd-24b40fb2e652",
       "name": "📊 Get Collected Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6832,
-        736
+        31952,
+        10000
       ]
     },
     {
@@ -193,39 +193,39 @@
         },
         "options": {}
       },
-      "id": "cfc5653f-b9cb-4db4-b1fe-f542a16e93c9",
+      "id": "a5e09ccc-cb0c-4e10-9543-9f423a5f749f",
       "name": "✅ Has Products?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        7056,
-        736
+        32176,
+        10000
       ]
     },
     {
       "parameters": {
         "jsCode": "// Expand the products array into individual items for the loop\nreturn $json.products.map(p => ({ json: p }));"
       },
-      "id": "b540514d-00f0-4295-ae4c-6dde9b5c68cb",
+      "id": "3231bc89-31af-4b1e-b065-b24b4b337856",
       "name": "🔀 Split Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        7408,
-        720
+        32528,
+        9984
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "1119add3-d58a-446a-b19b-86dc250c638a",
+      "id": "91376af9-1142-45f5-be5e-3c0a17b4892d",
       "name": "🔁 Iterate Products",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        7696,
-        720
+        32816,
+        9984
       ]
     },
     {
@@ -242,13 +242,13 @@
         },
         "options": {}
       },
-      "id": "6a2b05e6-8ecb-47be-a266-1687ffb65afa",
+      "id": "a015fe38-efdd-476b-8bdb-6944e7fa0dd7",
       "name": "📂 Find Category Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        7952,
-        736
+        33072,
+        10000
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -264,13 +264,13 @@
       "parameters": {
         "jsCode": "const sheetName = ($('🔁 Iterate Products').item.json.sheet_name || '').toString().trim().toLowerCase();\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === sheetName);\nreturn [exact || { json: { id: '', name: '' } }];"
       },
-      "id": "30b1e7d2-bec5-424f-866c-26847f70a2c0",
+      "id": "37eff3bb-7b40-4fd5-b723-721d4d8adb7e",
       "name": "🎯 Pick Exact Category Match",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        8176,
-        736
+        33296,
+        10000
       ]
     },
     {
@@ -286,13 +286,13 @@
         },
         "options": {}
       },
-      "id": "df03307c-e89d-483f-b339-7db4c7b1a00b",
+      "id": "2f38c10a-26c2-4149-b9c6-3360cdbe63c3",
       "name": "📁 Find Product Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        8464,
-        736
+        33584,
+        10000
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -308,13 +308,13 @@
       "parameters": {
         "jsCode": "const productNo = ($('🔁 Iterate Products').item.json['Product No.'] || '').toString().trim().toLowerCase();\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === productNo);\nreturn [exact || { json: { id: '', name: '' } }];"
       },
-      "id": "14beffd4-b26b-4595-a424-4cb3d39f75b6",
+      "id": "32d77559-311e-4585-84f8-878e6531c91d",
       "name": "🎯 Pick Exact Product Match",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        8688,
-        736
+        33808,
+        10000
       ]
     },
     {
@@ -331,13 +331,13 @@
         },
         "options": {}
       },
-      "id": "e110bd1b-0bcd-4e15-83cd-b290e40d5746",
+      "id": "9f675d63-b097-46b0-a3e5-4784f5253168",
       "name": "📁 Find LOGO Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        8976,
-        736
+        34096,
+        10000
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -353,13 +353,13 @@
       "parameters": {
         "jsCode": "const items = $input.all();\nconst logoFolder = items.find(\n  item => /logo/i.test(item.json.name || '')\n);\nif (!logoFolder) {\n  throw new Error(`No LOGO subfolder found for product: ${$('🔁 Iterate Products').item.json['Product No.']}`);\n}\nreturn [{ json: { id: logoFolder.json.id, name: logoFolder.json.name } }];"
       },
-      "id": "ffb3cf15-2313-42fd-b06d-1805be4d49ae",
+      "id": "3ecf3499-2f9a-47e8-8974-fd6a7d65b887",
       "name": "📂 Get Image Folder",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        9264,
-        752
+        34384,
+        10016
       ]
     },
     {
@@ -373,15 +373,19 @@
             "mode": "id"
           }
         },
-        "options": {}
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
       },
-      "id": "51e63461-1413-4080-9f7b-e986cf0f27db",
+      "id": "57cf0ba5-9530-4bad-a137-a8b0cd527ee1",
       "name": "🗂️ List Product Files",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        9488,
-        752
+        34608,
+        10016
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -393,15 +397,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || ''\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\nconst ordered = [];\nif (primary)   ordered.push({ id: primary.id,   fileName: primary.name,   mimeType: mime(primary.name),   slot: 'IMAGE URL1', role: 'primary'   });\nif (secondary) ordered.push({ id: secondary.id, fileName: secondary.name, mimeType: mime(secondary.name), slot: 'IMAGE URL2', role: 'secondary' });\nothers.forEach((f, i) => ordered.push({ id: f.id, fileName: f.name, mimeType: mime(f.name), slot: `IMAGE URL${i + 3}`, role: 'other' }));\n\nreturn [{ json: { images: ordered, hasImages: primary !== null, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
+        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || '',\n  // Drive reports pixel dimensions for images (requires the \"*\" fields option\n  // on the listing node); undefined when Drive could not extract them.\n  width:    item.json.imageMediaMetadata?.width,\n  height:   item.json.imageMediaMetadata?.height\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\n// Deterministic order so re-running against the same Drive contents always\n// assigns the same slot numbers -- Drive's API listing order is not guaranteed\n// stable, which previously made \"other\" slot assignment look arbitrary.\nothers.sort((a, b) => a.name.localeCompare(b.name));\n\nconst ordered = [];\nconst entry = (f, slot, role) => ({ id: f.id, fileName: f.name, mimeType: mime(f.name), width: f.width, height: f.height, slot, role });\nif (primary)   ordered.push(entry(primary, 'IMAGE URL1', 'primary'));\nif (secondary) ordered.push(entry(secondary, 'IMAGE URL2', 'secondary'));\nothers.forEach((f, i) => ordered.push(entry(f, `IMAGE URL${i + 3}`, 'other')));\n\nreturn [{ json: { images: ordered, hasImages: ordered.length > 0, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
       },
-      "id": "d227aa9a-b3de-47c3-9698-ccf78146d5c2",
+      "id": "6be1ce8f-59b9-46c0-b058-13d536962b09",
       "name": "🏷️ Classify Images",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        9712,
-        752
+        34832,
+        10016
       ]
     },
     {
@@ -428,26 +432,26 @@
         },
         "options": {}
       },
-      "id": "3da70313-cc41-4af2-a786-8502609f6f1a",
+      "id": "776624b3-ebbf-4f8b-9233-d09522ed0bc6",
       "name": "🖼️ Has Images?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        9936,
-        752
+        35056,
+        10016
       ]
     },
     {
       "parameters": {
-        "jsCode": "const { images, row_number, sheet_name, product_no } = $json;\nreturn images.map(img => ({ json: {\n  photoId:    img.id,\n  fileName:   img.fileName,\n  mimeType:   img.mimeType,\n  slot:       img.slot,\n  role:       img.role,\n  row_number,\n  sheet_name,\n  product_no\n} }));"
+        "jsCode": "const { images, row_number, sheet_name, product_no } = $json;\nconst iterJson = $('🔁 Iterate Products').item.json;\nconst isRepair = iterJson._reason === 'dead_image_url';\n\n// Shopify rejects images over 25 megapixels or 5000 px on a side (\"Media\n// processing failed\" / \"Exceeds 25 megapixels\"). Anything over this is\n// downscaled before upload; unknown dimensions are treated as oversized so\n// they still go through the (aspect-preserving, shrink-only) resize.\nconst MAX_SIDE = 4800;\nconst MAX_AREA = 24_000_000;\n\nconst staleFileName = (url) => {\n  if (!url) return '';\n  try { return decodeURIComponent(url.split('?')[0].split('/').pop() || ''); }\n  catch (e) { return ''; }\n};\n\nreturn images.map(img => {\n  const w = Number(img.width), h = Number(img.height);\n  const known = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;\n  const oversized = !known || w > MAX_SIDE || h > MAX_SIDE || (w * h) > MAX_AREA;\n  // Whatever this slot currently holds in the sheet (dead, alive, or empty for a\n  // brand-new product) is what we try to update in place -- this is what lets a\n  // full reclassification avoid creating duplicates for images already fine.\n  const staleUrl = String(iterJson[img.slot] || '').trim();\n  return { json: {\n    photoId:    img.id,\n    fileName:   img.fileName,\n    mimeType:   img.mimeType,\n    slot:       img.slot,\n    role:       img.role,\n    width:      known ? w : null,\n    height:     known ? h : null,\n    oversized,\n    isRepair,\n    staleUrl,\n    staleFileName: staleFileName(staleUrl),\n    row_number,\n    sheet_name,\n    product_no\n  } };\n});"
       },
-      "id": "6fdad7ad-4ac2-4bd2-b9ba-675164b6e8e2",
+      "id": "c2c2d431-0fdf-4c79-b570-438f8cf9df55",
       "name": "🔀 Split Per Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        7744,
-        1024
+        32864,
+        10288
       ]
     },
     {
@@ -461,13 +465,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation stagedUploadsCreate($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }', variables: { input: [{ resource: 'IMAGE', filename: $json.fileName, mimeType: $json.mimeType, httpMethod: 'POST' }] } }) }}",
         "options": {}
       },
-      "id": "359405e3-27df-426b-af17-20569763c882",
+      "id": "a5d1fb48-2dc4-4b5d-a8e2-d8125faaa79b",
       "name": "🎯 Staged Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        7968,
-        1024
+        33088,
+        10288
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -488,13 +492,13 @@
           "fileName": "={{ $('🔀 Split Per Image').item.json.fileName }}"
         }
       },
-      "id": "19e15ffd-f50d-47cc-9301-4ca96d55fee0",
+      "id": "915b3ccd-de8b-4b0e-a5ac-15949ebe94f9",
       "name": "⬇️ Download from Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        8176,
-        1024
+        33296,
+        10288
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -558,13 +562,13 @@
         },
         "options": {}
       },
-      "id": "41571574-236e-4104-ba65-2f417c3da9d8",
+      "id": "f516324d-9e0a-4f33-adaf-780b1ee4a8c2",
       "name": "☁️ Upload to Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        8400,
-        1024
+        33888,
+        10288
       ]
     },
     {
@@ -578,13 +582,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('🔀 Split Per Image').item.json.slot, contentType: 'IMAGE', originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
         "options": {}
       },
-      "id": "b3d7998b-d8e9-48ad-8984-2d1448b2491e",
+      "id": "f82fbaa6-292c-4da6-9c16-9b21160798b2",
       "name": "📎 File Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        8848,
-        1024
+        34608,
+        10304
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -595,30 +599,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const allItems   = $input.all();\nconst splitItems = $('🔀 Split Per Image').all();\nconst uploadedFiles = [];\nfor (let i = 0; i < allItems.length; i++) {\n  const fc   = allItems[i].json?.data?.fileCreate;\n  const slot = splitItems[i]?.json?.slot;\n  if (fc?.files?.[0]?.id && slot) uploadedFiles.push({ id: fc.files[0].id, slot });\n}\nconst first = splitItems[0]?.json || {};\nreturn [{ json: { uploadedFiles, row_number: first.row_number, sheet_name: first.sheet_name } }];"
+        "jsCode": "const allItems   = $input.all();\nconst splitItems = $('🔀 Split Per Image').all();\nconst bySlot = new Map(splitItems.map(item => [item.json.slot, item.json]));\n\nconst uploadedFiles = [];\nconst failures = [];\nfor (const item of allItems) {\n  const res = item.json;\n  const fc  = res?.data?.fileCreate || res?.data?.fileUpdate;\n  const returnedAlt = fc?.files?.[0]?.alt;\n  const meta = bySlot.get(returnedAlt) || {};\n  const slot = meta.slot || returnedAlt;\n\n  // A fileCreate/fileUpdate that \"succeeds\" as an HTTP call can still reject the\n  // file -- previously these were skipped silently, leaving the slot empty and the\n  // failure invisible.\n  if (res?.errors?.length) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): ${JSON.stringify(res.errors)}`);\n    continue;\n  }\n  if (fc?.userErrors?.length) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): ${JSON.stringify(fc.userErrors)}`);\n    continue;\n  }\n  if (!fc?.files?.[0]?.id) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): no file id returned ${JSON.stringify(res)}`);\n    continue;\n  }\n  if (slot) uploadedFiles.push({ id: fc.files[0].id, slot, fileName: meta.fileName });\n}\nconst first = splitItems[0]?.json || {};\nif (failures.length) {\n  throw new Error(`Shopify file ${first.isRepair ? 'update' : 'create'} failed for ${first.product_no} (${first.sheet_name} row ${first.row_number}): ${failures.join(' | ')}`);\n}\nreturn [{ json: { uploadedFiles, row_number: first.row_number, sheet_name: first.sheet_name, product_no: first.product_no, attempts: 0 } }];"
       },
-      "id": "29b3f523-220c-453a-a68d-e1b15852e10e",
+      "id": "10c17eff-5f02-48c2-8e91-f34f17719b85",
       "name": "📦 Aggregate Files",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        9072,
-        1024
+        34864,
+        10304
       ]
-    },
-    {
-      "parameters": {
-        "amount": 15
-      },
-      "id": "695078a7-7499-4809-9b25-d465bde6fe80",
-      "name": "⏳ Wait 15s",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        9296,
-        1024
-      ],
-      "webhookId": "49b4e561-0550-4da8-a7c0-89972d31d174"
     },
     {
       "parameters": {
@@ -631,13 +621,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'query getFiles($ids: [ID!]!) { nodes(ids: $ids) { ... on GenericFile { id alt fileStatus url } ... on MediaImage { id alt fileStatus image { url width height } } } }', variables: { ids: ($json.uploadedFiles || []).map(f => f.id) } }) }}",
         "options": {}
       },
-      "id": "18d97c01-7bd1-434d-b224-7d791bc2f0a6",
+      "id": "52a57954-0a59-4bdb-a360-500e72266aac",
       "name": "🔗 Get CDN URLs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        9488,
-        1024
+        35344,
+        10304
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -648,15 +638,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const nodes  = $json.data?.nodes || [];\nconst { uploadedFiles, row_number, sheet_name } = $('📦 Aggregate Files').first().json;\n\nconst idToUrl = {};\nfor (const node of nodes) {\n  // GenericFile exposes url directly; MediaImage exposes image.url\n  const url = node?.url || node?.image?.url;\n  if (url) idToUrl[node.id] = url;\n}\n\nconst update = { row_number, sheet_name };\nfor (const { id, slot } of uploadedFiles) {\n  const url = idToUrl[id];\n  if (url) {\n    update[slot] = url;\n    if (slot === 'IMAGE URL1') update['Picture'] = '=IMAGE(\"' + url + '\",1)';\n  }\n}\nreturn [{ json: update }];"
+        "jsCode": "const { nodes = [], uploadedFiles, row_number, sheet_name } = $json;\nconst iterJson = $('🔁 Iterate Products').item.json;\nconst isRepair = iterJson._reason === 'dead_image_url';\n\nconst idToUrl = {};\nfor (const node of nodes) {\n  // GenericFile exposes url directly; MediaImage exposes image.url\n  const url = node?.url || node?.image?.url;\n  if (url) idToUrl[node.id] = url;\n}\n\nconst update = { row_number, sheet_name };\nconst updatedSlots = [];\nconst freshSlots = new Set();\nfor (const { id, slot } of uploadedFiles) {\n  const url = idToUrl[id];\n  if (url) {\n    update[slot] = url;\n    updatedSlots.push(slot);\n    freshSlots.add(slot);\n    if (slot === 'IMAGE URL1') update['Picture'] = '=IMAGE(\"' + url + '\",1)';\n  }\n}\n\n// A repair fully reclassifies the row from Drive -- any slot that was previously\n// populated but Drive no longer has material for (a leftover duplicate slot from\n// the old full-row-reupload bug) is cleared instead of left pointing at a dead URL.\nif (isRepair) {\n  for (let n = 1; n <= 10; n++) {\n    const slot = `IMAGE URL${n}`;\n    const hadValue = String(iterJson[slot] || '').trim() !== '';\n    if (hadValue && !freshSlots.has(slot)) {\n      update[slot] = '';\n      if (slot === 'IMAGE URL1') update['Picture'] = '';\n    }\n  }\n}\n\n// If this product is already live on Shopify, flag the changed image slots so the\n// separate Shopify Merge product sync Pipeline picks the row up and pushes the\n// fresh URLs to the live product -- otherwise the sheet and Shopify silently\n// drift apart (the sheet shows a working image, Shopify still has the dead one).\nconst alreadyOnShopify = String(iterJson['Shopify_Product_URL'] || '').trim() !== '' && String(iterJson['Shopify_Update_product_URL'] || '').trim() !== '';\nif (alreadyOnShopify && updatedSlots.length > 0) {\n  const existing = String(iterJson['Fields_to_update'] || '').split(',').map(f => f.trim()).filter(Boolean);\n  const merged = Array.from(new Set([...existing, ...updatedSlots]));\n  update['Fields_to_update'] = merged.join(',');\n  update['Ready_to_post'] = 'yes';\n}\n\nreturn [{ json: update }];"
       },
-      "id": "66f53000-ffc7-4d43-a287-51b79d32b94e",
+      "id": "49bcc34f-3094-4381-b09e-1aa61c530b7b",
       "name": "🏗️ Build Sheet Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        9712,
-        1024
+        35792,
+        10576
       ]
     },
     {
@@ -812,6 +802,28 @@
               "canBeUsedToMatch": false,
               "readOnly": false,
               "removed": false
+            },
+            {
+              "id": "Fields_to_update",
+              "displayName": "Fields_to_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Ready_to_post",
+              "displayName": "Ready_to_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "readOnly": false,
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -826,13 +838,13 @@
           }
         }
       },
-      "id": "d320ea2f-679e-4968-aa4e-596c7bbd2eea",
+      "id": "5f2bce40-5b21-4614-8199-c7fa72f8ecd8",
       "name": "💾 Update Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        9968,
-        1024
+        36048,
+        10576
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -843,13 +855,13 @@
     },
     {
       "parameters": {},
-      "id": "f8380ba7-ac3a-4b87-bfdf-7edd56fd5c2f",
+      "id": "33eb67c6-992b-4c35-bc17-c2db4bf5058d",
       "name": "✅ All Done",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        7632,
-        480
+        32752,
+        9744
       ]
     },
     {
@@ -878,13 +890,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "a5387d47-0956-46b2-a294-bfd47c6342d8",
+      "id": "c5260c4d-f167-40b5-8cda-c950b48a4c58",
       "name": "If",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        8944,
-        512
+        34064,
+        9776
       ]
     },
     {
@@ -922,13 +934,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "f6409502-53ab-4726-9709-7bdeb2cf2b8b",
+      "id": "5c501141-8fe8-42d8-aaae-32da997230bb",
       "name": "If Category Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        7936,
-        512
+        33056,
+        9776
       ]
     },
     {
@@ -966,14 +978,503 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "060e31bf-7e27-4d3f-8fe3-091bf3373883",
+      "id": "871445b3-e7d4-4ead-b019-527aa2dabf28",
       "name": "If Product Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        8464,
-        512
+        33584,
+        9776
       ]
+    },
+    {
+      "parameters": {
+        "operation": "resize",
+        "dataPropertyName": "data",
+        "width": 4800,
+        "height": 4800,
+        "resizeOption": "onlyIfLarger",
+        "options": {
+          "quality": 92
+        }
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        33472,
+        10288
+      ],
+      "id": "7eb0bc1f-3b90-4cf5-8ca2-66e348efdc13",
+      "name": "🖼️ Downscale If Oversized",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Every image goes through the resize node in one pass (branching here would\n// split the per-product item stream and break the index-based aggregation\n// downstream). The resized bytes are only *used* for images Shopify would\n// reject; everything else is uploaded byte-for-byte as it came from Drive so\n// normal photos are never re-encoded.\nconst resized  = $input.all();\nconst originals = $('⬇️ Download from Drive').all();\nconst meta      = $('🔀 Split Per Image').all();\n\nreturn resized.map((item, i) => {\n  const m = meta[i]?.json || {};\n  const original = originals[i]?.binary?.data;\n  const resizedBin = item.binary?.data;\n  const resizable = /^image\\/(jpeg|png)$/i.test(m.mimeType || '');\n  const useResized = m.oversized && resizable && resizedBin && !item.json?.error;\n\n  if (m.oversized && !useResized) {\n    // Oversized but we could not safely resize it (unsupported format or the\n    // resize itself failed) -- fail loudly instead of letting Shopify reject it\n    // later with an opaque \"Media processing failed\".\n    throw new Error(`Cannot downscale oversized image ${m.fileName} (${m.width}x${m.height}, ${m.mimeType}) for ${m.product_no}: ${item.json?.error || 'unsupported format'}`);\n  }\n\n  return {\n    json: m,\n    binary: { data: useResized ? resizedBin : original },\n    pairedItem: { item: i }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        33680,
+        10288
+      ],
+      "id": "ceb06224-5c4b-4115-8153-d03138ed3261",
+      "name": "🧩 Pick Final Binary"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shopify processes uploads asynchronously; image.url is null until the file is\n// READY. A fixed 15s wait was writing partial rows for slower images (the URL\n// was silently skipped, leaving the slot empty forever). Now we keep polling\n// until every file is READY, and fail loudly on FAILED.\nconst MAX_ATTEMPTS = 12; // ~3 minutes at 15s (covers processing + CDN propagation)\nconst res  = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get files): ' + JSON.stringify(res.errors));\n}\nconst agg = $('📦 Aggregate Files').first().json;\nlet prev = 0;\ntry { prev = $('🧪 Check File Status').last()?.json?.attempts ?? 0; } catch (e) { prev = 0; } // first pass: no previous run yet\nconst attempts = prev + 1;\n\nconst nodes = res?.data?.nodes || [];\nconst byId = new Map(nodes.filter(Boolean).map(n => [n.id, n]));\n\nconst failed = [], pending = [];\nfor (const f of agg.uploadedFiles) {\n  const n = byId.get(f.id);\n  const status = n?.fileStatus;\n  const url = n?.url || n?.image?.url;\n  if (status === 'FAILED') failed.push(`${f.slot} (${f.fileName}) id=${f.id}`);\n  else if (!url) pending.push(`${f.slot} (${f.fileName}) status=${status || 'missing'}`);\n}\nif (failed.length) {\n  throw new Error(`Shopify rejected ${failed.length} image(s) for ${agg.product_no} (${agg.sheet_name} row ${agg.row_number}): ${failed.join(' | ')}`);\n}\nif (pending.length && attempts >= MAX_ATTEMPTS) {\n  throw new Error(`Images still not READY after ${attempts} checks for ${agg.product_no} (${agg.sheet_name} row ${agg.row_number}): ${pending.join(' | ')}`);\n}\nreturn [{ json: { ...agg, attempts, pending: pending.length, nodes } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        35584,
+        10304
+      ],
+      "id": "32e06326-1c46-4624-9048-7a93e530b1b0",
+      "name": "🧪 Check File Status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-still-processing",
+              "leftValue": "={{ $json.pending }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        35824,
+        10304
+      ],
+      "id": "3024b2d5-40b4-4949-9e98-411082e8d128",
+      "name": "⏳ Still Processing?"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        35104,
+        10304
+      ],
+      "id": "e31e4852-195b-451f-aed8-5944bf7a512c",
+      "name": "⏳ Wait 15s",
+      "webhookId": "3fda4b69-f3b8-4d2d-9ffa-a584be84cc7e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rows that already have images are never revisited by the original design, so\n// an image deleted from Shopify Files stays dead in the sheet forever. Check the\n// live CDN for every existing IMAGE URL (slots 1-10; slot 11 mirrors the CAD\n// Drawing URL and is owned by the product sync) and re-queue rows with dead\n// links for a fresh upload from Drive.\nconst sheetName = $('🔁 Iterate Sheets').item.json.sheet_name;\nconst rows = $('📖 Read Sheet Rows').all().map(i => i.json);\nconst hasValue = v => v !== undefined && v !== null && String(v).trim() !== '';\n\nconst checks = [];\nfor (const r of rows) {\n  if (!hasValue(r['Product No.']) || !hasValue(r['IMAGE URL1'])) continue;\n  // Only the columns actually used downstream (Phase 2 lookups + Build Sheet\n  // Update) are carried through -- not the whole row, which would drag along\n  // pricing/description/Etsy/QC columns nothing here reads.\n  const row = {\n    'Product No.': r['Product No.'],\n    row_number: r.row_number,\n    sheet_name: sheetName,\n    'Shopify_Product_URL': r['Shopify_Product_URL'],\n    'Shopify_Update_product_URL': r['Shopify_Update_product_URL'],\n    'Fields_to_update': r['Fields_to_update'],\n  };\n  for (let n2 = 1; n2 <= 10; n2++) row[`IMAGE URL${n2}`] = r[`IMAGE URL${n2}`];\n  for (let n = 1; n <= 10; n++) {\n    const url = String(r[`IMAGE URL${n}`] ?? '').trim();\n    if (!/^https?:\\/\\//i.test(url)) continue;\n    checks.push({ json: { url, slot: `IMAGE URL${n}`, row_number: r.row_number, sheet_name: sheetName, product_no: r['Product No.'], row } });\n  }\n}\nreturn checks.length ? checks : [{ json: { _skipCheck: true, sheet_name: sheetName } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31936,
+        10272
+      ],
+      "id": "386b96bd-0baf-4f3f-9734-ab1b21a96e14",
+      "name": "🩺 Build URL Checks"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-has-url",
+              "leftValue": "={{ $json.url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        32128,
+        10272
+      ],
+      "id": "859bf39b-6a0b-469d-b407-97d6a9573133",
+      "name": "🩺 Any URLs to Check?"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.url }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 25,
+              "batchInterval": 100
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        32336,
+        10256
+      ],
+      "id": "0d8a88cc-df1c-47d6-9fa0-a9cde906c7fc",
+      "name": "🩺 HEAD Check Image URL",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shopify's CDN has a known propagation delay after a file is uploaded, renamed,\n// or deleted+recreated (support-acknowledged, sometimes several minutes) -- a\n// single 404 during that window is not proof the file is actually gone. This\n// only flags suspects; \"🩺 Confirm Dead Image URLs\" re-checks them after a wait\n// and only re-queues rows that are STILL dead on the second check.\nconst results = $input.all();\nconst checks  = $('🩺 Build URL Checks').all();\n\nconst DEAD = new Set([404, 410]);\nconst suspects = [];\nfor (let i = 0; i < results.length; i++) {\n  const c = checks[i]?.json;\n  const status = results[i]?.json?.statusCode;\n  if (!c || !DEAD.has(status)) continue;\n  suspects.push({ ...c, status });\n}\nreturn suspects.length ? suspects.map(s => ({ json: s })) : [{ json: { _noSuspects: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32528,
+        10256
+      ],
+      "id": "ee2b3433-5741-45d1-8858-aed97b905c5e",
+      "name": "🩺 Find Suspect Image URLs"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Every file is READY -- but READY alone isn't proof the URL is live: Shopify can\n// still rename a file during processing (name collision or CDN-unfriendly\n// characters -> \"_1\"/uuid suffix = a different URL), and the CDN edge may lag.\n// The sheet must only ever get a URL that has been confirmed live, otherwise\n// we store a broken link that nothing downstream can recover from.\nconst { nodes = [], uploadedFiles = [] } = $json;\nconst idToUrl = {};\nfor (const n of nodes) { const url = n?.url || n?.image?.url; if (url) idToUrl[n.id] = url; }\nreturn uploadedFiles.map(f => ({ json: { id: f.id, slot: f.slot, fileName: f.fileName, url: idToUrl[f.id] || '' } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        34864,
+        10560
+      ],
+      "id": "cb17cd81-3b9a-4b88-8b6a-ce57bc916086",
+      "name": "🩺 Build Upload Verifications"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        35104,
+        10560
+      ],
+      "id": "ae445019-cfcd-49e5-81e2-4c95386453b5",
+      "name": "🩺 Verify Final URL (HEAD)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst checks  = $('🩺 Build Upload Verifications').all();\nconst status  = $('🧪 Check File Status').first().json; // nodes, uploadedFiles, row/sheet, attempts\n\nconst notLive = [];\nfor (let i = 0; i < results.length; i++) {\n  const c = checks[i]?.json || {};\n  const code = results[i]?.json?.statusCode;\n  if (!c.url || code !== 200) notLive.push(`${c.slot} (${c.fileName}) ${c.url || 'no url'} -> ${code ?? results[i]?.json?.error ?? 'no response'}`);\n}\nif (notLive.length && status.attempts >= 12) {\n  throw new Error(`Uploaded image URL(s) never became live for ${status.product_no} (${status.sheet_name} row ${status.row_number}): ${notLive.join(' | ')}`);\n}\n// Same shape Build Sheet Update expects; on retry the whole poll runs again so\n// a renamed file's *new* URL is picked up rather than the stale one.\nreturn [{ json: { ...status, unavailable: notLive.length, notLive } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        35344,
+        10560
+      ],
+      "id": "1fc4ff36-5f30-450e-beac-5e2c430584ad",
+      "name": "🧪 Check URL Availability"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-url-not-live",
+              "leftValue": "={{ $json.unavailable }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        35584,
+        10560
+      ],
+      "id": "61252367-a28d-4d92-872f-f42747d15b3c",
+      "name": "⏳ URL Not Live Yet?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-has-suspect",
+              "leftValue": "={{ $json._noSuspects }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        31584,
+        10560
+      ],
+      "id": "6729bc31-cf4f-489c-bb7d-4eb6a1b14952",
+      "name": "🩺 Any Suspects?"
+    },
+    {
+      "parameters": {
+        "amount": 45
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        31824,
+        10544
+      ],
+      "id": "d0c50f64-4c1c-4b83-b9c4-40d2b63216f7",
+      "name": "⏳ Wait 45s (confirm dead)",
+      "webhookId": "b4efcbd1-25d6-4727-a654-6af34f106142"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.url }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 25,
+              "batchInterval": 100
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        32064,
+        10544
+      ],
+      "id": "9be12bbf-7474-4626-b518-ecbb20793eaf",
+      "name": "🩺 Re-check Suspect URL",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only URLs that are STILL 404/410 after the wait are treated as genuinely\n// dead -- this is the confirmation pass that filters out CDN propagation-delay\n// false positives (a suspect that recovered here is left completely alone).\nconst results  = $input.all();\nconst suspects = $('🩺 Find Suspect Image URLs').all();\nconst sd = $getWorkflowStaticData('global');\nif (!Array.isArray(sd.allProducts)) sd.allProducts = [];\n\nconst DEAD = new Set([404, 410]);\nconst deadByRow = new Map();\nlet recovered = 0;\nfor (let i = 0; i < results.length; i++) {\n  const c = suspects[i]?.json;\n  const status = results[i]?.json?.statusCode;\n  if (!c) continue;\n  if (!DEAD.has(status)) { recovered++; continue; }\n  const key = `${c.sheet_name}#${c.row_number}`;\n  // Queue the whole row (not just the dead slot) -- Drive's \"other\" image order is\n  // arbitrary, so there's no reliable way to say a specific dead slot maps to a\n  // specific Drive file. Phase 2 fully reclassifies the row from Drive and\n  // reconciles each image against Shopify by filename (update in place where a\n  // matching file still exists, create where it doesn't).\n  if (!deadByRow.has(key)) deadByRow.set(key, { ...c.row, _reason: 'dead_image_url', _dead_slots: [] });\n  deadByRow.get(key)._dead_slots.push(`${c.slot} -> first ${c.status}, confirmed ${status}`);\n}\n\nconst queued = new Set(sd.allProducts.map(p => `${p.sheet_name}#${p.row_number}`));\nlet added = 0;\nfor (const [key, row] of deadByRow) {\n  if (queued.has(key)) continue;\n  sd.allProducts.push(row);\n  added++;\n}\nreturn [{ json: { _healthCheckDone: true, suspects: results.length, recovered, deadRows: deadByRow.size, requeued: added } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32256,
+        10544
+      ],
+      "id": "d9e9092b-437e-48ac-a005-3d04587a0e27",
+      "name": "🩺 Confirm Dead Image URLs"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query findFile($q: String!) { files(first: 1, query: $q) { edges { node { id alt fileStatus } } } }', variables: { q: $json.staleFileName ? ('filename:' + $json.staleFileName) : 'id:0' } }) }}",
+        "options": {}
+      },
+      "id": "34b4ae50-7d6e-421c-9da4-fcae689a7ad0",
+      "name": "🔍 Find Existing File By Filename",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        34080,
+        10288
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-file-found",
+              "leftValue": "={{ ($json.data?.files?.edges || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        34320,
+        10288
+      ],
+      "id": "6a2c5440-08a0-4461-8f2b-c954f022cfd4",
+      "name": "🔀 Existing File Found?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('⚙️ Set Config').first().json.shop + '/admin/api/' + $('⚙️ Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileUpdate($files: [FileUpdateInput!]!) { fileUpdate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ id: $json.data.files.edges[0].node.id, originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl, alt: $('🔀 Split Per Image').item.json.slot }] } }) }}",
+        "options": {}
+      },
+      "id": "611ce74f-edd7-4a07-bf61-627d8081ed9d",
+      "name": "📝 File Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        34400,
+        10592
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -1044,7 +1545,7 @@
       "main": [
         [
           {
-            "node": "🔁 Iterate Sheets",
+            "node": "🩺 Build URL Checks",
             "type": "main",
             "index": 0
           }
@@ -1248,22 +1749,11 @@
         ]
       ]
     },
-    "⏳ Wait 15s": {
-      "main": [
-        [
-          {
-            "node": "🔗 Get CDN URLs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "🔗 Get CDN URLs": {
       "main": [
         [
           {
-            "node": "🏗️ Build Sheet Update",
+            "node": "🧪 Check File Status",
             "type": "main",
             "index": 0
           }
@@ -1307,7 +1797,7 @@
       "main": [
         [
           {
-            "node": "☁️ Upload to Storage",
+            "node": "🖼️ Downscale If Oversized",
             "type": "main",
             "index": 0
           }
@@ -1318,7 +1808,7 @@
       "main": [
         [
           {
-            "node": "📎 File Create",
+            "node": "🔍 Find Existing File By Filename",
             "type": "main",
             "index": 0
           }
@@ -1378,9 +1868,264 @@
           }
         ]
       ]
+    },
+    "🖼️ Downscale If Oversized": {
+      "main": [
+        [
+          {
+            "node": "🧩 Pick Final Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Pick Final Binary": {
+      "main": [
+        [
+          {
+            "node": "☁️ Upload to Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧪 Check File Status": {
+      "main": [
+        [
+          {
+            "node": "⏳ Still Processing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Still Processing?": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 15s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🩺 Build Upload Verifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build URL Checks": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any URLs to Check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any URLs to Check?": {
+      "main": [
+        [
+          {
+            "node": "🩺 HEAD Check Image URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Iterate Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 HEAD Check Image URL": {
+      "main": [
+        [
+          {
+            "node": "🩺 Find Suspect Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build Upload Verifications": {
+      "main": [
+        [
+          {
+            "node": "🩺 Verify Final URL (HEAD)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Verify Final URL (HEAD)": {
+      "main": [
+        [
+          {
+            "node": "🧪 Check URL Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧪 Check URL Availability": {
+      "main": [
+        [
+          {
+            "node": "⏳ URL Not Live Yet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ URL Not Live Yet?": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 15s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🏗️ Build Sheet Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Find Suspect Image URLs": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any Suspects?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any Suspects?": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 45s (confirm dead)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Iterate Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait 45s (confirm dead)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Re-check Suspect URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Re-check Suspect URL": {
+      "main": [
+        [
+          {
+            "node": "🩺 Confirm Dead Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Confirm Dead Image URLs": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Find Existing File By Filename": {
+      "main": [
+        [
+          {
+            "node": "🔀 Existing File Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Existing File Found?": {
+      "main": [
+        [
+          {
+            "node": "📝 File Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📎 File Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 File Update": {
+      "main": [
+        [
+          {
+            "node": "📦 Aggregate Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait 15s": {
+      "main": [
+        [
+          {
+            "node": "🔗 Get CDN URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
@@ -1389,7 +2134,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "5a2110ac-c99b-4f3d-8bf7-0a204c119122",
+  "versionId": "fccd2344-187a-4dda-9531-7fda060260f1",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
