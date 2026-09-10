@@ -1,35 +1,30 @@
 {
   "name": "Metricool - List Boards Helper",
-  "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "pinData": {},
   "nodes": [
     {
       "parameters": {
-        "content": "## Metricool – List Boards helper (run as needed)\n\nPulls every Pinterest board name + ID from Metricool into the **Tailwind Boards** tab (kept under its original name — board IDs are native to Pinterest, so nothing else needs to change), for new boards you want to add to the Category map.\n\n**Setup:** Google Sheets + Metricool (Header Auth, X-Mc-Auth) credentials. Set userId and blogId in Set Config. Then click Execute — it appends every board it finds, so review for duplicates before copying rows into use.",
-        "height": 280,
+        "content": "## Metricool – List Boards helper (run as needed)\n\nPulls every Pinterest board name + ID from Metricool into the **Pinterest Boards** tab, for new boards you want to add to the Category map.\n\n**Setup:** Google Sheets + Metricool (Header Auth, X-Mc-Auth) credentials. Set userId and blogId in Set Config. Then click Execute — it appends every board it finds, so review for duplicates before copying rows into use.",
+        "height": 392,
         "width": 420
       },
-      "id": "sticky",
+      "id": "1d635752-f6de-41b5-91fb-56e079775ce0",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -360,
-        -100
+        5472,
+        1248
       ]
     },
     {
       "parameters": {},
-      "id": "n-trig",
+      "id": "121f2da6-e79b-4946-a97c-465a4ddab088",
       "name": "Run Once",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        160,
-        200
+        6000,
+        1440
       ]
     },
     {
@@ -46,7 +41,7 @@
               "id": "a2",
               "name": "boardsTab",
               "type": "string",
-              "value": "Tailwind Boards"
+              "value": "Pinterest Boards"
             },
             {
               "id": "a3",
@@ -64,18 +59,17 @@
         },
         "options": {}
       },
-      "id": "n-cfg",
+      "id": "edb9b643-d90f-4d30-8bb5-c06b6c9eb525",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        360,
-        200
+        6192,
+        1440
       ]
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://app.metricool.com/api/v2/scheduler/boards/pinterest",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -94,17 +88,17 @@
         },
         "options": {}
       },
-      "id": "n-boards",
+      "id": "612e72f9-80b5-470e-83a8-f70627aeae8f",
       "name": "Get Pinterest Boards",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        560,
-        200
+        6400,
+        1440
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "",
+          "id": "HyOn8LPYniNVacXo",
           "name": "Metricool API"
         }
       }
@@ -113,18 +107,18 @@
       "parameters": {
         "jsCode": "const resp = $json;\nconst boards = resp.data || resp || [];\nif (!Array.isArray(boards)) {\n  throw new Error('Unexpected boards response shape: ' + JSON.stringify(resp).slice(0, 500));\n}\nreturn boards.map(b => ({ json: {\n  'Pinterest Account': (b.owner && b.owner.username) || '',\n  'Board Name': b.name || '',\n  'Board ID': (b.id || '').toString()\n} }));\n"
       },
-      "id": "n-flat",
+      "id": "fe84b853-d9d8-4bf4-a608-5f0412c9fe03",
       "name": "Flatten Boards",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        760,
-        200
+        6592,
+        1440
       ]
     },
     {
       "parameters": {
-        "operation": "append",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
@@ -132,21 +126,59 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Tailwind Boards",
+          "value": "={{ $('Set Config').first().json.boardsTab }}",
           "mode": "name"
         },
         "columns": {
-          "mappingMode": "autoMapInputData"
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Board ID"
+          ],
+          "schema": [
+            {
+              "id": "Board Name",
+              "displayName": "Board Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Board ID",
+              "displayName": "Board ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "n-write",
+      "id": "8cf2e81a-c4ef-4c3f-9162-1a5c20cddfe3",
       "name": "Write Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        960,
-        200
+        6800,
+        1440
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -156,6 +188,7 @@
       }
     }
   ],
+  "pinData": {},
   "connections": {
     "Run Once": {
       "main": [
@@ -201,5 +234,22 @@
         ]
       ]
     }
-  }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "8123f3fa-7078-478d-9a09-c442df55604e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "WFesSlLtZKjWA7eY",
+  "tags": []
 }
