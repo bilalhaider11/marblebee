@@ -1,6 +1,21 @@
 {
-  "name": "Shopify Merge product sync Pipeline",
+  "name": "[DEPRECATED] Shopify Merge product sync Pipeline",
   "nodes": [
+    {
+      "parameters": {
+        "content": "## DEPRECATED -- do not activate\n\nSuperseded by **Shopify Merge product sync Pipeline (GraphQL)**, which is the live, maintained pipeline. This REST version is kept only for reference.\n\n**Do not re-publish/activate this workflow.** It reads and writes the exact same Google Sheet (`1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI`) and the same Shopify store as the GraphQL pipeline, on the same 9 AM daily trigger -- running both at once means two independent automations racing to reconcile the same product images.\n\nIt also still has two bugs that were found and fixed in the GraphQL version but never ported here:\n1. `extractImages` numbers image slots by running count (`images.length + 1`) instead of fixed column position -- silently renumbers every later slot whenever an earlier one is empty/added/removed.\n2. `Build Image Sync Requests` matches existing vs. desired images by the FULL alt text string -- any Keyword/Material edit changes that string, makes every existing photo look like an orphan, and deletes them all.\n\n`Check if Image Update Needed` also has no gate on `Fields_to_update` containing 'IMAGE URL', so the (buggy) image-sync logic runs on every update, not just ones that touch images.\n\nIf this is ever needed again, port the GraphQL version's fixes first -- don't just re-activate as-is.",
+        "height": 480,
+        "width": 480
+      },
+      "id": "deprecated-readme-note",
+      "name": "DEPRECATED README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -5280,
+        1960
+      ]
+    },
     {
       "parameters": {
         "amount": 0.54
@@ -3718,7 +3733,7 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",

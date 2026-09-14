@@ -1,0 +1,576 @@
+{
+  "name": "Image URL Health Audit",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🩺 Image URL Health Audit\n\nReport-only. Scans every already-uploaded IMAGE URL (slots 1-11) across all 30 sheets, ONE SHEET AT A TIME (sequential, not parallel -- a fan-out version was tried and it crashed n8n Cloud from too many concurrent executions piling up memory; this is the safe, proven-stable shape used by the main sync workflow's own sheet loop). Logs any dead (404/410, confirmed after a 45s re-check to rule out CDN propagation delay) into the 'Image Health Report' tab.\n\n**This workflow NEVER writes to IMAGE URL columns, never re-queues rows, and never triggers reclassification/repair.** It only appends findings to a report tab for a human to review. This is a deliberate design choice: the previous health-check auto-repaired dead-looking rows, which caused real data loss when combined with an unstable Drive-ordering bug (both fixed 2026-09-10). This audit is structurally incapable of repeating that failure mode.\n\n### One-time setup\n1. Create a tab named exactly `Image Health Report` in the same spreadsheet, with header row 1: checked_at | sheet_name | row_number | Product No. | slot | dead_url | status_code\n2. Reattach the Google Sheets credential on both Google Sheets nodes if needed.\n\n### To run a full audit\nJust execute '🚀 Manual: Run Full Audit'. It processes all 30 sheets one at a time -- expect roughly 30-45 minutes total for the full catalog (each sheet with any dead-looking URL spends ~45s in the confirmation wait). Slower than parallel would have been, but it can't crash from resource exhaustion.\n\n### To review results\nOpen the 'Image Health Report' tab. Each row is one confirmed-dead image URL. Nothing is auto-fixed -- restore affected images from Drive manually, or build a separate, explicitly-reviewed repair step later."
+      },
+      "id": "051ae844-2f96-4747-9b93-3f695eae4dc3",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -15600,
+        8200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "3d628334-2fe0-4328-b48a-965ec3c7897a",
+      "name": "🚀 Manual: Run Full Audit",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -15600,
+        8480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SHEETS = [\n'Animal', 'Bench', 'Planter', 'Fountain', 'Lamppost', 'Bathtub', 'Sink', 'Vanity', 'Fireplace', 'Table', 'Statue', 'MarbleSlab', '2026Instock', 'DoorSurround', 'Wall-Coverings', 'MarbleRangeHood', 'Moulding', 'StoneMosaicTile', 'MarbleMedallion', 'Exterior-Wall-Decoration', 'Columns', 'Marble+ Basin', 'Marble+ ConsoleTable', 'Carving', 'WindowSurround', 'Wainscoting', 'BookMatchedSlabs', 'OutdoorCornice', 'Stairs', 'Balustrade'\n];\nreturn SHEETS.map(s => ({ json: { sheet_name: s } }));"
+      },
+      "id": "56f87b70-4cd2-4489-bdf3-c9311327b9d0",
+      "name": "📋 Sheet List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15360,
+        8480
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.sheet_name }}",
+          "mode": "name"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRange",
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "id": "e645e5e9-57b6-48a9-abbc-0118bd263505",
+      "name": "📖 Read Sheet Rows (Audit)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -14880,
+        8800
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Report-only -- builds one HEAD-check item per populated IMAGE URL slot on\n// every row that has a Product No. This never writes anything back to the\n// sheet's IMAGE URL columns and never re-queues a row for reprocessing --\n// see README. Only rows with at least one populated image slot are relevant.\nconst sheetName = $('🔄 Loop Through Sheets').item.json.sheet_name;\nconst rows = items.map(i => i.json);\nconst hasValue = v => v !== undefined && v !== null && String(v).trim() !== '';\n\nconst checks = [];\nfor (const r of rows) {\n  if (!hasValue(r['Product No.'])) continue;\n  for (let n = 1; n <= 11; n++) {\n    const url = String(r[`IMAGE URL${n}`] ?? '').trim();\n    if (!/^https?:\\/\\//i.test(url)) continue;\n    checks.push({ json: {\n      url, slot: `IMAGE URL${n}`, row_number: r.row_number, sheet_name: sheetName,\n      product_no: r['Product No.']\n    } });\n  }\n}\nreturn checks.length ? checks : [{ json: { _skipCheck: true, sheet_name: sheetName } }];"
+      },
+      "id": "d5988e5e-36c8-462b-9612-34672323deb4",
+      "name": "🩺 Build URL Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -14640,
+        8800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-has-url",
+              "leftValue": "={{ $json.url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c9ee6c18-fc81-4ce6-b370-b83094d7ff1b",
+      "name": "🩺 Any URLs to Check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -14400,
+        8800
+      ]
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 25,
+              "batchInterval": 100
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "adf79dbe-7888-4238-9f03-f19abe7284e1",
+      "name": "🩺 HEAD Check Image URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -14160,
+        8720
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shopify's CDN has a known propagation delay after a file is uploaded, renamed,\n// or deleted+recreated -- a single 404 during that window is not proof the file\n// is actually gone. This only flags suspects; '🩺 Confirm Dead Image URLs'\n// re-checks them after a wait and only reports ones STILL dead on the second check.\nconst results = $input.all();\nconst checks  = $('🩺 Build URL Checks').all();\n\nconst DEAD = new Set([404, 410]);\nconst suspects = [];\nfor (let i = 0; i < results.length; i++) {\n  const c = checks[i]?.json;\n  const status = results[i]?.json?.statusCode;\n  if (!c || !DEAD.has(status)) continue;\n  suspects.push({ ...c, status });\n}\nreturn suspects.length ? suspects.map(s => ({ json: s })) : [{ json: { _noSuspects: true } }];"
+      },
+      "id": "d0ae1b04-09b7-4548-8f53-e1d49b332c18",
+      "name": "🩺 Find Suspect Image URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13920,
+        8720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-has-suspect",
+              "leftValue": "={{ $json._noSuspects }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "320d235e-d2bd-4423-a13b-f1c863ec93a4",
+      "name": "🩺 Any Suspects?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -13680,
+        8720
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 45
+      },
+      "id": "452a0993-faf4-4bf2-85e1-2f365b31ca68",
+      "name": "⏳ Wait 45s (confirm dead)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -13440,
+        8640
+      ],
+      "webhookId": "audit-wait-45s"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 25,
+              "batchInterval": 100
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "013b111f-caf4-4423-8092-f75141674d79",
+      "name": "🩺 Re-check Suspect URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -13200,
+        8640
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only URLs that are STILL 404/410 after the wait are treated as genuinely\n// dead -- filters out CDN propagation-delay false positives. Report-only: this\n// never writes to any IMAGE URL column and never re-queues the row.\nconst results  = $input.all();\nconst suspects = $('🩺 Find Suspect Image URLs').all();\n\nconst DEAD = new Set([404, 410]);\nconst dead = [];\nfor (let i = 0; i < results.length; i++) {\n  const c = suspects[i]?.json;\n  const status = results[i]?.json?.statusCode;\n  if (!c || !DEAD.has(status)) continue;\n  dead.push({\n    checked_at: $now,\n    sheet_name: c.sheet_name,\n    row_number: c.row_number,\n    'Product No.': c.product_no,\n    slot: c.slot,\n    dead_url: c.url,\n    status_code: status\n  });\n}\nreturn dead.length ? dead.map(d => ({ json: d })) : [{ json: { _noneDead: true } }];"
+      },
+      "id": "32068a47-4f7c-44f9-ad14-c781abb1dbc6",
+      "name": "🩺 Confirm Dead Image URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12960,
+        8640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-has-dead",
+              "leftValue": "={{ $json._noneDead }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c6f1e2a0-1111-4a11-9e11-aaaa11112222",
+      "name": "🩺 Any Dead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -12720,
+        8640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Image Health Report",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "checked_at": "={{ $json.checked_at }}",
+            "sheet_name": "={{ $json.sheet_name }}",
+            "row_number": "={{ $json.row_number }}",
+            "Product No.": "={{ $json['Product No.'] }}",
+            "slot": "={{ $json.slot }}",
+            "dead_url": "={{ $json.dead_url }}",
+            "status_code": "={{ $json.status_code }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e11a2222-2222-4222-8222-222222222222",
+      "name": "📝 Append to Report Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -12480,
+        8640
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-0000-4a00-9000-000000000001",
+      "name": "🔄 Loop Through Sheets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -15120,
+        8480
+      ]
+    }
+  ],
+  "connections": {
+    "🚀 Manual: Run Full Audit": {
+      "main": [
+        [
+          {
+            "node": "📋 Sheet List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Sheet List": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Read Sheet Rows (Audit)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Build URL Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build URL Checks": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any URLs to Check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any URLs to Check?": {
+      "main": [
+        [
+          {
+            "node": "🩺 HEAD Check Image URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 HEAD Check Image URL": {
+      "main": [
+        [
+          {
+            "node": "🩺 Find Suspect Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Find Suspect Image URLs": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any Suspects?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any Suspects?": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 45s (confirm dead)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait 45s (confirm dead)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Re-check Suspect URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Re-check Suspect URL": {
+      "main": [
+        [
+          {
+            "node": "🩺 Confirm Dead Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Confirm Dead Image URLs": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any Dead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any Dead Found?": {
+      "main": [
+        [
+          {
+            "node": "📝 Append to Report Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Loop Through Sheets": {
+      "main": [
+        [],
+        [
+          {
+            "node": "📖 Read Sheet Rows (Audit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Append to Report Sheet": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "ImgHealthAudit0001",
+  "tags": []
+}
