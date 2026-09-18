@@ -1,0 +1,295 @@
+{
+  "name": "AXE AI | Sort All Conversation Sheets by Timestamp",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Sort every client conversation sheet by timestamp\n\n**Manual trigger only.** Run on demand (e.g. after a batch of Gmail/Outlook processing) rather than per-message -- sorting after every single row append would mean two extra Sheets API calls per message; sorting all sheets in one pass afterward is far cheaper and the end result is identical.\n\nWhat it does:\n1. Lists every client root folder under the 3 known provider-parent Drive folders (gmail-only, outlook-only, combined) -- same enumeration as the row_number cleanup workflow.\n2. For each client folder, finds its \"conversation\" Google Sheet (skips clients that don't have one yet).\n3. Looks up that sheet's actual tab name AND numeric sheetId (gid) at runtime -- both vary per sheet (random gid, inconsistent tab names), same reason the Processor workflows resolve this dynamically instead of hardcoding it.\n4. Reads the header row and finds which column is literally named \"timestamp\" (skips sheets that don't have one -- shouldn't happen, but safe rather than guessing a position).\n5. Sorts rows 2+ (header excluded) by that column, ascending -- oldest message first, matching when it was actually sent/received rather than whatever order the processor happened to log it in.\n\nRun by clicking 'Execute workflow' on the Manual Trigger. Check the final node's output for a per-sheet summary of what was sorted vs skipped.",
+        "height": 560,
+        "width": 900
+      },
+      "id": "readme-sort-conversation-sheets",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-2400, 0]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "id": "manual-trigger-sort",
+      "name": "Manual Trigger",
+      "position": [-2400, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The 3 known provider-parent Drive folders every client root folder lives\n// directly inside -- same constants used in the orchestrator's\n// 'Combine Gmail & Outlook Per Client' node.\nreturn [\n  { json: { parentFolderId: '1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE', provider: 'gmail-only' } },\n  { json: { parentFolderId: '1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8', provider: 'outlook-only' } },\n  { json: { parentFolderId: '102oeld1yMYGMmWs2Od198HqO1KeVhv_n', provider: 'combined' } },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "provider-parent-folders-sort",
+      "name": "Provider Parent Folders",
+      "position": [-2160, 320]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.parentFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {
+          "fields": ["*"]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "id": "list-client-folders-sort",
+      "name": "List Client Folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      },
+      "position": [-1920, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Defensive -- these parent folders should only ever contain client root\n// folders, but filter out anything that isn't actually a folder just in case.\nreturn $input.all().filter(item => item.json.mimeType === 'application/vnd.google-apps.folder');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "keep-folders-only-sort",
+      "name": "Keep Folders Only",
+      "position": [-1680, 320]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "conversation",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "id": "find-conversation-sheet-sort",
+      "name": "Find Conversation Sheet",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      },
+      "position": [-1440, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Exact match on name -- same pattern used throughout the orchestrator.\n// Client folders with no conversation sheet yet produce no output here,\n// which is correct: nothing to sort for them.\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === 'conversation');\nreturn exact ? [{ json: { id: exact.json.id, name: exact.json.name } }] : [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "pick-exact-conversation-sheet-sort",
+      "name": "Pick Exact Conversation Sheet Match",
+      "position": [-1200, 320]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.id + '?fields=sheets.properties' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "id": "get-sheet-properties-sort",
+      "name": "Get Sheet Properties",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "position": [-960, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Every conversation sheet has exactly one tab, with a randomly-generated\n// gid and an inconsistent name across different sheets -- same reason the\n// Processor workflows resolve this at runtime instead of hardcoding it.\nconst spreadsheetId = $('Pick Exact Conversation Sheet Match').item.json.id;\nconst props = $json.sheets?.[0]?.properties;\nif (!props?.title || props.sheetId === undefined) {\n  throw new Error(`Could not resolve tab name/sheetId for conversation sheet ${spreadsheetId}`);\n}\nreturn [{ json: { spreadsheetId, tabName: props.title, tabSheetId: props.sheetId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "extract-tab-info-sort",
+      "name": "Extract Tab Info",
+      "position": [-720, 320]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.spreadsheetId + '/values/' + encodeURIComponent($json.tabName + '!1:1') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "id": "get-header-row-sort",
+      "name": "Get Header Row",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "position": [-480, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find which column is literally named 'timestamp' and use its position\n// directly as the sort dimension -- header layout can vary slightly across\n// sheets (some are older, from before recent fixes), so this is looked up\n// per sheet rather than assumed to be a fixed position.\nconst { spreadsheetId, tabName, tabSheetId } = $('Extract Tab Info').item.json;\nconst headerRow = $json.values?.[0] || [];\nconst idx = headerRow.findIndex(h => (h || '').toString().trim().toLowerCase() === 'timestamp');\n\nreturn [{\n  json: {\n    spreadsheetId,\n    tabName,\n    tabSheetId,\n    hasTimestampColumn: idx !== -1,\n    timestampColumnIndex: idx\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "find-timestamp-column-sort",
+      "name": "Find Timestamp Column",
+      "position": [-240, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "has-timestamp-column-cond",
+              "leftValue": "={{ $json.hasTimestampColumn }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "id": "has-timestamp-column-gate",
+      "name": "Has Timestamp Column?",
+      "position": [0, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.spreadsheetId + ':batchUpdate' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ requests: [ { sortRange: { range: { sheetId: $json.tabSheetId, startRowIndex: 1, startColumnIndex: 0 }, sortSpecs: [ { dimensionIndex: $json.timestampColumnIndex, sortOrder: 'ASCENDING' } ] } } ] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "id": "sort-sheet-by-timestamp",
+      "name": "Sort Sheet by Timestamp",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "position": [240, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{ json: { spreadsheetId: input.spreadsheetId, tabName: input.tabName, result: 'sorted' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "report-sorted",
+      "name": "Report: Sorted",
+      "position": [480, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{ json: { spreadsheetId: input.spreadsheetId, tabName: input.tabName, result: 'skipped (no timestamp column)' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "report-skipped-sort",
+      "name": "Report: Skipped",
+      "position": [240, 440]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Provider Parent Folders", "type": "main", "index": 0 }]]
+    },
+    "Provider Parent Folders": {
+      "main": [[{ "node": "List Client Folders", "type": "main", "index": 0 }]]
+    },
+    "List Client Folders": {
+      "main": [[{ "node": "Keep Folders Only", "type": "main", "index": 0 }]]
+    },
+    "Keep Folders Only": {
+      "main": [[{ "node": "Find Conversation Sheet", "type": "main", "index": 0 }]]
+    },
+    "Find Conversation Sheet": {
+      "main": [[{ "node": "Pick Exact Conversation Sheet Match", "type": "main", "index": 0 }]]
+    },
+    "Pick Exact Conversation Sheet Match": {
+      "main": [[{ "node": "Get Sheet Properties", "type": "main", "index": 0 }]]
+    },
+    "Get Sheet Properties": {
+      "main": [[{ "node": "Extract Tab Info", "type": "main", "index": 0 }]]
+    },
+    "Extract Tab Info": {
+      "main": [[{ "node": "Get Header Row", "type": "main", "index": 0 }]]
+    },
+    "Get Header Row": {
+      "main": [[{ "node": "Find Timestamp Column", "type": "main", "index": 0 }]]
+    },
+    "Find Timestamp Column": {
+      "main": [[{ "node": "Has Timestamp Column?", "type": "main", "index": 0 }]]
+    },
+    "Has Timestamp Column?": {
+      "main": [
+        [{ "node": "Sort Sheet by Timestamp", "type": "main", "index": 0 }],
+        [{ "node": "Report: Skipped", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sort Sheet by Timestamp": {
+      "main": [[{ "node": "Report: Sorted", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000004",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "SortConvoSheets0001",
+  "tags": []
+}

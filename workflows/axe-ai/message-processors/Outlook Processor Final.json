@@ -1,6 +1,69 @@
 {
-  "name": "sub workflow for outlook Final",
+  "name": "AXE AI | Outlook Processor",
   "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1456,
+        400
+      ],
+      "id": "f18247b4-dd8d-45d6-856d-cc820b4013c4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Processed",
+              "lookupValue": "false"
+            },
+            {
+              "lookupColumn": "source",
+              "lookupValue": "email"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1200,
+        400
+      ],
+      "id": "3e44b95d-9f2f-4de3-8e84-eaba7063a9d9",
+      "name": "Load Queued Messages from Queue Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
     {
       "parameters": {
         "options": {}
@@ -8,8 +71,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -192,
-        288
+        -656,
+        400
       ],
       "id": "bc801008-db6e-4bc5-905a-2323b104ee68",
       "name": "Loop | Outlook Message IDs"
@@ -43,8 +106,8 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        176,
-        304
+        -368,
+        192
       ],
       "id": "53d6bb94-495b-476f-99d5-3f8e74762f52",
       "name": "Outlook | Fetch Message + Attachments",
@@ -58,16 +121,150 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst data = $('Loop | Outlook Message IDs');\nconst sheet_id = data.item.json.sheet_id;\n// logged-in mailbox email\nconst MY_EMAIL = 'jack@marblebee.com'.toLowerCase();\n\n/**\n * Cut message at polite sign-offs like \"Kind regards,\"\n */\nfunction cutAtKindRegards(text = '') {\n  const match = text.match(\n    /\\b(Kind regards|Best regards|Regards|Warm regards),\\b/i\n  );\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Extract latest message from Outlook/Gmail HTML body\n */\nfunction extractLatestMessageFromHtml(html = '') {\n  if (!html) return '';\n\n  // 1ï¸â£ Remove scripts & styles\n  html = html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '');\n\n  // 2ï¸â£ Cut at known reply/forward separators (earliest match wins)\n  const cutPatterns = [\n    /<hr[\\s\\S]*?>/i,\n    /<div[^>]+id=[\"']divRplyFwdMsg[\"'][\\s\\S]*?>/i,\n    /<div[^>]+class=[\"'][^\"']*gmail_quote[^\"']*[\"'][\\s\\S]*?>/i,\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},/i\n  ];\n\n  for (const pattern of cutPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      html = html.slice(0, match.index);\n    }\n  }\n\n  // 3ï¸â£ Strip remaining HTML â plain text\n  return html\n    .replace(/<\\/?[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n\nfunction cutAtReplyDate(text = '') {\n  const replyRegex =\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s*(AM|PM)/i;\n\n  const match = text.match(replyRegex);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Strip HTML safely\n */\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Cut text at first occurrence of:\n *  - 5 or more underscores\n *  - \"Get Outlook for \"\n * whichever comes first\n */\nfunction cutAtSeparator(text = '') {\n  const match = text.match(/_{5,}|Get Outlook for /i);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const fromEmail =\n    msg.from?.emailAddress?.address || null;\n\n  // receivers\n  const toEmail =\n    (msg.toRecipients || []).map(\n      r => r.emailAddress?.address\n    );\n\n  // sent or received\n  const direction =\n    fromEmail?.toLowerCase() === MY_EMAIL\n      ? 'sent'\n      : 'received';\n\n  // body (HTML â text)\nlet message = '';\n\nif (msg.body?.contentType === 'html') {\n  message = extractLatestMessageFromHtml(msg.body.content);\n} else {\n  message = stripHtml(msg.body?.content || '');\n}\n\n// 1ï¸â£ Remove signatures / Outlook footer\nmessage = cutAtSeparator(message);\n\n// 2ï¸â£ Remove quoted reply thread\nmessage = cutAtReplyDate(message);\n\n// 3ï¸â£ Remove content after \"Kind regards,\"\nmessage = cutAtKindRegards(message);\n\n\n  return {\n    json: {\n      sheet_id,\n      message,\n      fromEmail,\n      toEmail,\n      direction,\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false,\n      row_number:\n        data.first().json.row_number\n    },\n\n    binary: $input.all()[index]?.binary || {}\n  };\n});"
+        "jsCode": "const items = $input.all();\nconst data = $('Load Queued Messages from Queue Sheet');\nconst sheet_id = data.item.json.sheet_id ?? '';\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. Same fix as the Gmail processor.\nconst row_number = data.item.json.row_number ?? '';\n// logged-in mailbox email\nconst MY_EMAIL = 'jack@marblebee.com'.toLowerCase();\n\n/**\n * Cut message at polite sign-offs like \"Kind regards,\"\n */\nfunction cutAtKindRegards(text = '') {\n  const match = text.match(\n    /\\b(Kind regards|Best regards|Regards|Warm regards),\\b/i\n  );\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Extract latest message from Outlook/Gmail HTML body\n */\nfunction extractLatestMessageFromHtml(html = '') {\n  if (!html) return '';\n\n  // Remove scripts & styles\n  html = html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '');\n\n  // Cut at known reply/forward separators (earliest match wins)\n  const cutPatterns = [\n    /<hr[\\s\\S]*?>/i,\n    /<div[^>]+id=[\"']divRplyFwdMsg[\"'][\\s\\S]*?>/i,\n    /<div[^>]+class=[\"'][^\"']*gmail_quote[^\"']*[\"'][\\s\\S]*?>/i,\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},/i\n  ];\n\n  for (const pattern of cutPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      html = html.slice(0, match.index);\n    }\n  }\n\n  // Strip remaining HTML -> plain text\n  return html\n    .replace(/<\\/?[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n\nfunction cutAtReplyDate(text = '') {\n  const replyRegex =\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s*(AM|PM)/i;\n\n  const match = text.match(replyRegex);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Strip HTML safely\n */\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Cut text at first occurrence of:\n *  - 5 or more underscores\n *  - \"Get Outlook for \"\n * whichever comes first\n */\nfunction cutAtSeparator(text = '') {\n  const match = text.match(/_{5,}|Get Outlook for /i);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const fromEmail =\n    msg.from?.emailAddress?.address || null;\n  const fromName =\n    msg.from?.emailAddress?.name || null;\n\n  // receivers -- joined into a plain comma-separated string, matching the\n  // Gmail processor's convention for this shared sheet (this used to be a\n  // raw array, which stringified into the cell as e.g. [\"a@b.com\"] instead\n  // of a clean address).\n  const toRecipientsArr = msg.toRecipients || [];\n  const toEmail =\n    toRecipientsArr.map(r => r.emailAddress?.address).filter(Boolean).join(', ') || null;\n  const toName =\n    toRecipientsArr.map(r => r.emailAddress?.name).filter(Boolean).join(', ') || null;\n\n  // sent or received -- uppercase to match the Gmail processor's convention;\n  // a client's conversation sheet interleaves both providers, so the two\n  // must agree on casing.\n  const direction =\n    fromEmail?.toLowerCase() === MY_EMAIL\n      ? 'SENT'\n      : 'RECEIVED';\n\n  // body (HTML -> text)\nlet message = '';\n\nif (msg.body?.contentType === 'html') {\n  message = extractLatestMessageFromHtml(msg.body.content);\n} else {\n  message = stripHtml(msg.body?.content || '');\n}\n\n// Remove signatures / Outlook footer\nmessage = cutAtSeparator(message);\n\n// Remove quoted reply thread\nmessage = cutAtReplyDate(message);\n\n// Remove content after \"Kind regards,\"\nmessage = cutAtKindRegards(message);\n\n\n  return {\n    json: {\n      id: msg.id ?? '',\n      sheet_id,\n      row_number,\n      message,\n      fromEmail,\n      fromName,\n      toEmail,\n      toName,\n      direction,\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false\n    },\n\n    binary: $input.all()[index]?.binary || {}\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        512,
-        304
+        -32,
+        192
       ],
       "id": "28170fc2-c919-44a8-b4ee-78cf3389766f",
       "name": "Normalize | Extract Message Metadata"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sheet_id + '?fields=sheets.properties.title' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        224,
+        192
+      ],
+      "id": "get-conversation-sheet-tab-name-outlook",
+      "name": "Get Conversation Sheet Tab Name",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Each conversation sheet is created via the Sheets API with an explicit\n// sheets[] array and no sheetId specified -- per Google's own docs, an\n// unspecified sheetId is RANDOMLY GENERATED, not 0, and the tab name itself\n// is also inconsistent across sheets ('sheet1' vs 'Sheet1'). Neither a\n// hardcoded name nor a hardcoded gid can address it. Look up this specific\n// document's actual (single) tab name at runtime and reference it by name\n// from here on -- same fix as the Gmail processor.\nconst original = $('Normalize | Extract Message Metadata').item;\nconst tabName = $json.sheets?.[0]?.properties?.title;\nif (!tabName) {\n  throw new Error(`Could not resolve the conversation sheet's tab name for sheet_id ${original.json.sheet_id}`);\n}\nreturn [{\n  json: { ...original.json, tabName },\n  binary: original.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        192
+      ],
+      "id": "extract-tab-name-outlook",
+      "name": "Extract Tab Name"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.tabName }}",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "timestamp",
+              "lookupValue": "={{ $json.timestamp }}"
+            },
+            {
+              "lookupColumn": "fromEmail",
+              "lookupValue": "={{ $json.fromEmail }}"
+            },
+            {
+              "lookupColumn": "toEmail",
+              "lookupValue": "={{ $json.toEmail }}"
+            },
+            {
+              "lookupColumn": "subject",
+              "lookupValue": "={{ $json.subject }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        192
+      ],
+      "id": "sheets-find-existing-message-row-outlook",
+      "name": "Sheets | Find Existing Message Row",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The lookup node above replaces our data with whatever row it found (or\n// {} via Always Output Data if nothing matched, or an {error: ...} shaped\n// item if the sheet is missing a filtered-on column) -- recover the real\n// message data (and its binary attachments) from before the lookup, and\n// just carry forward whether a real row was found.\n//\n// 'row_number' is NOT the found-signal here (this sheet may not even have\n// that column). Use the Sheets node's own always-attached 'row_number'\n// metadata field instead -- present on every real matched row regardless\n// of which actual columns that row has. Matching is done on timestamp +\n// fromEmail + toEmail + subject (see the lookup node) since those columns\n// exist on every row ever logged, old and new, by either provider.\nconst lookupResult = $input.first().json;\nconst original = $('Extract Tab Name').item;\nreturn [{\n  json: { ...original.json, _alreadyLogged: !!(lookupResult && lookupResult.row_number !== undefined) },\n  binary: original.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        192
+      ],
+      "id": "restore-message-data-after-lookup-outlook",
+      "name": "Restore Message Data After Lookup"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "already-logged-cond-outlook",
+              "leftValue": "={{ $json._alreadyLogged }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        192
+      ],
+      "id": "message-already-logged-gate-outlook",
+      "name": "Message Already Logged?"
     },
     {
       "parameters": {
@@ -97,8 +294,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        864,
-        304
+        1504,
+        96
       ],
       "id": "77ccfd7e-87fb-41ea-86ab-d7a20ebc6eb0",
       "name": "If Has Attachments"
@@ -110,16 +307,94 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1168,
-        96
+        1760,
+        -32
       ],
       "id": "ab4429f5-e428-4c20-b4be-4082796fc7d5",
       "name": "Expand | Split Attachments"
     },
     {
       "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.file_name }}",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Loop | Outlook Message IDs').item.json.subf5_id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2016,
+        -32
+      ],
+      "id": "drive-find-existing-attachment-outlook",
+      "name": "Drive | Find Existing Attachment",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\nconst byOrigin = new Map();\nfor (const c of candidates) {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) continue;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, []);\n  byOrigin.get(idx).push(c);\n}\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx) || [];\n  const exact = group.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        -32
+      ],
+      "id": "pick-exact-attachment-match-outlook",
+      "name": "Pick Exact Attachment Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "attachment-found-cond-outlook",
+              "leftValue": "={{ $json._existingFileId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2528,
+        -32
+      ],
+      "id": "attachment-already-uploaded-gate-outlook",
+      "name": "Attachment Already Uploaded?"
+    },
+    {
+      "parameters": {
         "inputDataFieldName": "={{ $json.binary_field_name }}",
-        "name": "={{ $binary.attachment_0.fileName }}",
+        "name": "={{ $binary[$json.binary_field_name].fileName }}",
         "driveId": {
           "__rl": true,
           "mode": "list",
@@ -137,8 +412,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1376,
-        96
+        2784,
+        -96
       ],
       "id": "b5674e91-5a24-4986-bb10-98f8b7105230",
       "name": "Drive | Upload Attachment",
@@ -153,13 +428,26 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`webViewLink${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
+        "jsCode": "return $input.all().map(item => ({ json: { webViewLink: item.json._existingFileWebViewLink }, pairedItem: item.pairedItem }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1664,
+        2784,
         96
+      ],
+      "id": "existing-attachment-resolved-outlook",
+      "name": "Existing Attachment (Resolved)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get previous node data\nconst previousData = $('Message Already Logged?').item.json;\n\n// Collect all webViewLinks -- named 'attachment1'/'attachment2'/... to match\n// the Gmail processor's convention (these were previously 'webViewLink1'/\n// '...2', which would have populated separate, unused columns instead of\n// the sheet's real 'attachment1'/'attachment2' headers).\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        0
       ],
       "id": "9a1eb0ec-e007-41f8-bb19-7aaf04af14c4",
       "name": "Merge | Add Drive Links"
@@ -174,7 +462,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "sheet1",
+          "value": "={{ $('Extract Tab Name').item.json.tabName }}",
           "mode": "name"
         },
         "columns": {
@@ -190,8 +478,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        1584,
-        320
+        3296,
+        192
       ],
       "id": "dc933fb3-15bf-418c-aba6-0a0fafe3d1a7",
       "name": "Sheets | Log Message Row",
@@ -202,72 +490,6 @@
           "name": "Template_control"
         }
       }
-    },
-    {
-      "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "gid=0",
-          "mode": "list",
-          "cachedResultName": "Sheet1",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "mainf4_id",
-              "lookupValue": "10e1vDtThiyaGDkzsdQNJLmOc8935EU2p"
-            },
-            {
-              "lookupColumn": "Processed",
-              "lookupValue": "false"
-            },
-            {
-              "lookupColumn": "source"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        -528,
-        288
-      ],
-      "id": "3e44b95d-9f2f-4de3-8e84-eaba7063a9d9",
-      "name": "Get row(s) in sheet",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "rKfNzy77xzsMahH6",
-          "name": "Template_control"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 10
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -816,
-        288
-      ],
-      "id": "f18247b4-dd8d-45d6-856d-cc820b4013c4",
-      "name": "Schedule Trigger"
     },
     {
       "parameters": {
@@ -287,7 +509,7 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "id": "={{ $('Loop | Outlook Message IDs').first().json.id }}",
+            "id": "={{ $('Load Queued Messages from Queue Sheet').item.json.id }}",
             "Processed": "true"
           },
           "matchingColumns": [
@@ -392,11 +614,11 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        1808,
-        320
+        3552,
+        192
       ],
       "id": "9f70cff3-fef2-4c72-8a1c-e71a4c8a6df0",
-      "name": "Append or update row in sheet",
+      "name": "Sheets | Mark Queue Row Processed",
       "retryOnFail": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -406,29 +628,30 @@
       }
     }
   ],
-  "pinData": {
-    "Schedule Trigger": [
-      {
-        "json": {
-          "timestamp": "2026-02-10T16:09:28.288-05:00",
-          "Readable date": "February 10th 2026, 4:09:28 pm",
-          "Readable time": "4:09:28 pm",
-          "Day of week": "Tuesday",
-          "Year": "2026",
-          "Month": "February",
-          "Day of month": "10",
-          "Hour": "16",
-          "Minute": "09",
-          "Second": "28",
-          "Timezone": "America/New_York (UTC-05:00)"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load Queued Messages from Queue Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Queued Messages from Queue Sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Loop | Outlook Message IDs": {
       "main": [
         [],
@@ -456,6 +679,68 @@
       "main": [
         [
           {
+            "node": "Get Conversation Sheet Tab Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Sheet Tab Name": {
+      "main": [
+        [
+          {
+            "node": "Extract Tab Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Tab Name": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Find Existing Message Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Find Existing Message Row": {
+      "main": [
+        [
+          {
+            "node": "Restore Message Data After Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Message Data After Lookup": {
+      "main": [
+        [
+          {
+            "node": "Message Already Logged?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Already Logged?": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Mark Queue Row Processed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "If Has Attachments",
             "type": "main",
             "index": 0
@@ -474,7 +759,7 @@
         ],
         [
           {
-            "node": "Sheets | Log Message Row",
+            "node": "Merge | Add Drive Links",
             "type": "main",
             "index": 0
           }
@@ -485,7 +770,47 @@
       "main": [
         [
           {
+            "node": "Drive | Find Existing Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Find Existing Attachment": {
+      "main": [
+        [
+          {
+            "node": "Pick Exact Attachment Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Exact Attachment Match": {
+      "main": [
+        [
+          {
+            "node": "Attachment Already Uploaded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attachment Already Uploaded?": {
+      "main": [
+        [
+          {
             "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Existing Attachment (Resolved)",
             "type": "main",
             "index": 0
           }
@@ -493,6 +818,17 @@
       ]
     },
     "Drive | Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing Attachment (Resolved)": {
       "main": [
         [
           {
@@ -518,40 +854,7 @@
       "main": [
         [
           {
-            "node": "Append or update row in sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get row(s) in sheet": {
-      "main": [
-        [
-          {
-            "node": "Loop | Outlook Message IDs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Get row(s) in sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Append or update row in sheet": {
-      "main": [
-        [
-          {
-            "node": "Loop | Outlook Message IDs",
+            "node": "Sheets | Mark Queue Row Processed",
             "type": "main",
             "index": 0
           }
@@ -562,12 +865,10 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "0d793252-23d3-4595-9f5d-ebb9165cfd1d",
+  "versionId": "00000000-0000-0000-0000-000000000003",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
   "nodeGroups": [],

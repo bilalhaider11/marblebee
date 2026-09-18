@@ -1,5 +1,5 @@
 {
-  "name": "sub workflow for gmail Final",
+  "name": "AXE AI | Gmail Processor",
   "nodes": [
     {
       "parameters": {
@@ -8,24 +8,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
-        224
+        1824,
+        1456
       ],
-      "id": "2e15504e-07b2-406a-b8ef-5a630dedec06",
+      "id": "ac65bd09-62eb-402c-a972-1b59bc925fbe",
       "name": "Merge | Add Drive Links"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Get all input items\nconst items = $input.all();\n\n// Sort by timestamp: oldest â newest\nitems.sort((a, b) => {\n  const t1 = new Date(a.json.timestamp).getTime();\n  const t2 = new Date(b.json.timestamp).getTime();\n  return t1 - t2;\n});\n\n// Return sorted items\nreturn items;\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        256,
-        0
-      ],
-      "id": "b95ed818-3ebf-457a-bc88-689233a478e0",
-      "name": "Prepare | Resolve Sheet ID"
     },
     {
       "parameters": {
@@ -48,12 +35,14 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1920,
-        224
+        1824,
+        1168
       ],
-      "id": "169dc3cb-3342-4154-87c0-085bdd51e6e4",
+      "id": "64f4d0eb-243e-4ad4-9af3-d6207154bc93",
       "name": "Drive | Upload Attachment",
       "alwaysOutputData": false,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
@@ -68,10 +57,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1600,
-        224
+        1008,
+        1184
       ],
-      "id": "2b30b90d-bc71-40cf-82ce-9340da46b2d2",
+      "id": "688f7c0a-a37b-495a-bb4d-37b210345e20",
       "name": "Expand | Split Attachments"
     },
     {
@@ -87,11 +76,11 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        512,
-        192
+        -352,
+        1152
       ],
-      "id": "618de394-0010-4a6b-8c28-705c3237d372",
-      "name": "Gmail | Fetch Message + Attachments",
+      "id": "801c0599-e9af-4227-a5c8-00c9d46f0da0",
+      "name": "Gmail | Fetch Message + Attachments (Emily)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
       "credentials": {
@@ -109,10 +98,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -144,
-        400
+        -640,
+        1360
       ],
-      "id": "e058819b-2a2e-457b-b00d-f1d5c55649e0",
+      "id": "68fac8eb-f0f1-4839-a7c8-7f741ca59ea8",
       "name": "Loop | Gmail Message IDs"
     },
     {
@@ -142,10 +131,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1120,
-        416
+        1056,
+        1392
       ],
-      "id": "cfdce29b-c99f-4dd3-8090-ea3e0d5929dc",
+      "id": "e48b3d02-71bc-478b-a630-5897bc388f4d",
       "name": "If Has Attachments"
     },
     {
@@ -171,10 +160,6 @@
             {
               "lookupColumn": "source",
               "lookupValue": "email"
-            },
-            {
-              "lookupColumn": "mainf4_id",
-              "lookupValue": "1mS9R8JnI0uABeg1UKr1AUil8pWyBV-5G"
             }
           ]
         },
@@ -183,30 +168,17 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -592,
-        400
+        -912,
+        1360
       ],
-      "id": "8dc7317e-f63e-4091-b0dc-be918eae2379",
-      "name": "Get row(s) in sheet",
+      "id": "dde39f16-9b21-4af2-8242-8f2be1422c30",
+      "name": "Load Queued Messages from Queue Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
           "name": "Template_control"
         }
       }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Get only the first 10 items\nconst items = $input.all().slice(0, 5);\n\n// Loop over those 10 items\nfor (const item of items) {\n  item.json.myNewField = 1;\n}\n\nreturn items;\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -384,
-        256
-      ],
-      "id": "554ec016-14dc-4eba-8cd3-c4f614c0cb9c",
-      "name": "Code in JavaScript"
     },
     {
       "parameters": {
@@ -221,11 +193,11 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        512,
-        416
+        -128,
+        1376
       ],
-      "id": "a63a92fd-5d78-4459-a753-3cec32f4ec80",
-      "name": "Gmail | Fetch Message + Attachments1",
+      "id": "e82060c6-cc2d-4599-a866-886f9b48549f",
+      "name": "Gmail | Fetch Message + Attachments (Terry)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
       "credentials": {
@@ -249,11 +221,11 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        512,
-        704
+        -368,
+        1632
       ],
-      "id": "e24a1dff-c1bc-4db7-8543-42945e2f93bc",
-      "name": "Gmail | Fetch Message + Attachments2",
+      "id": "205b7184-8692-4735-8c06-c183d907bd30",
+      "name": "Gmail | Fetch Message + Attachments (Office)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
       "credentials": {
@@ -274,7 +246,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Sheet1",
+          "value": "={{ $('Extract Tab Name').item.json.tabName }}",
           "mode": "name"
         },
         "columns": {
@@ -290,13 +262,13 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        512,
-        0
+        384,
+        960
       ],
-      "id": "04ce453b-1c3e-4458-b6b8-c5bd4292c7d4",
-      "name": "Sheets | Log Message Row4",
+      "id": "02bb9a5e-3928-4255-b34c-a75016c4d598",
+      "name": "Sheets | Log Message Row",
       "retryOnFail": true,
-      "waitBetweenTries": 3000,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -323,7 +295,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "Processed": "true",
-            "row_number": "={{ $json.row_number }}"
+            "row_number": "={{ $('Load Queued Messages from Queue Sheet').item.json.row_number }}"
           },
           "matchingColumns": [
             "row_number"
@@ -439,11 +411,13 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        752,
-        0
+        800,
+        960
       ],
-      "id": "b3ee2ddd-6fbc-4150-b8e3-3486e151e9dd",
-      "name": "Sheets | Cleanup Template Columns5",
+      "id": "46d57700-da97-40fe-bb35-5250ddf33bfe",
+      "name": "Sheets | Mark Queue Row Processed",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -530,37 +504,24 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        80,
-        400
+        -368,
+        1360
       ],
-      "id": "3a2d50c0-eb78-4802-8008-0c53565860d7",
-      "name": "Route by Workspace1"
+      "id": "4c1d9bce-3481-480c-95d6-39511a923944",
+      "name": "Route by Mailbox"
     },
     {
       "parameters": {
-        "jsCode": "const output = [];\n\nconst data = $('Loop | Gmail Message IDs').item.json;\nconst row = data.row;\nconst row_number = data.row_number;\n/**\n * Clean unwanted characters and normalize spacing\n */\nconst cleanText = (text = \"\") =>\n  text\n    ?.replace(/[<>&*]/g, \"\")   // remove special chars\n    .replace(/\\s+/g, \" \")     // normalize spaces\n    .trim();\n\n/**\n * Remove everything AFTER an email inside <>\n * Example stop point: <example@gmail.com>\n */\nconst cutAfterAngleEmail = (text = \"\") => {\n  if (!text) return null;\n\n  // Match <email@domain>\n  const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n  const match = text.match(angleEmailRegex);\n  if (!match) return text;\n\n  return text.slice(0, match.index);\n};\n\n/**\n * Extract ONLY reply content (remove quoted Gmail reply)\n */\nconst extractReplyText = (text = \"\") => {\n  if (!text) return null;\n\n  // First: remove quoted reply block\n  const splitPatterns = [\n    \"\\nOn \",   // Gmail reply marker\n    \"\\n>\"      // quoted lines\n  ];\n\n  let clean = text;\n  for (const p of splitPatterns) {\n    if (clean.includes(p)) {\n      clean = clean.split(p)[0];\n      break;\n    }\n  }\n\n  // Second: cut after <email@domain>\n  clean = cutAfterAngleEmail(clean);\n\n  return cleanText(clean);\n};\n\n/**\n * MAIN LOOP\n */\nfor (const input of items) {\n  const e = input.json;\n  const headers = e.headers || {};\n\n  const isSent = e.labelIds?.includes(\"SENT\");\n  const isReply =\n    !!e.inReplyTo ||\n    !!headers[\"in-reply-to\"] ||\n    !!headers.references;\n\n  const rawText = e.text || \"\";\n\n  const finalText = isReply\n    ? extractReplyText(rawText)\n    : cleanText(cutAfterAngleEmail(rawText));\n\n  output.push({\n    json: {\n      // Direction\n      direction: isSent ? \"SENT\" : \"RECEIVED\",\n      sheet_id:data.sheet_id,\n      row,\n      row_number,\n\n      // From\n      fromEmail: e.from?.value?.[0]?.address || null,\n      fromName: e.from?.value?.[0]?.name || null,\n\n      // To\n      toEmail: e.to?.value?.[0]?.address || null,\n      toName: e.to?.value?.[0]?.name || null,\n\n      // Subject\n      subject:\n        e.subject ||\n        headers.subject?.replace(\"Subject: \", \"\") ||\n        null,\n\n      // Timestamp\n      timestamp: e.date || null,\n\n      //  Cleaned message\n      message: finalText || null,\n    },\n\n    //  Preserve attachments exactly\n    binary: input.binary ?? undefined,\n  });\n}\n\nreturn output;"
+        "jsCode": "const output = [];\n\nconst data = $('Loop | Gmail Message IDs').item.json;\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. An always-present key (even when\n// empty) can never trigger that shift.\nconst row_number = $('Load Queued Messages from Queue Sheet').item.json.row_number ?? '';\n/**\n * Clean unwanted characters and normalize spacing\n */\nconst cleanText = (text = \"\") =>\n  text\n    ?.replace(/[<>&*]/g, \"\")   // remove special chars\n    .replace(/\\s+/g, \" \")     // normalize spaces\n    .trim();\n\n/**\n * Remove everything AFTER an email inside <>\n * Example stop point: <example@gmail.com>\n */\nconst cutAfterAngleEmail = (text = \"\") => {\n  if (!text) return null;\n\n  // Match <email@domain>\n  const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n  const match = text.match(angleEmailRegex);\n  if (!match) return text;\n\n  return text.slice(0, match.index);\n};\n\n/**\n * Extract ONLY reply content (remove quoted Gmail reply)\n */\nconst extractReplyText = (text = \"\") => {\n  if (!text) return null;\n\n  // First: remove quoted reply block\n  const splitPatterns = [\n    \"\\nOn \",   // Gmail reply marker\n    \"\\n>\"      // quoted lines\n  ];\n\n  let clean = text;\n  for (const p of splitPatterns) {\n    if (clean.includes(p)) {\n      clean = clean.split(p)[0];\n      break;\n    }\n  }\n\n  // Second: cut after <email@domain>\n  clean = cutAfterAngleEmail(clean);\n\n  return cleanText(clean);\n};\n\n/**\n * MAIN LOOP\n */\nfor (const input of items) {\n  const e = input.json;\n  const headers = e.headers || {};\n\n  const isSent = e.labelIds?.includes(\"SENT\");\n  const isReply =\n    !!e.inReplyTo ||\n    !!headers[\"in-reply-to\"] ||\n    !!headers.references;\n\n  const rawText = e.text || \"\";\n\n  const finalText = isReply\n    ? extractReplyText(rawText)\n    : cleanText(cutAfterAngleEmail(rawText));\n\n  output.push({\n    json: {\n      // Direction\n      id: e.id ?? '',\n      direction: isSent ? \"SENT\" : \"RECEIVED\",\n      sheet_id: data.sheet_id ?? '',\n      row_number,\n\n      // From\n      fromEmail: e.from?.value?.[0]?.address || null,\n      fromName: e.from?.value?.[0]?.name || null,\n\n      // To\n      toEmail: e.to?.value?.[0]?.address || null,\n      toName: e.to?.value?.[0]?.name || null,\n\n      // Subject\n      subject:\n        e.subject ||\n        headers.subject?.replace(\"Subject: \", \"\") ||\n        null,\n\n      // Timestamp\n      timestamp: e.date || null,\n\n      //  Cleaned message\n      message: finalText || null,\n    },\n\n    //  Preserve attachments exactly\n    binary: input.binary ?? undefined,\n  });\n}\n\nreturn output;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        832,
-        416
+        128,
+        1376
       ],
-      "id": "086f425e-442f-4296-8cfb-e5d5cf81320d",
+      "id": "d9896397-e52a-48a9-b1a1-9b3911cc05a8",
       "name": "Normalize | Extract Clean Reply Text2"
-    },
-    {
-      "parameters": {
-        "jsCode": "\nreturn $input.all();"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2032,
-        432
-      ],
-      "id": "5c93b51b-624e-48f9-b5d3-cd0538c902bf",
-      "name": "Code in JavaScript7"
     },
     {
       "parameters": {
@@ -576,11 +537,241 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -848,
-        400
+        -1168,
+        1360
       ],
-      "id": "7c45e67a-8c36-478d-b756-34dd28b88428",
+      "id": "1b14dc40-f122-48be-9a4b-850070ae4a06",
       "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.sheet_id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.tabName }}",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "timestamp",
+              "lookupValue": "={{ $json.timestamp }}"
+            },
+            {
+              "lookupColumn": "fromEmail",
+              "lookupValue": "={{ $json.fromEmail }}"
+            },
+            {
+              "lookupColumn": "toEmail",
+              "lookupValue": "={{ $json.toEmail }}"
+            },
+            {
+              "lookupColumn": "subject",
+              "lookupValue": "={{ $json.subject }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        416,
+        1376
+      ],
+      "id": "8e371438-c02d-4335-a611-de6c1a62e204",
+      "name": "Sheets | Find Existing Message Row",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The lookup node above replaces our data with whatever row it found (or\n// {} via Always Output Data if nothing matched, or an {error: ...} shaped\n// item if the sheet is missing a filtered-on column) -- recover the real\n// message data (and its binary attachments) from before the lookup, and\n// just carry forward whether a real row was found.\n//\n// 'row_number' (not 'id') is the found-signal: it's a field n8n's Sheets\n// node always attaches to every real matched row, regardless of which\n// actual columns that row has -- unlike 'id', which only exists on rows\n// logged by this dedup feature itself. Matching is done on timestamp +\n// fromEmail + toEmail + subject (see the lookup node) specifically because\n// those columns already exist on every row ever logged, old and new, so\n// messages logged before this feature existed are still correctly\n// recognized as already-logged instead of silently re-duplicated.\nconst lookupResult = $input.first().json;\nconst original = $('Normalize | Extract Clean Reply Text2').item;\nreturn [{\n  json: { ...original.json, _alreadyLogged: !!(lookupResult && lookupResult.row_number !== undefined) },\n  binary: original.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        1376
+      ],
+      "id": "1322d5c1-8f3c-44e1-acbd-9eba6f51a916",
+      "name": "Restore Message Data After Lookup"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "already-logged-cond",
+              "leftValue": "={{ $json._alreadyLogged }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        1376
+      ],
+      "id": "bd7bf0f3-25e0-4a93-bf27-54d0b13ed6e2",
+      "name": "Message Already Logged?"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.file_name }}",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Loop | Gmail Message IDs').item.json.subf5_id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1216,
+        1184
+      ],
+      "id": "40f829ff-9185-46bb-8909-e4b6a2aedaa8",
+      "name": "Drive | Find Existing Attachment",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} (as this used to do) silently broke every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\nconst byOrigin = new Map();\nfor (const c of candidates) {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) continue;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, []);\n  byOrigin.get(idx).push(c);\n}\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx) || [];\n  const exact = group.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        1184
+      ],
+      "id": "dc6dc22f-a2f6-400a-98f9-b54d92132c2a",
+      "name": "Pick Exact Attachment Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "attachment-found-cond",
+              "leftValue": "={{ $json._existingFileId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1600,
+        1184
+      ],
+      "id": "bf7fb570-53a4-4607-bab4-f937028d9365",
+      "name": "Attachment Already Uploaded?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map to the shape 'Merge | Add Drive Links' expects (a bare webViewLink)\n// -- the item still carries the original file_name/binary fields from\n// 'Pick Exact Attachment Match', which aren't needed on this skip-upload\n// path and are intentionally dropped here.\nreturn $input.all().map(item => ({\n  json: { webViewLink: item.json._existingFileWebViewLink },\n  pairedItem: item.pairedItem\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        1456
+      ],
+      "id": "a9994c1a-7f26-4bb6-b251-4b2c51f0bc73",
+      "name": "Existing Attachment (Resolved)"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sheet_id + '?fields=sheets.properties.title' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        176,
+        1712
+      ],
+      "id": "d92b96e7-a64c-483a-9aa7-a3c2ffaae2c4",
+      "name": "Get Conversation Sheet Tab Name",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Each conversation sheet is created via the Sheets API with an\n// explicit sheets[] array and no sheetId specified -- per Google's own\n// docs, an unspecified sheetId is RANDOMLY GENERATED, not 0. So neither\n// a hardcoded name ('sheet1'/'Sheet1', which genuinely varies per\n// client) nor a hardcoded gid ('gid=0', confirmed NOT reliable here)\n// can address it. The only robust option: look up this specific\n// document's actual (single) tab name at runtime and reference it by\n// name from here on, since every conversation sheet has exactly one tab.\nconst original = $('Normalize | Extract Clean Reply Text2').item;\nconst tabName = $json.sheets?.[0]?.properties?.title;\nif (!tabName) {\n  throw new Error(`Could not resolve the conversation sheet's tab name for sheet_id ${original.json.sheet_id}`);\n}\nreturn [{\n  json: { ...original.json, tabName },\n  binary: original.binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        1712
+      ],
+      "id": "bc8d3a71-fe10-48ee-86c0-147bbe906593",
+      "name": "Extract Tab Name"
     }
   ],
   "pinData": {},
@@ -589,18 +780,7 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript7",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare | Resolve Sheet ID": {
-      "main": [
-        [
-          {
-            "node": "Sheets | Log Message Row4",
+            "node": "Sheets | Log Message Row",
             "type": "main",
             "index": 0
           }
@@ -622,14 +802,14 @@
       "main": [
         [
           {
-            "node": "Drive | Upload Attachment",
+            "node": "Drive | Find Existing Attachment",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gmail | Fetch Message + Attachments": {
+    "Gmail | Fetch Message + Attachments (Emily)": {
       "main": [
         [
           {
@@ -642,16 +822,10 @@
     },
     "Loop | Gmail Message IDs": {
       "main": [
+        [],
         [
           {
-            "node": "Prepare | Resolve Sheet ID",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Route by Workspace1",
+            "node": "Route by Mailbox",
             "type": "main",
             "index": 0
           }
@@ -669,25 +843,14 @@
         ],
         [
           {
-            "node": "Code in JavaScript7",
+            "node": "Sheets | Log Message Row",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get row(s) in sheet": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript": {
+    "Load Queued Messages from Queue Sheet": {
       "main": [
         [
           {
@@ -698,7 +861,7 @@
         ]
       ]
     },
-    "Gmail | Fetch Message + Attachments2": {
+    "Gmail | Fetch Message + Attachments (Office)": {
       "main": [
         [
           {
@@ -709,7 +872,7 @@
         ]
       ]
     },
-    "Gmail | Fetch Message + Attachments1": {
+    "Gmail | Fetch Message + Attachments (Terry)": {
       "main": [
         [
           {
@@ -720,36 +883,36 @@
         ]
       ]
     },
-    "Sheets | Log Message Row4": {
+    "Sheets | Log Message Row": {
       "main": [
         [
           {
-            "node": "Sheets | Cleanup Template Columns5",
+            "node": "Sheets | Mark Queue Row Processed",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Route by Workspace1": {
+    "Route by Mailbox": {
       "main": [
         [
           {
-            "node": "Gmail | Fetch Message + Attachments",
+            "node": "Gmail | Fetch Message + Attachments (Emily)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Gmail | Fetch Message + Attachments1",
+            "node": "Gmail | Fetch Message + Attachments (Terry)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Gmail | Fetch Message + Attachments2",
+            "node": "Gmail | Fetch Message + Attachments (Office)",
             "type": "main",
             "index": 0
           }
@@ -760,18 +923,7 @@
       "main": [
         [
           {
-            "node": "If Has Attachments",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript7": {
-      "main": [
-        [
-          {
-            "node": "Loop | Gmail Message IDs",
+            "node": "Get Conversation Sheet Tab Name",
             "type": "main",
             "index": 0
           }
@@ -782,7 +934,131 @@
       "main": [
         [
           {
-            "node": "Get row(s) in sheet",
+            "node": "Load Queued Messages from Queue Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Find Existing Message Row": {
+      "main": [
+        [
+          {
+            "node": "Restore Message Data After Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Message Data After Lookup": {
+      "main": [
+        [
+          {
+            "node": "Message Already Logged?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Already Logged?": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Mark Queue Row Processed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets | Mark Queue Row Processed": {
+      "main": [
+        [
+          {
+            "node": "Loop | Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive | Find Existing Attachment": {
+      "main": [
+        [
+          {
+            "node": "Pick Exact Attachment Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Exact Attachment Match": {
+      "main": [
+        [
+          {
+            "node": "Attachment Already Uploaded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attachment Already Uploaded?": {
+      "main": [
+        [
+          {
+            "node": "Drive | Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Existing Attachment (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing Attachment (Resolved)": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation Sheet Tab Name": {
+      "main": [
+        [
+          {
+            "node": "Extract Tab Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Tab Name": {
+      "main": [
+        [
+          {
+            "node": "Sheets | Find Existing Message Row",
             "type": "main",
             "index": 0
           }
@@ -793,15 +1069,13 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "e4ebf9e2-0c34-4c37-9ba1-53f1cfda6967",
+  "versionId": "b50ef5e2-9cdc-462e-a3ca-78a36b7f86d9",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
   "nodeGroups": [],
-  "id": "EQtjfa06RVRxn5eNf-_kc",
+  "id": "sr4pjT39Z70svB30",
   "tags": []
 }
