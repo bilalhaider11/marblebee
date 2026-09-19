@@ -18,11 +18,12 @@ This repository contains the complete automation suite built for **Marblebee** �
 - 📸 Google Drive images → Shopify CDN, zero manual uploads
 - 🤖 AI-generated product titles, descriptions, and SEO content
 - 🛒 Google Sheets product data → Shopify product listings
-- 📧 Full inbound and outbound email pipeline
-- 📌 Pinterest pin creation and publishing
+- 📧 Full inbound and outbound email pipeline, plus warmup
+- 📬 AXE AI: Gmail/Outlook conversations logged per client into Drive + Sheets, with an AI/RAG responder
+- 📌 Pinterest pin creation, scheduling (via Metricool) and publish verification
 - 🕷️ Houzz market data scraping
 
-**Tech stack:** n8n (self-hosted), Google Drive API, Google Sheets API, Shopify GraphQL Admin API, OpenAI, Pinterest API, Python
+**Tech stack:** n8n, Google Drive API, Google Sheets API, Shopify GraphQL Admin API, OpenAI, Google Gemini, Microsoft Graph (Outlook), Gmail API, Supabase (pgvector), Cohere reranker, Metricool API, Python
 
 ---
 
@@ -35,7 +36,8 @@ This repository contains the complete automation suite built for **Marblebee** �
   - [4. Wall Coverings Classifier](#4-wall-coverings-classifier)
   - [5. Email Automation Pipeline](#5-email-automation-pipeline)
   - [6. Pinterest Publishing Pipeline](#6-pinterest-publishing-pipeline)
-- [Houzz Scraper](#7-houzz-scraper)
+  - [7. AXE AI Email Data Pipeline](#7-axe-ai-email-data-pipeline)
+- [Houzz Scraper](#8-houzz-scraper)
 - [Repository Structure](#repository-structure)
 - [Setup & Installation](#setup--installation)
 - [Credentials & Security](#credentials--security)
@@ -50,7 +52,7 @@ All workflows are built in **n8n** and exported as importable `.json` files. Eac
 
 ### 1. Google Drive → Shopify Image Sync
 
-**File:** `workflows/image-sync/drive_shopify_image_sync.json`
+**Files:** `workflows/image-sync/drive_shopify_image_sync.json`, `workflows/image-sync/image_url_health_audit.json`
 
 Automatically syncs product images from Google Drive to Shopify CDN on a daily schedule. No manual uploads needed — just drop images in Drive with the correct naming convention and the workflow handles everything.
 
@@ -60,7 +62,7 @@ Automatically syncs product images from Google Drive to Shopify CDN on a daily s
 
 | Phase | What happens |
 |-------|-------------|
-| **Phase 1 — Collect** | Scans all 19 Google Sheets product tabs, collects rows where `IMAGE URL1` is empty |
+| **Phase 1 — Collect** | Scans all 30 Google Sheets product tabs, collects rows where `IMAGE URL1` is empty |
 | **Phase 2 — Process** | For each product, finds its folder in Drive (Root → Category → ProductNo → LOGO), classifies images, uploads to Shopify CDN via Staged Upload API, writes CDN URLs back to the sheet |
 
 **Image naming convention:**
@@ -81,8 +83,14 @@ Automatically syncs product images from Google Drive to Shopify CDN on a daily s
 4. 15s wait → `nodes` query → retrieves final CDN URL
 5. Writes `=IMAGE("cdn_url", 1)` formula to the `Picture` column for thumbnail preview
 
-**Supported categories (19 sheets):**
-Animal, Bench, Planter, Fountain, Lamppost, Bathtub, Sink, Vanity, Fireplace, Table, Statue, MarbleSlab, 2026Instock, DoorSurround, Wall-Coverings, MarbleRangeHood, Moulding, StoneMosaicTile, MarbleMedallion
+**Safety features:**
+- **Self-healing:** existing `IMAGE URL1-10` values are HEAD-checked on the Shopify CDN; dead links are re-checked after 45s (CDN propagation delay) and only re-queued for a fresh upload from Drive if still dead
+- **Upload safety:** oversized images are downscaled before upload, and URLs are only written once the file is READY and the exact URL is confirmed live on the CDN
+
+**Image URL Health Audit** (`image_url_health_audit.json`): manual, report-only workflow that scans every uploaded `IMAGE URL1-11` across all 30 sheets and logs dead links (404/410) to an `Image Health Report` tab. It never writes to image columns or re-queues rows.
+
+**Supported categories (30 sheets):**
+2026Instock, Animal, Balustrade, Bathtub, Bench, BookMatchedSlabs, Carving, Columns, DoorSurround, Exterior-Wall-Decoration, Fireplace, Fountain, Lamppost, Marble+ Basin, Marble+ ConsoleTable, MarbleMedallion, MarbleRangeHood, MarbleSlab, Moulding, OutdoorCornice, Planter, Sink, Stairs, Statue, StoneMosaicTile, Table, Vanity, Wainscoting, Wall-Coverings, WindowSurround
 
 ---
 
@@ -104,9 +112,19 @@ Reads product rows from Google Sheets and uses AI to generate complete Shopify-r
 
 ### 3. Shopify Product Sync Pipeline
 
-**File:** `workflows/product-management/Shopify Merge product sync Pipeline.json`
+**Files:**
+- `workflows/product-management/Shopify Merge product sync Pipeline (GraphQL).json` — main pipeline
+- `workflows/product-management/Shopify Merge product sync Pipeline (GraphQL) - Process Product (sub-workflow).json` — per-product sub-workflow
 
-Syncs product data from Google Sheets directly into Shopify. Handles product creation, field updates, collection assignments, and metafield mapping across all 19 category sheets.
+Syncs product data from Google Sheets into Shopify via the **GraphQL Admin API** across all 30 category sheets. Handles product create/update, variants, slot-based image sync, collection assignments, metafields, SEO fields and Online Store publishing.
+
+**Sub-workflow architecture:** the main pipeline loops over sheets and reads/filters rows, then calls the Process Product sub-workflow once per product via an *Execute Sub-workflow* node (*Run once for each item*). This sidesteps an n8n Split-In-Batches bug where a node triggered more than once per execution silently stops processing items. A dedupe step guards against the sheet loop's *Done* branch firing more than once.
+
+**Also handled by the main pipeline:**
+- **CAD → IMAGE URL11 sync:** copies `CAD Drawing URL` into `IMAGE URL11` (skipped if that exact URL already sits in another image slot)
+- **Publish reconciliation:** recently created products missing from the Online Store channel are re-published
+
+**Import note:** import both files, then open the main pipeline's `Process Product (per item)` node and select the sub-workflow from its dropdown.
 
 ---
 
@@ -114,7 +132,7 @@ Syncs product data from Google Sheets directly into Shopify. Handles product cre
 
 **File:** `workflows/product-management/wall_coverings_classifier_workflow.json`
 
-Classifies wall covering products by material, dimensions, and style attributes, then assigns them to the correct Shopify collections and categories automatically.
+Classifies wall covering product images with Gemini into a 4-category system, generates a descriptive panel name, and fills the matching Shopify collection IDs in the sheet.
 
 ---
 
@@ -122,7 +140,7 @@ Classifies wall covering products by material, dimensions, and style attributes,
 
 **Directory:** `workflows/email-automation/`
 
-Five interconnected n8n workflows covering the complete email lifecycle:
+Interconnected n8n workflows covering the complete email lifecycle:
 
 | Workflow | Purpose |
 |---------|---------|
@@ -130,6 +148,7 @@ Five interconnected n8n workflows covering the complete email lifecycle:
 | `Email Sending Automation` | Sends outbound emails based on workflow triggers |
 | `Email To Interested` | Automated follow-up sequence for interested leads |
 | `Email To Manager` | Escalation notifications with context to managers |
+| `Email Warmup` | Runs at 9 AM and 3 PM, round-robining warmup templates across 13 sending workspaces |
 | `Global Error Handler` *(in `workflows/shared/`)* | Catches errors across **all** workflows system-wide and sends alert emails |
 
 ---
@@ -138,20 +157,40 @@ Five interconnected n8n workflows covering the complete email lifecycle:
 
 **Directory:** `workflows/pinterest/`
 
-Six workflows automating the full Pinterest content cycle from product classification to live pin:
+Workflows automating the Pinterest content cycle from product/blog classification to a verified live pin. Pins are scheduled through the **Metricool API**.
 
 | Workflow | Purpose |
 |---------|---------|
-| `product_classifier_workflow` | Classifies products and maps them to Pinterest boards |
-| `pinterest_prepare_workflow` | Prepares pin content — image, title, description, destination URL |
-| `pinterest_verify_workflow` | Validates content against Pinterest guidelines before publishing |
-| `pinterest_publish_workflow` | Publishes approved pins to the correct boards |
-| `shopify_blog_n8n_workflow` | Syncs Shopify blog posts as Pinterest idea pins |
-| `tailwind_list_boards_helper` | Helper workflow for Tailwind board management |
+| `product_classifier_workflow` | AI-classifies products by image into Category + Subcategory |
+| `pinterest_product_photo_prepare_workflow` *(WF0)* | Scans the Drive product-photo folder, uploads new images to Shopify Files, AI-writes pin copy, and queues pins linking to the Shopify product page |
+| `pinterest_prepare_workflow` *(WF1)* | Reads newly posted blogs, extracts images, plans pins, AI-writes copy and auto-assigns boards |
+| `pinterest_publish_workflow` *(WF2)* | Schedules approved pins from both pin tabs in Metricool, with retry and reschedule handling |
+| `pinterest_verify_workflow` *(WF3)* | Polls Metricool and writes back the live Pinterest URL once a pin is published |
+| `shopify_blog_n8n_workflow` | Publishes blog posts to Shopify |
+| `metricool_list_boards_helper` | Pulls Pinterest board names/IDs from Metricool into the boards tab |
 
 ---
 
-### 7. Houzz Scraper
+### 7. AXE AI Email Data Pipeline
+
+**Directory:** `workflows/axe-ai/`
+
+Logs Gmail and Outlook conversations per client into Drive + Sheets, and answers questions over that data with RAG.
+
+| Workflow | Purpose |
+|---------|---------|
+| `email-ingestion/Email Intake Orchestrator` | Reads accounts from a control sheet, searches Gmail/Outlook, reuses or creates each client's Drive folder, attachments subfolder and conversation sheet, and queues message IDs (with a `last_synced_at` watermark) |
+| `message-processors/Gmail Processor` | Every 10 min: reads queued Gmail messages, extracts the latest message text, uploads attachments to Drive, and appends a row to the client conversation sheet |
+| `message-processors/Outlook Processor` | Same as above for Outlook (Microsoft Graph) |
+| `message-processors/Sort All Conversation Sheets by Timestamp` | Manual utility that sorts every client conversation sheet by timestamp |
+| `ai-responder/Email Receiver and Replier` | Monitors mailboxes, stores cases/messages/files in Supabase with embeddings, and drafts RAG-based replies |
+| `rag/RAG Query Interface` | Webhook Q&A endpoint over the Supabase vector store with Cohere reranking |
+
+Flow: Intake Orchestrator → queue sheet → Gmail/Outlook Processors → per-client conversation sheets and Drive attachment folders.
+
+---
+
+### 8. Houzz Scraper
 
 **Directory:** `houzz-scraper/` *(linked as git submodule → [bilalhaider11/houzz_scrapper](https://github.com/bilalhaider11/houzz_scrapper))*
 
@@ -172,27 +211,43 @@ Async Python scraper that extracts product listings and contractor profiles from
 ```
 marblebee/
 ├── workflows/
+│   ├── axe-ai/
+│   │   ├── ai-responder/
+│   │   │   └── Email Receiver and Replier.json
+│   │   ├── email-ingestion/
+│   │   │   └── Email Intake Orchestrator.json
+│   │   ├── message-processors/
+│   │   │   ├── Gmail Processor.json
+│   │   │   ├── Outlook Processor.json
+│   │   │   └── Sort All Conversation Sheets by Timestamp.json
+│   │   └── rag/
+│   │       └── RAG Query Interface.json
 │   ├── image-sync/
-│   │   └── drive_shopify_image_sync.json       # Google Drive → Shopify image sync
+│   │   ├── drive_shopify_image_sync.json           # Google Drive → Shopify image sync
+│   │   └── image_url_health_audit.json             # Report-only dead image link audit
 │   ├── product-management/
 │   │   ├── AI Product Title & Description Generator.json
-│   │   ├── Shopify Merge product sync Pipeline.json
+│   │   ├── Shopify Merge product sync Pipeline (GraphQL).json
+│   │   ├── Shopify Merge product sync Pipeline (GraphQL) - Process Product (sub-workflow).json
 │   │   └── wall_coverings_classifier_workflow.json
 │   ├── shared/
-│   │   └── Global Error Handler.json           # System-wide — covers ALL workflows
+│   │   └── Global Error Handler.json               # System-wide — covers ALL workflows
 │   ├── email-automation/
 │   │   ├── Email Receiving Automation.json
 │   │   ├── Email Sending Automation.json
 │   │   ├── Email To Interested.json
-│   │   └── Email To Manager.json
+│   │   ├── Email To Manager.json
+│   │   ├── Email Warmup.json
+│   │   └── README.md
 │   └── pinterest/
+│       ├── metricool_list_boards_helper.json
 │       ├── pinterest_prepare_workflow.json
+│       ├── pinterest_product_photo_prepare_workflow.json
 │       ├── pinterest_publish_workflow.json
 │       ├── pinterest_verify_workflow.json
 │       ├── product_classifier_workflow.json
-│       ├── shopify_blog_n8n_workflow.json
-│       └── tailwind_list_boards_helper.json
-├── houzz-scraper/                               # Submodule → houzz_scrapper repo
+│       └── shopify_blog_n8n_workflow.json
+├── houzz-scraper/                                   # Submodule → houzz_scrapper repo
 ├── .gitignore
 └── README.md
 ```
@@ -223,9 +278,12 @@ marblebee/
 | Google Drive OAuth2 | Image Sync, all Drive lookups |
 | Google Sheets OAuth2 | All sheet read/write operations |
 | Shopify OAuth2 | Image Sync, Product Sync |
-| OpenAI API | AI Title & Description Generator |
-| Pinterest OAuth2 | Pinterest Publishing Pipeline |
-| Gmail / SMTP | Email Automation workflows |
+| OpenAI API | AI Title & Description Generator, Pinterest, AXE AI |
+| Google Gemini API | Wall Coverings Classifier, AXE AI responder |
+| Metricool (Header Auth, `X-Mc-Auth`) | Pinterest Publishing Pipeline |
+| Gmail OAuth2 / SMTP | Email Automation, AXE AI |
+| Microsoft Outlook OAuth2 | AXE AI Outlook ingestion and processor |
+| Supabase / Cohere | AXE AI responder and RAG |
 
 ### Houzz Scraper
 
