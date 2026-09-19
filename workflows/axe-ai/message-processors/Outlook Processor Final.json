@@ -15,10 +15,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -3984,
-        496
+        -1456,
+        400
       ],
-      "id": "d6441ffc-1a3f-4802-bc19-5085e0a78708",
+      "id": "f18247b4-dd8d-45d6-856d-cc820b4013c4",
       "name": "Schedule Trigger"
     },
     {
@@ -39,14 +39,11 @@
           "values": [
             {
               "lookupColumn": "Processed",
-              "lookupValue": "="
+              "lookupValue": "false"
             },
             {
-              "lookupColumn": "source"
-            },
-            {
-              "lookupColumn": "mainf4_id",
-              "lookupValue": "1mPRYdqz3GMiow9QCuuK-gsL8ebPg1pNl"
+              "lookupColumn": "source",
+              "lookupValue": "email"
             }
           ]
         },
@@ -55,10 +52,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -3728,
-        496
+        -1200,
+        400
       ],
-      "id": "0216b839-2ac4-4c81-b68a-c47dcb0e0794",
+      "id": "3e44b95d-9f2f-4de3-8e84-eaba7063a9d9",
       "name": "Load Queued Messages from Queue Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -74,10 +71,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -3472,
-        496
+        -656,
+        400
       ],
-      "id": "6459b840-9b3e-4fdd-95a7-353843fb4efb",
+      "id": "bc801008-db6e-4bc5-905a-2323b104ee68",
       "name": "Loop | Outlook Message IDs"
     },
     {
@@ -109,10 +106,10 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        -3184,
-        512
+        -368,
+        192
       ],
-      "id": "2eb2ebab-81a2-41dd-8640-533e10d576c9",
+      "id": "53d6bb94-495b-476f-99d5-3f8e74762f52",
       "name": "Outlook | Fetch Message + Attachments",
       "webhookId": "c1c331d7-f9bd-4045-b252-f530d984d7e9",
       "credentials": {
@@ -129,14 +126,15 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2848,
-        512
+        -32,
+        192
       ],
-      "id": "de9e0787-b042-4228-8654-49c4a8df19e5",
+      "id": "28170fc2-c919-44a8-b4ee-78cf3389766f",
       "name": "Normalize | Extract Message Metadata"
     },
     {
       "parameters": {
+        "method": "GET",
         "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sheet_id + '?fields=sheets.properties.title' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleSheetsOAuth2Api",
@@ -145,13 +143,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -2592,
-        512
+        224,
+        192
       ],
-      "id": "7a0925de-2743-4538-bf59-6d7ea24b647a",
+      "id": "get-conversation-sheet-tab-name-outlook",
       "name": "Get Conversation Sheet Tab Name",
-      "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -166,10 +162,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2336,
-        512
+        480,
+        192
       ],
-      "id": "f0d3f9a3-831d-401a-bcf7-6fd5bb2038cb",
+      "id": "extract-tab-name-outlook",
       "name": "Extract Tab Name"
     },
     {
@@ -209,21 +205,19 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -2080,
-        512
+        736,
+        192
       ],
-      "id": "03fdd51e-1b32-44ef-b774-4b30266229d4",
+      "id": "sheets-find-existing-message-row-outlook",
       "name": "Sheets | Find Existing Message Row",
       "alwaysOutputData": true,
-      "retryOnFail": true,
-      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
           "name": "Template_control"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
@@ -232,10 +226,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1808,
-        512
+        992,
+        192
       ],
-      "id": "52b9f7d6-8b92-41f1-92c6-c027bc77c10e",
+      "id": "restore-message-data-after-lookup-outlook",
       "name": "Restore Message Data After Lookup"
     },
     {
@@ -266,10 +260,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1552,
-        512
+        1248,
+        192
       ],
-      "id": "bc2e5028-3f5f-400a-9b2f-9409aac42439",
+      "id": "message-already-logged-gate-outlook",
       "name": "Message Already Logged?"
     },
     {
@@ -300,23 +294,23 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2864,
-        800
+        1504,
+        96
       ],
-      "id": "1349b3b9-ef71-46f0-a258-a3a37623a14b",
+      "id": "77ccfd7e-87fb-41ea-86ab-d7a20ebc6eb0",
       "name": "If Has Attachments"
     },
     {
       "parameters": {
-        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach((item, itemIndex) => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            },\n            // This fans one email out into N attachment items -- without\n            // pairedItem, n8n loses the lineage back to that source item,\n            // and every downstream $('SomeNode').item lookup (the Message\n            // Already Logged? read in Merge | Add Drive Links, the Loop |\n            // Outlook Message IDs subf5_id read in the Drive nodes) throws\n            // \"Cannot read properties of undefined (reading 'pairedItem')\"\n            // for any email that actually has an attachment.\n            pairedItem: itemIndex\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2576,
-        784
+        1760,
+        -32
       ],
-      "id": "595dc228-093f-486d-ac05-f82d78b615a3",
+      "id": "ab4429f5-e428-4c20-b4be-4082796fc7d5",
       "name": "Expand | Split Attachments"
     },
     {
@@ -336,14 +330,12 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -2320,
-        784
+        2016,
+        -32
       ],
-      "id": "bd1a7ea4-28df-4f00-baa0-7f88927f6d14",
+      "id": "drive-find-existing-attachment-outlook",
       "name": "Drive | Find Existing Attachment",
       "alwaysOutputData": true,
-      "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
@@ -353,15 +345,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\n// Track each candidate's own ARRAY POSITION in `candidates` (this node's\n// real $input), not just which attachment it belongs to. pairedItem must\n// point at a real index into this node's own input for n8n to keep the\n// lineage chain unbroken -- using the attachment's index instead (0, 1, 2..)\n// breaks the moment any earlier attachment returns more than one candidate\n// (search node's 'Drive | Find Existing Attachment' has alwaysOutputData on\n// so every attachment adds at least one, but not always exactly one, entry\n// to this flat list), which shifts every later attachment's true position\n// out from under that naive index and corrupts the chain downstream --\n// every $('SomeNode').item lookup after this node (the message-metadata\n// read in 'Merge | Add Drive Links', the folder id read in 'Drive | Upload\n// Attachment') then throws \"Cannot read properties of undefined (reading\n// 'pairedItem')\" for any email whose attachment search fanned out.\nconst byOrigin = new Map();\ncandidates.forEach((c, candidateIndex) => {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) return;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, { items: [], firstCandidateIndex: candidateIndex });\n  byOrigin.get(idx).items.push(c);\n});\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx);\n  const items = group?.items || [];\n  const exact = items.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: group ? group.firstCandidateIndex : 0\n  };\n});"
+        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\nconst byOrigin = new Map();\nfor (const c of candidates) {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) continue;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, []);\n  byOrigin.get(idx).push(c);\n}\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx) || [];\n  const exact = group.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2064,
-        784
+        2272,
+        -32
       ],
-      "id": "10c33acd-caff-470f-a3ac-d3e558dfc466",
+      "id": "pick-exact-attachment-match-outlook",
       "name": "Pick Exact Attachment Match"
     },
     {
@@ -393,10 +385,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1808,
-        784
+        2528,
+        -32
       ],
-      "id": "a20e6bcc-e974-4fc8-8fe4-9ebfcc762a3c",
+      "id": "attachment-already-uploaded-gate-outlook",
       "name": "Attachment Already Uploaded?"
     },
     {
@@ -420,14 +412,13 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -1552,
-        768
+        2784,
+        -96
       ],
-      "id": "bba67c8a-24f0-43d7-a36b-cc28babde03a",
+      "id": "b5674e91-5a24-4986-bb10-98f8b7105230",
       "name": "Drive | Upload Attachment",
       "alwaysOutputData": false,
       "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
@@ -437,28 +428,28 @@
     },
     {
       "parameters": {
-        "jsCode": "// 'Pick Exact Attachment Match' only sets _existingFileWebViewLink from\n// the Drive search result's own webViewLink -- that search response isn't\n// guaranteed to include it either, so fall back to the same canonical\n// Drive URL format built from the file id it always does return.\nreturn $input.all().map(item => ({\n  json: {\n    webViewLink: item.json._existingFileWebViewLink\n      || (item.json._existingFileId ? `https://drive.google.com/file/d/${item.json._existingFileId}/view?usp=drivesdk` : null)\n  },\n  pairedItem: item.pairedItem\n}));"
+        "jsCode": "return $input.all().map(item => ({ json: { webViewLink: item.json._existingFileWebViewLink }, pairedItem: item.pairedItem }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2640,
-        1184
+        2784,
+        96
       ],
-      "id": "664a565d-6553-46e3-b134-47973fadd856",
+      "id": "existing-attachment-resolved-outlook",
       "name": "Existing Attachment (Resolved)"
     },
     {
       "parameters": {
-        "jsCode": "// Get previous node data -- drop tabName, it's routing metadata (which\n// tab of the conversation sheet to write to) used by upstream/downstream\n// nodes, not a column that belongs in the sheet itself.\nconst { tabName, ...previousData } = $('Message Already Logged?').item.json;\n\n// When a message has no attachments, 'If Has Attachments'' false branch\n// feeds this node the single ORIGINAL message item untouched -- NOT a\n// Drive file result. That item's own `id` is the Outlook message id\n// (e.g. 'AAMkADEzYjVk...'), so treating it as a fallback Drive file id\n// synthesized a bogus drive.google.com link on every attachment-less row.\n// Only ever read $input as Drive results when this message actually went\n// through the attachment branch.\n//\n// 'Drive | Upload Attachment' has no explicit `fields` option, so its\n// response isn't guaranteed to include webViewLink -- only `id` is\n// guaranteed on any real Drive file response. Rebuild the same canonical\n// URL Drive itself uses (confirmed identical to what the search path\n// already returns) from the id whenever webViewLink itself didn't come\n// back, instead of silently saving a blank link for a file that really is\n// sitting in Drive.\nconst links = previousData.hasAttachments\n  ? $input.all()\n      .map(item => item.json.webViewLink\n        || (item.json.id ? `https://drive.google.com/file/d/${item.json.id}/view?usp=drivesdk` : null))\n      .filter(link => !!link)\n  : [];\n\n// Collect all webViewLinks -- named 'webViewLink1'/'webViewLink2'/... to\n// match the conversation sheet's actual existing header columns. A prior\n// version of this named them 'attachment1'/'attachment2', which didn't\n// match any existing header, so autoMapInputData created a brand new\n// 'attachment1' column instead of populating the real webViewLink1/2\n// columns every other row (Gmail included) already uses.\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`webViewLink${index + 1}`] = link;\n});\n\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
+        "jsCode": "// Get previous node data\nconst previousData = $('Message Already Logged?').item.json;\n\n// Collect all webViewLinks -- named 'attachment1'/'attachment2'/... to match\n// the Gmail processor's convention (these were previously 'webViewLink1'/\n// '...2', which would have populated separate, unused columns instead of\n// the sheet's real 'attachment1'/'attachment2' headers).\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields\n    }\n  }\n];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2240,
-        1184
+        3040,
+        0
       ],
-      "id": "be4422cd-7342-406b-9605-67880cf9632b",
+      "id": "9a1eb0ec-e007-41f8-bb19-7aaf04af14c4",
       "name": "Merge | Add Drive Links"
     },
     {
@@ -477,181 +468,8 @@
         "columns": {
           "mappingMode": "autoMapInputData",
           "value": {},
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "sheet_id",
-              "displayName": "sheet_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "message",
-              "displayName": "message",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "senderEmail",
-              "displayName": "senderEmail",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "receiverEmails",
-              "displayName": "receiverEmails",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "direction",
-              "displayName": "direction",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "timestamp",
-              "displayName": "timestamp",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "subject",
-              "displayName": "subject",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "hasAttachments",
-              "displayName": "hasAttachments",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "webViewLink1",
-              "displayName": "webViewLink1",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "webViewLink2",
-              "displayName": "webViewLink2",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "fromEmail",
-              "displayName": "fromEmail",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "fromName",
-              "displayName": "fromName",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "toEmail",
-              "displayName": "toEmail",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "toName",
-              "displayName": "toName",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "tabName",
-              "displayName": "tabName",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "_alreadyLogged",
-              "displayName": "_alreadyLogged",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            }
-          ],
+          "matchingColumns": [],
+          "schema": [],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         },
@@ -660,13 +478,12 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -1984,
-        1184
+        3296,
+        192
       ],
-      "id": "d58176ba-8857-40d0-95ca-8e9c0e1f8b80",
+      "id": "dc933fb3-15bf-418c-aba6-0a0fafe3d1a7",
       "name": "Sheets | Log Message Row",
       "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -676,7 +493,7 @@
     },
     {
       "parameters": {
-        "operation": "update",
+        "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
           "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
@@ -684,17 +501,19 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "Sheet1",
-          "mode": "name"
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "Processed": "TRUE",
-            "row_number": "={{ $json.row_number }}"
+            "id": "={{ $('Load Queued Messages from Queue Sheet').item.json.id }}",
+            "Processed": "true"
           },
           "matchingColumns": [
-            "row_number"
+            "id"
           ],
           "schema": [
             {
@@ -705,7 +524,7 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
-              "removed": true
+              "removed": false
             },
             {
               "id": "threadId",
@@ -784,38 +603,23 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "row_number",
-              "displayName": "row_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "readOnly": true,
-              "removed": false
+              "canBeUsedToMatch": true
             }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         },
-        "options": {
-          "cellFormat": "RAW"
-        }
+        "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -1600,
-        1184
+        3552,
+        192
       ],
-      "id": "8084dff1-cc28-465e-9735-7942c2a78ce3",
+      "id": "9f70cff3-fef2-4c72-8a1c-e71a4c8a6df0",
       "name": "Sheets | Mark Queue Row Processed",
       "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -1056,17 +860,6 @@
           }
         ]
       ]
-    },
-    "Sheets | Mark Queue Row Processed": {
-      "main": [
-        [
-          {
-            "node": "Loop | Outlook Message IDs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "active": false,
@@ -1074,11 +867,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "426d792c-8a4b-45f9-abe9-75c52e21aa44",
+  "versionId": "00000000-0000-0000-0000-000000000003",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
   "nodeGroups": [],
-  "id": "wrJK37lHtbocGTnO",
+  "id": "XwwicP3Ug6baCjYZiXS60",
   "tags": []
 }

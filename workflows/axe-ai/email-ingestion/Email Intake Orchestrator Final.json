@@ -1,0 +1,1792 @@
+{
+  "name": "AXE AI | Email Intake → Drive + Sheets Orchestrator Final",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Reuse-or-create + watermark + single-path consolidation\n\n**Reuse-or-create:** before, every run unconditionally created a new client root folder, attachments subfolder, and conversation sheet -- even for a client that already had them, duplicating everything and re-logging their entire history the moment `Processed` got reset to false. Now, each of the 3 resources is preceded by a Find -> Pick Exact Match -> If Found trio (same pattern already used in drive_shopify_image_sync.json's 'Find Category Folder'/'Pick Exact Category Match'). Found -> reuse its id, skip creating. Not found -> create exactly as before. Downstream nodes read from a stable '... (Resolved)' node instead of the Create node directly, since the Create node no longer always runs. New accounts with no existing folder are unaffected -- same create + full-history-fetch behavior as before.\n\n**Watermark:** the control sheet needs a `last_synced_at` column (manually add the header -- blank = new account). Gmail search is scoped to `after:<date>` when present; each successful run writes the new `last_synced_at` back alongside `Processed: true`.\n\n**Outlook watermark:** Microsoft Graph won't combine $search (needed for \"from OR to\" matching) with $filter (needed for a date range) in one request, and toRecipients isn't $filter-able at all -- confirmed against Graph's docs. So Outlook still calls the API with the full-history search, but 'Normalize Outlook Messages' filters the results client-side against last_synced_at before anything gets queued.\n\n**Single-path consolidation:** this workflow used to have two nearly-identical parallel paths -- a \"single-provider\" path (triggered when Platform was exactly \"gmail\" or \"outlook\") and a \"merged\" path (triggered otherwise, handling accounts active on both providers). The only reason two paths existed was that the merged path's account-splitting logic did `JSON.parse(Platform)`, which throws on a plain \"gmail\"/\"outlook\" string -- not an actual difference in what needed to happen. That parsing was made tolerant of both a plain string and a JSON array (treating a plain string as a single-element array), so the merged path's already-optional-chained gmail/outlook handling now correctly covers the single-provider case too. The single-provider path (its own copy of the reuse-or-create trio, its own Gmail/Outlook search+normalize, its own queue/mark-processed nodes -- 39 nodes) was deleted; every account now goes through what used to be only the \"merged\" path. 82 nodes -> 43, no loss of behavior.\n\n**Not yet addressed:** per-message/per-attachment dedup for anything that still gets queued despite the watermark (Outlook's full-history refetch, or anything the Gmail date-scoping doesn't catch) -- relies on the Gmail/Outlook Processor Final sub-workflows, not yet implemented. Also, nothing resets `Processed` back to false automatically -- still a manual action; the watermark only matters once someone does that for an account that already has infrastructure.\n\n**Drive scoping audit (no global search):** confirmed every Google Drive operation in this workflow is parent-scoped, none search Drive-wide. Search nodes (`📂 Find Client Root Folder`, `📂 Find Attachments Subfolder`, `📂 Find Conversation Sheet`) all set `filter.folderId`. Create nodes (`Create Client Root Folder`, `Create Attachments Subfolder`) and `Move Sheet to Client Folder` all set an explicit parent `folderId`. The only exception is `Create Conversation Sheet` (Google Sheets node) landing wherever the credential's default location is on creation -- the Sheets API has no create-with-parent option -- but `Move Sheet to Client Folder` relocates it into the resolved client root folder immediately after, in the same execution.\nFolder hierarchy (top -> bottom): `1a6nPIjW5VLARperP9yrSqXJMDmfojqUl` (top-level Axe AI parent -- corrected; superseded 1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr, which was the older/wrong top folder) contains the 3 provider parents used as `folder_id` in 'Combine Gmail & Outlook Per Client' -- gmail-only `1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE`, outlook-only `1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8`, combined `102oeld1yMYGMmWs2Od198HqO1KeVhv_n` -- each of which contains that provider's per-client folders, each of which contains that client's attachments subfolder + conversation sheet. Every search/create already resolves within this tree, so no change was needed to scope things \"inside this folder\" -- it already was.\n\n**Fixed: zero-new-messages stalled the loop.** Root cause identical in shape to the earlier \"empty Platform kills the loop\" bug, just one stage later: `Expand Gmail Message IDs` / `Expand Outlook Message IDs` return 0 items when an account has no new mail on that side, and by default n8n doesn't run a node at all when its only input produced 0 items -- so when BOTH sides are empty (nothing new anywhere for that account this cycle), `Merge Expanded Messages` never fires, which means `Queue Messages` never fires, which means `Mark Account Processed` never fires -- and since `Mark Account Processed` was the only thing looping back into `For Each Account`, that account (and every account still left in the batch) stalled silently, exactly like Michael Latifi's case did earlier. Fixed by turning on \"Always Output Data\" on `Merge Expanded Messages` (so it emits one placeholder item instead of nothing when both sides are truly empty) and adding `❓ Any New Messages?` right after it, gating on `{{ $json.id }}` notEmpty: real messages -> unchanged path through `Queue Messages` -> `Mark Account Processed`; no messages -> straight to `Mark Account Processed`, bypassing `Queue Messages` entirely so the placeholder item never risks writing a blank row into the queue sheet (the same mistake \"Always Output Data\" caused once already, when it was tried on `Queue Messages` directly instead).",
+        "height": 1744,
+        "width": 848
+      },
+      "id": "c46a5d28-b16e-4fc9-99aa-626f70083f6a",
+      "name": "README - Reuse-or-Create + Watermark + Consolidation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        6224,
+        4320
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1SM-fEJ71XiL7cS464X4jUCFhY_A1b96bHvaZeNgvYr8",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SM-fEJ71XiL7cS464X4jUCFhY_A1b96bHvaZeNgvYr8/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Processed",
+              "lookupValue": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        7712,
+        4864
+      ],
+      "id": "74d75338-6475-4aa1-a21b-92201eaea94b",
+      "name": "Load Accounts from Control Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        7984,
+        4864
+      ],
+      "id": "90e6af54-cf2d-41f4-8606-e19194bce2cd",
+      "name": "For Each Account"
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.googleQuery }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        9024,
+        4176
+      ],
+      "id": "4437495c-082a-4bb1-9d1c-52d96856f20d",
+      "name": "Gmail API | Search Messages (Emily)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst Email = $('Build Gmail Search Query').item.json.Email\nconst Name = $('Build Gmail Search Query').item.json.Name\nfor (const item of $input.all()) {\n  item.json.by_mail = 'sales_emily';\n  item.json.to_mail = Email;\n  item.json.Name = Name;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9248,
+        4176
+      ],
+      "id": "5d5526a8-3f5b-42e8-8a59-c689b497dbce",
+      "name": "Tag Mailbox (Emily)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst Email = $('Build Gmail Search Query').item.json.Email\nconst Name = $('Build Gmail Search Query').item.json.Name\nfor (const item of $input.all()) {\n  item.json.by_mail = \"sales_terry\";\n  item.json.to_mail = Email;\n  item.json.Name = Name;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9248,
+        4400
+      ],
+      "id": "837758b6-97c2-4226-b7a5-a4b2a07facc2",
+      "name": "Tag Mailbox (Terry)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst Email = $('Build Gmail Search Query').item.json.Email\nconst Name = $('Build Gmail Search Query').item.json.Name\nfor (const item of $input.all()) {\n  item.json.by_mail = \"sales_office\";\n  item.json.to_mail = Email;\n  item.json.Name = Name;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9248,
+        4624
+      ],
+      "id": "4b8d1e3c-2d5e-429f-a882-b61d0aeeb96c",
+      "name": "Tag Mailbox (Office)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  let googleQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    googleQuery += i !== 0 ? ' OR ' : ''\n    googleQuery += `from:${email} OR to:${ email }`\n\n  })\n\n  // Only search messages since the last successful sync for this account --\n  // avoids re-fetching (and the sub-workflow re-logging) a client's entire\n  // mailbox history on every run once they already have a conversation\n  // sheet. A brand-new account has no last_synced_at yet, so it still gets\n  // the full history, same as before this existed.\n  const lastSyncedAt = item.json.last_synced_at;\n  if (lastSyncedAt) {\n    const d = new Date(lastSyncedAt);\n    if (!isNaN(d.getTime())) {\n      const gmailDate = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;\n      googleQuery += ` after:${gmailDate}`;\n    }\n  }\n  item.json.googleQuery = googleQuery;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8784,
+        4400
+      ],
+      "id": "9ecfe009-74c9-4729-b8bb-67252395ba9d",
+      "name": "Build Gmail Search Query"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  let outlookQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n\n    outlookQuery += i !== 0 ? ' OR ' : ''\n    outlookQuery += `${email}`\n  })\n  item.json.outlookQuery = outlookQuery;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9040,
+        4880
+      ],
+      "id": "04631013-7477-44b6-a0d1-74a322b96b4f",
+      "name": "Build Outlook Search Query"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        9488,
+        4384
+      ],
+      "id": "20019e8f-8f09-45cc-9d77-0607f50d6f0c",
+      "name": "Merge Gmail Mailbox Results"
+    },
+    {
+      "parameters": {
+        "method": "=GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.googleQuery }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        9024,
+        4400
+      ],
+      "id": "2a2da75b-ec47-4c1c-a37f-d5ee3e61fae6",
+      "name": "Gmail API | Search Messages (Terry)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b15d3178-74f1-4eec-a08d-d1fcf01855c2",
+              "leftValue": "={{ $json.Platform }}",
+              "rightValue": "gmail",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8816,
+        4864
+      ],
+      "id": "dab7be7e-fbf9-4d69-9a41-4e51902fac52",
+      "name": "❓ Gmail or Outlook?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\nconst head_email = $input.first().json.Email\nfor (const item of items) {\n  const json = item.json;\n\n  // Split emails\n  const emails = (json.Email || \"\")\n    .split(',')\n    .map(e => e.trim())\n    .filter(Boolean);\n\n  // Parse Platform safely -- this used to only ever see a JSON-array string\n  // (e.g. '[\"gmail\",\"outlook\"]') because plain single-provider accounts\n  // (\"gmail\" / \"outlook\" with no brackets) were routed down a separate,\n  // now-removed path instead of reaching this node. Now every account comes\n  // through here, so a plain string must also be accepted -- treated as a\n  // single-element array, which the rest of this function already handles\n  // correctly as the \"one provider\" case.\n  let platforms = [];\n  const rawPlatform = json.Platform;\n  if (Array.isArray(rawPlatform)) {\n    platforms = rawPlatform;\n  } else {\n    try {\n      const parsed = JSON.parse(rawPlatform);\n      platforms = Array.isArray(parsed) ? parsed : [parsed];\n    } catch {\n      platforms = rawPlatform ? [rawPlatform] : [];\n    }\n  }\n\n  // ---- CASE 1: Single email, multiple platforms ----\n  if (emails.length === 1 && platforms.length > 1) {\n    for (const rawPlatform of platforms) {\n      if (!rawPlatform) continue;\n      // Normalize + validate the same way CASE 2 below already does --\n      // this branch used to pass the raw array value straight through\n      // unchecked, so anything other than an exact lowercase \"gmail\" or\n      // \"outlook\" (e.g. \"Gmail\", a stray space) would silently fail the\n      // downstream \"Gmail or Outlook?\" equality check and get routed to\n      // Outlook regardless of what it actually was, with no error.\n      const platform = String(rawPlatform).trim().toLowerCase();\n      if (platform !== 'gmail' && platform !== 'outlook') continue;\n\n      output.push({\n        json: {\n          ...json,\n          Email: emails[0],\n          mails:head_email,\n          Platform: platform\n        }\n      });\n    }\n    continue;\n  }\n\n  // ---- CASE 2: Multiple emails (normal mapping) ----\n  const gmailEmails = [];\n  const outlookEmails = [];\n\n  for (let i = 0; i < emails.length; i++) {\n    const email = emails[i];\n    const platform = platforms[i];\n\n    if (!platform || platform === \"None\") continue;\n\n    if (Array.isArray(platform)) {\n      if (platform.includes(\"gmail\")) gmailEmails.push(email);\n      if (platform.includes(\"outlook\")) outlookEmails.push(email);\n    } else {\n      if (platform === \"gmail\") gmailEmails.push(email);\n      if (platform === \"outlook\") outlookEmails.push(email);\n    }\n  }\n\n  if (gmailEmails.length) {\n    output.push({\n      json: {\n        ...json,\n         mails:head_email,\n        Email: gmailEmails.join(','),\n        Platform: \"gmail\"\n      }\n    });\n  }\n\n  if (outlookEmails.length) {\n    output.push({\n      json: {\n        ...json,\n        mails:head_email,\n        Email: outlookEmails.join(','),\n        Platform: \"outlook\"\n      }\n    });\n  }\n\n  // Neither branch matched anything for this account -- e.g. Platform is\n  // blank/unset (a row that hasn't been classified yet). Returning zero\n  // items here would silently kill the loop: n8n stops the whole branch\n  // when a node produces no output, which breaks the loop-back into\n  // \"For Each Account\" and stalls every account still queued after this\n  // one, not just this one. Emit an explicit \"unclassified\" marker\n  // instead so the next node can route it straight back to the loop.\n  if (!gmailEmails.length && !outlookEmails.length) {\n    output.push({ json: { ...json, mails: head_email, Platform: '' } });\n  }\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8272,
+        4880
+      ],
+      "id": "a51a30df-7ff9-4c28-a463-e0c3bf8afbc0",
+      "name": "Split Multi-Platform Account by Provider"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst data = $('Build Gmail Search Query').item.json;\nconst row_number = data.row_number;\nconst querymail = data.mails;\nconst allMessages = [];\n\nfor (const item of items) {\n  const messages = item.json.messages || [];\n  const fromEmail = item.json.by_mail; // get sender for this batch\n\n  messages.forEach(msg => {\n    allMessages.push({\n      ...msg,\n      from_email: fromEmail, // attach sender to each message\n    });\n  });\n}\n\nreturn [\n  {\n    json: {\n      row_number:row_number,\n      querymail:querymail,\n      resource: 'gmail',\n      email: $input.first().json.to_mail,\n      name: $input.first().json.Name,\n      messages: allMessages\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9728,
+        4400
+      ],
+      "id": "5fcbb8d5-a683-453e-a6a2-f1419ebd9b16",
+      "name": "Normalize Gmail Messages"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        9776,
+        4864
+      ],
+      "id": "33e2bd7e-afb3-4f20-8ac6-00840b562d69",
+      "name": "Merge Gmail + Outlook Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items.length) return [];\n\n// Find gmail & outlook objects safely\nconst gmailItem = items.find(i => i.json.resource === 'gmail');\nconst outlookItem = items.find(i => i.json.resource === 'outlook');\n\n// ------------------\n// Merge base fields\n// ------------------\nconst merged = {\n  row_number: gmailItem?.json.row_number ?? outlookItem?.json.row_number,\n  name: gmailItem?.json.name ?? outlookItem?.json.name,\n  querymail: gmailItem?.json.querymail ?? outlookItem?.json.querymail,\n\n  // Combined resource string\n  resource: items.map(i => i.json.resource).join(','),\n\n  gmail: gmailItem\n    ? {\n        email: gmailItem.json.email,\n        messages: gmailItem.json.messages || []\n      }\n    : null,\n\n  outlook: outlookItem\n    ? {\n        email: outlookItem.json.email,\n        ids: outlookItem.json.ids || []\n      }\n    : null\n};\n\n// ------------------\n// Email merge + dedup\n// ------------------\nconst rawEmails = [\n  merged.gmail?.email,\n  merged.outlook?.email\n].filter(Boolean);\n\nconst combinedEmails = [\n  ...new Set(\n    rawEmails\n      .flatMap(e => e.split(','))\n      .map(e => e.trim())\n      .filter(Boolean)\n  )\n].join(',');\n\n// ------------------\n// Final output object\n// ------------------\nreturn [\n  {\n    json: {\n      row_number: merged.row_number,\n      name: merged.name,\n      querymail: merged.querymail,\n      resource: merged.resource,\n      email: combinedEmails,\n      gmail: merged.gmail,\n      outlook: merged.outlook,\n      // Three different Drive parent folders exist from before the single-\n      // provider path was consolidated into this one: gmail-only clients,\n      // outlook-only clients, and dual-provider clients each live under a\n      // different parent. This used to be picked correctly for gmail-only /\n      // outlook-only accounts by \"Detect Email Provider\", which got deleted\n      // along with the rest of that path during the node-count cleanup --\n      // leaving every account hardcoded to the dual-provider parent only,\n      // so an existing single-provider client's folder was never found by\n      // the reuse-or-create search (wrong parent), and a duplicate would\n      // get created under the wrong location instead.\n      folder_id: (merged.gmail && merged.outlook)\n        ? \"102oeld1yMYGMmWs2Od198HqO1KeVhv_n\"   // dual-provider (combined) parent\n        : merged.gmail\n        ? \"1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE\"    // gmail-only parent\n        : \"1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8\"    // outlook-only parent\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10032,
+        4864
+      ],
+      "id": "45e3839f-00c4-4dc2-87b6-00c0efe6aa96",
+      "name": "Combine Gmail & Outlook Per Client"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1SM-fEJ71XiL7cS464X4jUCFhY_A1b96bHvaZeNgvYr8",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SM-fEJ71XiL7cS464X4jUCFhY_A1b96bHvaZeNgvYr8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email": "={{ $('Combine Gmail & Outlook Per Client').item.json.querymail }}",
+            "Processed": "true",
+            "last_synced_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Processed",
+              "displayName": "Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_synced_at",
+              "displayName": "last_synced_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        11968,
+        5680
+      ],
+      "id": "18c94721-2710-4c5d-8f50-e3c2e237d1d9",
+      "name": "Mark Account Processed",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resource }}",
+                    "rightValue": "gmail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "51137e73-9b86-41a0-afe2-11dd95b79437"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "gmail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0041f684-437b-4eae-9d01-6da6bd13db79",
+                    "leftValue": "={{ $json.resource }}",
+                    "rightValue": "outlook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "outlook"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        11040,
+        5632
+      ],
+      "id": "fdc33d3e-24f6-4faa-afbc-0616dde0ebcc",
+      "name": "Route by Resource"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $items('Combine Gmail & Outlook Per Client', 0);\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  const base = {\n    row_number: data.row_number,\n    name: data.name,\n  };\n\n  // Gmail object\n  if (data.gmail) {\n    results.push({\n      json: {\n        ...base,\n        resource: 'gmail',\n        email: data.gmail.email,\n        messages: data.gmail.messages\n      }\n    });\n  }\n\n  // Outlook object\n  if (data.outlook) {\n    results.push({\n      json: {\n        ...base,\n        resource: 'outlook',\n        email: data.outlook.email,\n        ids: data.outlook.ids\n      }\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10688,
+        5632
+      ],
+      "id": "8a7b626a-2418-48a2-8c84-96c88e48f065",
+      "name": "Split Combined Result by Provider"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        11280,
+        5920
+      ],
+      "id": "5aac627b-211f-45c5-9b46-258afe8c76fe",
+      "name": "Merge Expanded Messages",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.googleQuery }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        9024,
+        4624
+      ],
+      "id": "941c961b-0bc2-4644-b453-35eafe7578f3",
+      "name": "Gmail API | Search Messages (Office)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 1000,
+        "filtersUI": {
+          "values": {
+            "filterBy": "search",
+            "search": "={{ $('Build Outlook Search Query').item.json.outlookQuery }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        9296,
+        4880
+      ],
+      "id": "38f5cb2b-009b-4b5d-900c-6525de35891b",
+      "name": "Outlook API | Search Messages",
+      "webhookId": "d626b425-8dc0-4a90-8942-8efd9ec72be2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Microsoft Graph does not allow combining $search (needed here to match\n// \"from OR to\" across possibly multiple addresses in one query) with $filter\n// (needed for a receivedDateTime range) in the same request -- confirmed\n// against Graph's own docs, not guessed. toRecipients also isn't filterable\n// via $filter at all, so switching to $filter would silently drop the \"to\"\n// side of the match. So the date scoping happens here instead, client-side,\n// after the (still full-history) search returns -- less efficient than a\n// server-side date filter would be, but correct and doesn't lose \"to\"\n// matches. A brand-new account has no last_synced_at yet, so nothing here\n// gets filtered out for it -- same full-history behavior as before.\nconst data = $('❓ Gmail or Outlook?').first().json;\nconst rowdata = $('Build Outlook Search Query').item.json\n\nconst row_number = rowdata.row_number;\nconst querymail = rowdata.mails;\n\nconst lastSyncedAt = data.last_synced_at ? new Date(data.last_synced_at) : null;\nconst isNewEnough = (item) => {\n  if (!lastSyncedAt || isNaN(lastSyncedAt.getTime())) return true;\n  const ts = item.json.receivedDateTime || item.json.sentDateTime;\n  if (!ts) return true;\n  return new Date(ts) >= lastSyncedAt;\n};\n\n// get all incoming messages (current node input) in DESC order\nconst messages = [...$input.all()].filter(isNewEnough).reverse();\n\n// extract only VALID ids\nconst ids = messages\n  .map(item => item.json.id)\n  .filter(id => id); // 🔥 removes null, undefined, empty\n\n// 🚫 if no ids, return nothing\nif (ids.length === 0) {\n  return [];\n}\n\n// ✅ return only when ids exist\nreturn [\n  (() => {\n    const result = {\n      json: {\n        row_number:row_number,\n        querymail:querymail,\n        resource: \"outlook\",\n        email: data.Email,\n        by_mail:\"outlook\",\n        name: data.Name,\n        ids,\n      }\n    };\n    return result;\n  })(),\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9552,
+        4880
+      ],
+      "id": "db8aa8a2-269a-4c1c-8445-7364ed0746a7",
+      "name": "Normalize Outlook Messages",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "threadId",
+              "displayName": "threadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "by_mail",
+              "displayName": "by_mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sheet_id",
+              "displayName": "sheet_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mainf4_id",
+              "displayName": "mainf4_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subf5_id",
+              "displayName": "subf5_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "index",
+              "displayName": "index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Processed",
+              "displayName": "Processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        12032,
+        5904
+      ],
+      "id": "4cbed863-df19-49d5-a4e6-4e7d34357e13",
+      "name": "Queue Messages",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Combine Gmail & Outlook Per Client').item.json.name }} <{{ $('Combine Gmail & Outlook Per Client').item.json.email }}>",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Combine Gmail & Outlook Per Client').item.json.folder_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        8288,
+        5168
+      ],
+      "id": "368f2a27-60c3-41fa-a776-ddbd0486ddb2",
+      "name": "Create Client Root Folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "attachments",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('📁 Client Root Folder (Resolved)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        9152,
+        5616
+      ],
+      "id": "c972f9c9-9bee-44d3-8c5d-90bd98235fe4",
+      "name": "Create Attachments Subfolder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('📁 Client Root Folder (Resolved)').item.json.id }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        10320,
+        5344
+      ],
+      "id": "769930ff-e6c9-4446-bd09-ceb648f9dc75",
+      "name": "Move Sheet to Client Folder",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "=conversation",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "sheet1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        10048,
+        5888
+      ],
+      "id": "97877caa-4154-470d-96ee-588e67ad41e5",
+      "name": "Create Conversation Sheet",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const idsArr = $input.first().json.ids;\n\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\nconst by_mail = $input.first().json.resource;\nconst row_number = $input.first().json.row_number;\n\nreturn idsArr.map((id, i) => ({\n  json: {\n    id,\n    row_number,\n    by_mail,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index: i,\n    // Must match Gmail's field names/casing exactly ('source' + capital\n    // 'Processed') -- the queue sheet is shared and appended via\n    // autoMapInputData, so a mismatched field name here creates a SEPARATE,\n    // unused column instead of populating the one every processor's queue\n    // filter actually reads (Processed = false AND source = email). This\n    // previously left every Outlook-sourced queue row permanently\n    // unmatched by that filter -- never picked up by any processor.\n    source: 'email',\n    Processed: false\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10960,
+        5936
+      ],
+      "id": "d0e61bd8-fae9-4d2e-89fa-1e0d3dfeddc5",
+      "name": "Expand Outlook Message IDs",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get messages array from previous node\nconst messagesArr = $input.first().json.messages\nconst row_number = $input.first().json.row_number\n// Get parent info\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\n// Map over messages array\nreturn messagesArr.map((msg, index) => ({\n  json: {\n    id: msg.id,\n    row_number:row_number,\n    threadId: msg.threadId,  // include threadId if needed\n    by_mail: msg.from_email,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index,\n    source: 'email',\n    Processed:false\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11344,
+        5616
+      ],
+      "id": "4c4f6afc-3cda-4979-bb8c-f298f2b43071",
+      "name": "Expand Gmail Message IDs",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.name }}",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.folder_id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        10240,
+        4864
+      ],
+      "id": "f4d8217e-ee4f-4b5f-954f-52f723e90fc4",
+      "name": "📂 Find Client Root Folder",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match on the client's name only, not the trailing \"<email1,email2>\" suffix --\n// the email list is recomputed fresh every run from whatever this run's Gmail/\n// Outlook search actually turned up, so it can drift from what got baked into\n// the real folder's name at creation time (a new alias appears, order shifts,\n// etc.) and an exact full-string match would then never hit again, forcing a\n// duplicate folder. The name is the stable identity; the email suffix isn't.\nconst expectedName = $('Combine Gmail & Outlook Per Client').item.json.name.toString().trim().toLowerCase();\nconst exact = $input.all().find(item => {\n  const folderName = (item.json.name || '').toString().trim().toLowerCase();\n  return folderName === expectedName || folderName.startsWith(expectedName + ' <');\n});\nreturn [exact || { json: { id: '', name: '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10480,
+        4864
+      ],
+      "id": "3351c291-0700-440a-9642-2c024bb52d20",
+      "name": "🎯 Pick Exact Client Folder Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reuse-cond-103",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8832,
+        5584
+      ],
+      "id": "3d8394c6-cdaa-4c64-a4e8-07219c387147",
+      "name": "❓ Client Folder Found?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8528,
+        5168
+      ],
+      "id": "7669f454-d0e0-4ef2-971b-2e65d4d3aceb",
+      "name": "📁 Client Root Folder (Resolved)"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "attachments",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('📁 Client Root Folder (Resolved)').item.json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        8848,
+        5168
+      ],
+      "id": "e560ada3-1b80-4230-9dff-471b36a2fb25",
+      "name": "📂 Find Attachments Subfolder",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const expected = ('attachments').toString().trim().toLowerCase();\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === expected);\nreturn [exact || { json: { id: '', name: '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9056,
+        5168
+      ],
+      "id": "8aa4e643-40ef-4ec6-908d-a2cd6ff3c4d3",
+      "name": "🎯 Pick Exact Attachments Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reuse-cond-108",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        9328,
+        5168
+      ],
+      "id": "51bced65-b34e-4394-bff8-26515fff26e3",
+      "name": "❓ Attachments Subfolder Found?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9616,
+        5184
+      ],
+      "id": "057b1578-a091-446f-9ef0-01bfabfa0f63",
+      "name": "📁 Attachments Subfolder (Resolved)"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "conversation",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('📁 Client Root Folder (Resolved)').item.json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        9536,
+        5616
+      ],
+      "id": "5411832f-1919-4757-aa63-cc97d7f41f5a",
+      "name": "📂 Find Conversation Sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const expected = \"conversation\";\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === expected);\nif (!exact) return [{ json: { id: '', name: '', spreadsheetId: '' } }];\nreturn [{ json: { ...exact.json, spreadsheetId: exact.json.id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9744,
+        5616
+      ],
+      "id": "ffb29283-ac0d-4a61-a2e6-a9bc054d2957",
+      "name": "🎯 Pick Exact Conversation Sheet Match"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reuse-cond-113",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        10032,
+        5616
+      ],
+      "id": "7004bd7a-0b5f-4375-983a-1eb13b3bcc30",
+      "name": "❓ Conversation Sheet Found?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10416,
+        5632
+      ],
+      "id": "6a6dbc87-4ba5-4dc1-88e9-3c0285c1b6a5",
+      "name": "📄 Conversation Sheet (Resolved)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "has-valid-platform-cond",
+              "leftValue": "={{ $json.Platform }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8560,
+        4880
+      ],
+      "id": "fb05d1e6-f6a5-410a-bec0-fd5d6dc655ab",
+      "name": "❓ Has Valid Platform?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "any-new-messages-cond",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        11568,
+        5920
+      ],
+      "id": "b5ee4a2a-5962-4710-98ee-91be575d0f8b",
+      "name": "❓ Any New Messages?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        12256,
+        5680
+      ],
+      "id": "3eabe9f3-1779-4be1-ba54-2e4a723a196b",
+      "name": "Wait",
+      "webhookId": "b7bd2394-0a2c-4323-a29e-8a6f7465c345"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        7472,
+        4864
+      ],
+      "id": "f142035d-6b00-4432-af31-bab39448dd4d",
+      "name": "scheduleTrigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Load Accounts from Control Sheet": {
+      "main": [
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "For Each Account": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Split Multi-Platform Account by Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail API | Search Messages (Emily)": {
+      "main": [
+        [
+          {
+            "node": "Tag Mailbox (Emily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Mailbox (Emily)": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail Mailbox Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Mailbox (Terry)": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail Mailbox Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Tag Mailbox (Office)": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail Mailbox Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Build Gmail Search Query": {
+      "main": [
+        [
+          {
+            "node": "Gmail API | Search Messages (Terry)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail API | Search Messages (Emily)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail API | Search Messages (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Outlook Search Query": {
+      "main": [
+        [
+          {
+            "node": "Outlook API | Search Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail API | Search Messages (Terry)": {
+      "main": [
+        [
+          {
+            "node": "Tag Mailbox (Terry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Gmail or Outlook?": {
+      "main": [
+        [
+          {
+            "node": "Build Gmail Search Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Outlook Search Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Multi-Platform Account by Provider": {
+      "main": [
+        [
+          {
+            "node": "❓ Has Valid Platform?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Gmail Mailbox Results": {
+      "main": [
+        [
+          {
+            "node": "Normalize Gmail Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Gmail Messages": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail + Outlook Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Gmail + Outlook Results": {
+      "main": [
+        [
+          {
+            "node": "Combine Gmail & Outlook Per Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Gmail & Outlook Per Client": {
+      "main": [
+        [
+          {
+            "node": "📂 Find Client Root Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Account Processed": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Resource": {
+      "main": [
+        [
+          {
+            "node": "Expand Gmail Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expand Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Combined Result by Provider": {
+      "main": [
+        [
+          {
+            "node": "Route by Resource",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Expanded Messages": {
+      "main": [
+        [
+          {
+            "node": "❓ Any New Messages?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail API | Search Messages (Office)": {
+      "main": [
+        [
+          {
+            "node": "Tag Mailbox (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook API | Search Messages": {
+      "main": [
+        [
+          {
+            "node": "Normalize Outlook Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Outlook Messages": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail + Outlook Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Queue Messages": {
+      "main": [
+        [
+          {
+            "node": "Mark Account Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Client Root Folder": {
+      "main": [
+        [
+          {
+            "node": "📁 Client Root Folder (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Attachments Subfolder": {
+      "main": [
+        [
+          {
+            "node": "📁 Attachments Subfolder (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation Sheet": {
+      "main": [
+        [
+          {
+            "node": "📄 Conversation Sheet (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Outlook Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Merge Expanded Messages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Expand Gmail Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Merge Expanded Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 Find Client Root Folder": {
+      "main": [
+        [
+          {
+            "node": "🎯 Pick Exact Client Folder Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Pick Exact Client Folder Match": {
+      "main": [
+        [
+          {
+            "node": "❓ Client Folder Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Client Folder Found?": {
+      "main": [
+        [
+          {
+            "node": "Create Client Root Folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📁 Client Root Folder (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📁 Client Root Folder (Resolved)": {
+      "main": [
+        [
+          {
+            "node": "📂 Find Attachments Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 Find Attachments Subfolder": {
+      "main": [
+        [
+          {
+            "node": "🎯 Pick Exact Attachments Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Pick Exact Attachments Match": {
+      "main": [
+        [
+          {
+            "node": "❓ Attachments Subfolder Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Attachments Subfolder Found?": {
+      "main": [
+        [
+          {
+            "node": "Create Attachments Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📁 Attachments Subfolder (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📁 Attachments Subfolder (Resolved)": {
+      "main": [
+        [
+          {
+            "node": "📂 Find Conversation Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 Find Conversation Sheet": {
+      "main": [
+        [
+          {
+            "node": "🎯 Pick Exact Conversation Sheet Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Pick Exact Conversation Sheet Match": {
+      "main": [
+        [
+          {
+            "node": "❓ Conversation Sheet Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Conversation Sheet Found?": {
+      "main": [
+        [
+          {
+            "node": "Create Conversation Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📄 Conversation Sheet (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📄 Conversation Sheet (Resolved)": {
+      "main": [
+        [
+          {
+            "node": "Move Sheet to Client Folder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Combined Result by Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Has Valid Platform?": {
+      "main": [
+        [
+          {
+            "node": "❓ Gmail or Outlook?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Any New Messages?": {
+      "main": [
+        [
+          {
+            "node": "Queue Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Account Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "For Each Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scheduleTrigger": {
+      "main": [
+        [
+          {
+            "node": "Load Accounts from Control Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8cddc791-4fc2-42de-b64f-739942656dfa",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "0jQXUqHuijkxuZPf",
+  "tags": []
+}

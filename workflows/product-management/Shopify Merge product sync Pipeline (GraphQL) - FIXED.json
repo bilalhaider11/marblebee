@@ -1,0 +1,1494 @@
+{
+  "name": "Shopify Merge product sync Pipeline (GraphQL) - Sub-workflow Architecture",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Isolated, self-contained publish sub-chain for reconciliation -- does not\n// share nodes with the create-path publish chain, so this can never regress\n// the already-working create flow. Runs once per input item -- multiple\n// unpublished products can be in flight at once.\nconst producers = $('🩺 Build GraphQL: Get Publication (Reconcile)').all();\nreturn $input.all().map((item, i) => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (get publications, reconcile): ' + JSON.stringify(res.errors));\n  }\n  const pubs = res?.data?.publications?.nodes || [];\n  const onlineStore = pubs.find(p => p.name === 'Online Store');\n  if (!onlineStore) {\n    throw new Error('Could not find an \"Online Store\" publication/sales channel on this shop: ' + JSON.stringify(pubs));\n  }\n\n  const productLegacyId = producers[i]?.json?.product_legacy_id;\n  if (!productLegacyId) {\n    throw new Error('Reconcile publish: missing product id for item ' + i);\n  }\n\n  const QUERY = `mutation PublishProduct($id: ID!, $input: [PublicationInput!]!) {\n  publishablePublish(id: $id, input: $input) {\n    publishable { ... on Product { id } }\n    userErrors { field message }\n  }\n}`;\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          id: `gid://shopify/Product/${productLegacyId}`,\n          input: [{ publicationId: onlineStore.id }]\n        }\n      }\n    }\n  };\n});"
+      },
+      "id": "bb6865ee-765f-4775-827a-56c9cfed2f4a",
+      "name": "🩺 Build GraphQL: Publish (Reconcile)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "a7bcddfb-fd44-40cb-82e1-38d80707ec3d",
+      "name": "🩺 Get Publication (Reconcile) (GraphQL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1824,
+        176
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({\n  json: {\n    product_legacy_id: item.json?.data?.product?.legacyResourceId,\n    body: { query: `query GetOnlineStorePublication { publications(first: 10) { nodes { id name } } }` }\n  }\n}));"
+      },
+      "id": "9c35e883-7de0-4b00-9de2-07f516dd1bec",
+      "name": "🩺 Build GraphQL: Get Publication (Reconcile)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 0.2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -464
+      ],
+      "id": "1f86c863-bc9b-4f52-bd7c-528d7e175ea5",
+      "name": "⏸️ Rate Limit (200ms)",
+      "webhookId": "fd9ab9a4-171f-443a-b98e-b0f99561bfb7"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.product_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "17c48f3f-91de-40de-a8a8-ffcfefb9f4e9",
+      "name": "🩺 Any Products to Check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.sheet_name }}",
+          "mode": "name"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRange",
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        368,
+        -176
+      ],
+      "id": "6d5c4e0b-b449-4d51-b7de-c7e4384a80a0",
+      "name": "📖 Read Sheet Data",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        -192
+      ],
+      "id": "1cfe853b-7a41-4fd5-80c2-58df280dc5cf",
+      "name": "⏰ Daily Trigger at 9 AM"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "f9515a6f-b723-4c3e-9dc5-e8987b574da3",
+      "name": "🩺 Check Publication Status (GraphQL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1040,
+        192
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({\n  json: {\n    body: {\n      query: `query CheckPublication($id: ID!) { product(id: $id) { legacyResourceId onlineStoreUrl } }`,\n      variables: { id: `gid://shopify/Product/${item.json.product_id}` }\n    }\n  }\n}));"
+      },
+      "id": "1f07fa14-42af-4efd-be56-e26d5e20548b",
+      "name": "🩺 Build GraphQL: Check Publication",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sheetName = $(\"\\ud83d\\udd04 Loop Through Sheets\").item?.json?.sheet_name\n  ?? $(\"\\ud83d\\udd04 Loop Through Sheets\").first()?.json?.sheet_name;\nconst rows = $input.all().map(i => i.json);\n\nconst IMAGE_URL_KEY = /^IMAGE URL(\\d+)$/;\n\n// Shopify's CDN appends a `v=` cache-busting query param that changes on every\n// fetch/serve without indicating a different file -- confirmed directly via\n// curl: two URLs differing only in `v=` return identical content-length and\n// Shopify's own `Link: rel=\"canonical\"` response header, which strips `v=`\n// and points BOTH at the exact same canonical URL. Stripped only for\n// duplicate-comparison purposes -- the original src (with its real v=) is\n// still what gets written/uploaded. This is not a fuzzy filename/suffix\n// match (still forbidden) -- it's a verified-equivalent query param on an\n// otherwise byte-identical URL.\n// Pure string manipulation -- deliberately avoids the `URL`/`URLSearchParams`\n// globals, which are not guaranteed to exist in every Code-node execution\n// sandbox (confirmed the hard way: an earlier version used `new URL()` and\n// silently no-op'd via its own try/catch in production, with zero visible\n// error, because that global wasn't available there).\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\nconst out = [];\nfor (const row of rows) {\n  const cad = String(row['CAD Drawing URL'] || '').trim();\n  const current = String(row['IMAGE URL11'] || '').trim();\n  if (!cad) continue; // never auto-clear IMAGE URL11 when there's no CAD drawing at all\n\n  // If the CAD drawing was already manually uploaded alongside the regular\n  // product photos (landing in some other IMAGE URL slot via the normal Drive\n  // sync), mirroring it into IMAGE URL11 too would upload it to Shopify a\n  // second time -- leave URL11 empty instead of duplicating it. Only an EXACT\n  // URL match counts: filenames can legitimately be similar (different real\n  // photos from the same shoot) so a fuzzy/partial match would wrongly treat\n  // distinct photos as duplicates.\n  const cadNorm = normalizeImageUrl(cad);\n\n  const duplicateSlot = Object.keys(row).find(key => {\n    const m = key.match(IMAGE_URL_KEY);\n    if (!m || m[1] === '11') return false;\n    return normalizeImageUrl(String(row[key] || '').trim()) === cadNorm;\n  });\n\n  if (duplicateSlot) {\n    if (current) out.push({ json: { row_number: row.row_number, sheet_name: sheetName, 'IMAGE URL11': '' } });\n    continue;\n  }\n\n  if (normalizeImageUrl(current) === cadNorm) continue; // already in sync (v= cache-buster ignored)\n  out.push({ json: { row_number: row.row_number, sheet_name: sheetName, 'IMAGE URL11': cad } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -176
+      ],
+      "id": "e89467c1-1988-47ed-89a9-4614c8f5efbd",
+      "name": "🗑️ Detect CAD-Image11 Sync"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  MAX_CREATE_ITEMS: 3,\n  VENDOR: 'Marblebee',\n  WEIGHT_UNIT: 'kg',\n  DECIMAL_PLACES: 2,\n\n  IMAGE_KEYS: [\n    'IMAGE URL1',\n    'IMAGE URL2',\n    'IMAGE URL3',\n    'IMAGE URL4',\n    'IMAGE URL5',\n    'IMAGE URL6',\n    'IMAGE URL7',\n    'IMAGE URL8',\n    'IMAGE URL9',\n    'IMAGE URL10',\n    'IMAGE URL11'\n  ],\n\n  SHEET_NAME: $('🔄 Loop Through Sheets').item.json.sheet_name\n};\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst safeRound = (value, decimals = CONFIG.DECIMAL_PLACES) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? Number(num.toFixed(decimals))\n    : '';\n};\n\nconst cleanWeight = (weightRaw) => {\n  const cleaned = String(weightRaw ?? '0').replace(/[^\\d.]/g, '');\n  return cleaned ? parseFloat(cleaned) : 0.0;\n};\n\nconst safeNumeric = (value, defaultValue = 0) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? num\n    : defaultValue;\n};\n\nconst hasValue = (value) =>\n  value !== undefined &&\n  value !== null &&\n  String(value).trim() !== '';\n\n\n// ============================================\n// SEO HELPERS\n// ============================================\n\n// Shopify handle formatter\nconst slugify = (text = '') =>\n  String(text)\n    .toLowerCase()\n    .trim()\n    .replace(/&/g, 'and')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n\n\n// URL HANDLE RULE:\n// \"{keyword}-{material}-{product-number}\"\nconst buildHandle = (data) => {\n  const keyword = data['Keywords (Luna)'] ?? '';\n  const material = data.Material ?? '';\n  const productNumber = String(data['Product No.'] ?? '').trim();\n\n  // Product No. is the primary disambiguator for the handle -- without it, two\n  // rows sharing the same keyword+material (common for a generic category like\n  // \"Stone Mosaic\" + \"Marble\") slugify to the identical handle and Shopify\n  // rejects the create with HANDLE_NOT_UNIQUE. Fall back to this row's own\n  // sheet+row_number (already guaranteed unique) so a missing Product No. can\n  // never cause a handle collision.\n  const disambiguator = productNumber || `${CONFIG.SHEET_NAME}-row${data.row_number ?? ''}`;\n\n  return slugify(\n    `${keyword}-${material}-${disambiguator}`\n  );\n};\n\n\n// IMAGE ALT RULE:\n// \"{keyword} in {material} - Image {index}\"\nconst buildAltText = (data, index) => {\n  const keyword = (data['Keywords (Luna)'] ?? 'Marble Product').trim();\n  const material = (data.Material ?? 'Natural Marble').trim();\n\n  return `${keyword} in ${material} - Image ${index}`;\n};\n\n\n// Shopify's CDN appends a `v=` cache-busting query param that changes on every\n// fetch/serve without indicating a different file -- confirmed directly via\n// curl: two URLs differing only in `v=` return identical content-length and\n// Shopify's own `Link: rel=\"canonical\"` response header, which strips `v=`\n// and points BOTH at the exact same canonical URL. So `v=` is stripped only\n// for the purposes of comparing \"is this the same image\" -- it is NOT a fuzzy\n// filename/suffix match (still forbidden -- see extractImages below), it is a\n// verified-equivalent query param on an otherwise byte-identical URL.\n// Pure string manipulation -- deliberately avoids the `URL`/`URLSearchParams`\n// globals, which are not guaranteed to exist in every Code-node execution\n// sandbox (confirmed the hard way: an earlier version used `new URL()` and\n// silently no-op'd via its own try/catch in production, with zero visible\n// error, because that global wasn't available there).\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\n// Build Shopify images with alt text -- any IMAGE URL slot whose value is an\n// EXACT duplicate of an earlier slot's URL (after stripping Shopify's `v=`\n// cache-buster, see normalizeImageUrl above) is skipped so the same photo is\n// never uploaded to Shopify twice. Filenames can legitimately be similar\n// (e.g. \"-2.jpg\" / \"-2_1.jpg\" / \"-2_2.jpg\" as genuinely different photos from\n// the same shoot) so no other normalization is applied -- never a fuzzy\n// filename/suffix match.\nconst extractImages = (data, keys) => {\n  const seenUrls = new Set();\n  const images = [];\n  keys.forEach((key, idx) => {\n    if (!hasValue(data[key])) return;\n    const src = String(data[key]).trim();\n    const normalized = normalizeImageUrl(src);\n    if (seenUrls.has(normalized)) return;\n    seenUrls.add(normalized);\n    // Slot number is the image's fixed position in CONFIG.IMAGE_KEYS (IMAGE\n    // URL1 -> 1, ..., IMAGE URL11 -> 11) -- NOT a running count of images seen\n    // so far. A running count silently renumbers every later slot whenever an\n    // earlier one is added, removed, or deduped (e.g. the IMAGE URL11 CAD sync\n    // toggling on and off) -- and that renumbering broke the Shopify-side\n    // alt-text identity match used to correlate \"this is the same photo\" on\n    // every subsequent update, causing real photos to be deleted as\n    // \"orphans\" and silently replaced with dead sheet links.\n    images.push({ src, alt: buildAltText(data, idx + 1) });\n  });\n  return images;\n};\n\n\n// ============================================\n// VALIDATION & OPERATION TYPE\n// ============================================\n\nconst isReadyToPost = (data) => {\n  const value = String(data?.Ready_to_post ?? '')\n    .trim()\n    .toLowerCase();\n\n  return value === 'yes' || value === 'true';\n};\n\nconst hasTitle = (data) =>\n  hasValue(data?.Title_Shopify);\n\nconst getOperationType = (data) => {\n\n  if (!isReadyToPost(data) || !hasTitle(data)) {\n    return null;\n  }\n\n  const hasFieldsToUpdate = hasValue(data.Fields_to_update);\n  const hasPublicUrl = hasValue(data.Shopify_Product_URL);\n  const hasAdminUrl = hasValue(data.Shopify_Update_product_URL);\n\n  // UPDATE\n  if (\n    hasFieldsToUpdate &&\n    hasPublicUrl &&\n    hasAdminUrl\n  ) {\n    return 'update';\n  }\n\n  // CREATE\n  if (\n    !hasFieldsToUpdate &&\n    !hasPublicUrl &&\n    !hasAdminUrl\n  ) {\n    return 'create';\n  }\n\n  return 'mark false';\n};\n\n\n// ============================================\n// PRODUCT BUILDER\n// ============================================\n\nconst buildProduct = (data, operation) => {\n\n  const weight = safeRound(\n    cleanWeight(data['Weight KG'])\n  );\n\n  const price = safeNumeric(\n    data['Price IN USD $ (Jack)']\n  );\n\n  // ============================================\n  // DIMENSIONS\n  // ============================================\n\n  const isFireplace =\n    CONFIG.SHEET_NAME === 'Fireplace'  ||\n    CONFIG.SHEET_NAME === 'Test data';\n\n  const isCarving =\n    CONFIG.SHEET_NAME === 'Carving';\n\n  const isWindowSurround =\n    CONFIG.SHEET_NAME === 'WindowSurround';\n\n  const isWallCoverings =\n    CONFIG.SHEET_NAME === 'Wall-Coverings'\n\n  const isExteriorWallDecoration =\n    CONFIG.SHEET_NAME === 'Exterior-Wall-Decoration'\n  \n  const isMarbleSlab =\n    CONFIG.SHEET_NAME === 'MarbleSlab';\n\n  const isMarbleRangeHood =\n    CONFIG.SHEET_NAME === 'MarbleRangeHood';\n\n  const isMoulding =\n    CONFIG.SHEET_NAME === 'Moulding';\n\n  const isStoneMosaicTile =\n    CONFIG.SHEET_NAME === 'StoneMosaicTile';\n\n  const isMarbleMedallion =\n    CONFIG.SHEET_NAME === 'MarbleMedallion';\n\n  const isWainscoting =\n    CONFIG.SHEET_NAME === 'Wainscoting';\n\n  const isOutdoorCornice =\n    CONFIG.SHEET_NAME === 'OutdoorCornice';\n\n  const isBookMatchedSlabs =\n    CONFIG.SHEET_NAME === 'BookMatchedSlabs';\n\n  const isStairs =\n    CONFIG.SHEET_NAME === 'Stairs';\n\n  const isBalustrade =\n    CONFIG.SHEET_NAME === 'Balustrade';\n\n  const dimensions = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration || isWainscoting\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isFireplace || isMarbleRangeHood || isCarving || isWindowSurround \n    ? {\n        d_cm: data['Depth CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        d_in: safeRound(data['Depth Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      }\n    : isMoulding\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isOutdoorCornice\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        p_cm: data['Projection CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        p_in: safeRound(data['Projection Inch'])\n      }\n    : isStairs\n    ? {\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        diam_cm: data['Diameter CM'] ?? '',\n        io_diam_cm: data['Inner Opening Diameter CM'] ?? '',\n      \n        w_in: safeRound(data['Width Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        diam_in: safeRound(data['Diameter Inch']) ?? '',\n        io_diam_in: safeRound(data['Inner Opening Diameter Inch']) ?? '',\n      }\n    : isBalustrade\n    ? {\n        oh_cm: data['Overall Height CM'] ?? '',\n        hh_cm: data['Handrail Height CM'] ?? '',\n        hw_cm: data['Handrail Width CM'] ?? '',\n        bd_cm: data['Baluster Diameter CM'] ?? '',\n        bh_cm: data['Baluster Height CM'] ?? '',\n        bpw_cm: data['Base/Plinth Width CM'] ?? '',\n        bph_cm: data['Base/Plinth Height CM'] ?? '',\n      \n        oh_in: safeRound(data['Overall Height Inch']) ?? '',\n        hh_in: safeRound(data['Handrail Height Inch']) ?? '',\n        hw_in: safeRound(data['Handrail Width Inch']) ?? '',\n        bd_in: safeRound(data['Baluster Diameter Inch']) ?? '',\n        bh_in: safeRound(data['Baluster Height Inch']) ?? '',\n        bpw_in: safeRound(data['Base/Plinth Width Inch']) ?? '',\n        bph_in: safeRound(data['Base/Plinth Height Inch']) ?? '',\n      }\n    : isBookMatchedSlabs\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n      }\n    : {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      };\n\n  // ============================================\n  // Opening Size For Fireplace\n  // ============================================\n\n  const opening_size = isFireplace\n    ? {\n        opening_w_cm: data['Width_CM'] ?? '',\n        opening_h_cm: data['Height_CM'] ?? '',\n\n        opening_w_in: safeRound(data['Width_Inch']),\n        opening_h_in: safeRound(data['Height_Inch'])\n      }\n    : {}\n\n  // ============================================\n  // SEO\n  // ============================================\n\n  const seoTitle =\n    String(data.Shopify_SEO_Title || data.Title_Shopify || '').trim();\n\n  const seoDescription =\n    String(data.Shopify_SEO_Description ?? '').trim();\n\n  const handle = buildHandle(data);\n\n  // ============================================\n  // RETURN PRODUCT\n  // ============================================\n\n  return {\n\n    // Metadata\n    row_number: data.row_number ?? 0,\n    sheet_name: CONFIG.SHEET_NAME ?? '',\n    updating_fields: data.Fields_to_update ?? '',\n    operation,\n\n    // URLs\n    public_shopify_url:\n      data.Shopify_Product_URL ?? '',\n\n    admin_shopify_url:\n      data.Shopify_Update_product_URL ?? '',\n\n    // Dimensions\n    ...dimensions,\n    ...opening_size,\n\n    // Shopify Product\n    title: String(data.Title_Shopify ?? '').trim(),\n    description: String(data.Description_Shopify ?? '').trim(),\n\n    material: String(data.Material ?? '').trim(),\n    product_number: String(data['Product No.'] ?? '').trim(),\n\n    weight,\n\n    drain_diameter:\n      data.Drain_Diameter ?? '',\n\n    radius: data.Radius ?? '',\n    surface: data.Surface ?? '',\n\n    signature:\n      data.Signature ?? '',\n\n    // SEO\n\n    seo_title: seoTitle,\n    seo_description: seoDescription,\n    handle,\n\n    // Custom buttons\n    material_catalog_url:\n      String(data['Material Catalog URL'] ?? '').trim(),\n\n    care_guide_url:\n      String(data['Care Guide URL'] ?? '').trim(),\n\n    cad_drawing_url:\n      String(data['CAD Drawing URL'] ?? '').trim(),\n\n    price_unit_suffix: (isExteriorWallDecoration || isMoulding || isOutdoorCornice || isStoneMosaicTile || isWallCoverings) ? '/piece' : '',\n\n    // Etsy\n    title_Etsy:\n      data.Title_Etsy ?? '',\n\n    description_Etsy:\n      data.Description_Etsy ?? '',\n\n    tags_Etsy:\n      data.Tags_Etsy ?? '',\n\n    who_made:\n      data.who_made ?? '',\n\n    when_made:\n      data.when_made ?? '',\n\n    product_type_Etsy:\n      data.Etsy_type ?? '',\n\n    quantity_Etsy:\n      data.Etsy_quantity ?? 0,\n\n    // Shopify\n    vendor: CONFIG.VENDOR,\n\n    product_type:\n      String(data.Product_Type ?? 'Default').trim(),\n\n    tags:\n      String(data.Tags_Shopify ?? '').trim(),\n\n    // Variants\n    variants: [\n      {\n        requires_shipping: false,\n        price,\n        weight,\n        weight_unit: CONFIG.WEIGHT_UNIT\n      }\n    ],\n\n    // Images + ALT TEXT\n    images: extractImages(\n      data,\n      CONFIG.IMAGE_KEYS\n    )\n  };\n};\n\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\n\n// Step 1\nconst categorized = items\n  .map(item => {\n\n    const data = item.json ?? {};\n    const operation = getOperationType(data);\n\n    return { data, operation };\n\n  })\n  .filter(({ operation }) => operation !== null);\n\n\n// Step 2\nconst createItems =\n  categorized.filter(\n    ({ operation }) => operation === 'create'\n  );\n\nconst updateItems =\n  categorized.filter(\n    ({ operation }) => operation === 'update'\n  );\n\nconst mark_false =\n  categorized.filter(\n    ({ operation }) => operation === 'mark false'\n  );\n\n\n// Step 3\nconst limitedCreateItems =\n  createItems.slice(0, CONFIG.MAX_CREATE_ITEMS);\n\n\n// Step 4\nconst selectedItems = [\n  ...limitedCreateItems,\n  ...updateItems,\n  ...mark_false\n];\n\n\n// Step 5\nconst outputItems = selectedItems.map(\n  ({ data, operation }) => ({\n\n    json: {\n\n      collection_id1: String(data.Collection_ID1 ?? '').trim(),\n\n      collection_id2: String(data.Collection_ID2 ?? '').trim(),\n\n      collection_id3: String(data.Collection_ID3 ?? '').trim(),\n\n      collection_id4: String(data.Collection_ID4 ?? '').trim(),\n\n      operation,\n\n      product: buildProduct(\n        data,\n        operation\n      )\n    }\n  })\n);\n\n\nreturn outputItems.length > 0\n  ? outputItems\n  : [\n      {\n        json: {\n          sheet_name: CONFIG.SHEET_NAME,\n          operation: 'None'\n        }\n      }\n    ];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -464
+      ],
+      "id": "f1df52f6-ff28-4f7b-ad59-ae9529cde7ad",
+      "name": "✅ Filter Unacknowledged & Ready to Post"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "mark false",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2a57fd1f-4ef0-44fe-aa1f-e1b15164e9c8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mark No"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f4c25f0f-717c-4585-a1a8-4bbc23e86255",
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "=^(create|update)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create&update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7597f48e-abfd-41e5-b996-8d2ddd12c6ad",
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "None",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "None"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -432,
+        -672
+      ],
+      "id": "168b29a6-586c-48ff-a968-c3b8e5e582d7",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.data.product.onlineStoreUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e9d690bb-9481-4184-b06b-36bc6b921510",
+      "name": "🩺 Needs Publish?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "28496252-230a-436b-9a58-71cbc0cbb5ec",
+      "name": "🩺 Publish (Reconcile) (GraphQL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2304,
+        176
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.product.sheet_name }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.product.row_number }}",
+            "Ready_to_post": "no"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "locationDefine": {
+            "values": {
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -32,
+        -912
+      ],
+      "id": "7ce44ee9-5a18-4805-a040-6e106bdb362c",
+      "name": "💾 Update Google Sheet1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sheetName = $('🔄 Loop Through Sheets').item?.json?.sheet_name\n  ?? $('🔄 Loop Through Sheets').first()?.json?.sheet_name;\nconst rows = $input.all().map(i => i.json);\n\n// A product can be created on Shopify but fail to become published to the\n// Online Store channel (e.g. an earlier step in the same run threw before the\n// publish step ran, or the publish call itself failed transiently). Only\n// recently-created rows are checked -- older products have had plenty of\n// chances to be caught already, and re-checking the whole historical catalog\n// every day would be a lot of wasted API calls for no benefit.\nconst RECENT_DAYS = 3;\nconst cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;\n\nconst extractProductId = (url) => String(url || '').match(/\\/products\\/(\\d+)/)?.[1] ?? '';\n\nconst out = [];\nfor (const row of rows) {\n  const adminUrl = String(row['Shopify_Update_product_URL'] || '').trim();\n  const createTime = String(row['create_time'] || '').trim();\n  if (!adminUrl || !createTime) continue;\n\n  const created = Date.parse(createTime);\n  if (!Number.isFinite(created) || created < cutoff) continue;\n\n  const productId = extractProductId(adminUrl);\n  if (!productId) continue;\n\n  out.push({ json: { product_id: productId, row_number: row.row_number, sheet_name: sheetName } });\n}\nreturn out.length ? out : [{ json: { _noneToCheck: true } }];"
+      },
+      "id": "1064c520-6131-4479-92e2-6f9ff7c4eb9c",
+      "name": "🩺 Find Recently Created Products",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.sheet_name }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "IMAGE URL11": "={{ $json[\"IMAGE URL11\"] }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Product No.",
+              "displayName": "Product No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Raw-Location",
+              "displayName": "Raw-Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Picture",
+              "displayName": "Picture",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL1",
+              "displayName": "IMAGE URL1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL2",
+              "displayName": "IMAGE URL2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL3",
+              "displayName": "IMAGE URL3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL4",
+              "displayName": "IMAGE URL4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL5",
+              "displayName": "IMAGE URL5",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL6",
+              "displayName": "IMAGE URL6",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL7",
+              "displayName": "IMAGE URL7",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL8",
+              "displayName": "IMAGE URL8",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL9",
+              "displayName": "IMAGE URL9",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL10",
+              "displayName": "IMAGE URL10",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL11",
+              "displayName": "IMAGE URL11",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Material Catalog URL",
+              "displayName": "Material Catalog URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Care Guide URL",
+              "displayName": "Care Guide URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CAD Drawing URL",
+              "displayName": "CAD Drawing URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Material",
+              "displayName": "Material",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Length CM",
+              "displayName": "Length CM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Width CM",
+              "displayName": "Width CM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Height CM",
+              "displayName": "Height CM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Length Inch",
+              "displayName": "Length Inch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Width Inch",
+              "displayName": "Width Inch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Height Inch",
+              "displayName": "Height Inch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Weight KG",
+              "displayName": "Weight KG",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price IN USD $ (Jack)",
+              "displayName": "Price IN USD $ (Jack)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price In CAD",
+              "displayName": "Price In CAD",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Keywords (Luna)",
+              "displayName": "Keywords (Luna)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Generate_Title_Description",
+              "displayName": "Generate_Title_Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Prompt_Rules",
+              "displayName": "Prompt_Rules",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Title_Shopify",
+              "displayName": "Title_Shopify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Description_Shopify",
+              "displayName": "Description_Shopify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Shopify_SEO_Title",
+              "displayName": "Shopify_SEO_Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Shopify_SEO_Description",
+              "displayName": "Shopify_SEO_Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tags_Shopify",
+              "displayName": "Tags_Shopify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Product_Type",
+              "displayName": "Product_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Jack QC",
+              "displayName": "Jack QC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Luna QC",
+              "displayName": "Luna QC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Website QC()",
+              "displayName": "Website QC()",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Collection_ID1",
+              "displayName": "Collection_ID1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Collection_ID2",
+              "displayName": "Collection_ID2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Collection_ID3",
+              "displayName": "Collection_ID3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Radius",
+              "displayName": "Radius",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Signature",
+              "displayName": "Signature",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Title_Etsy",
+              "displayName": "Title_Etsy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Description_Etsy",
+              "displayName": "Description_Etsy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Etsy",
+              "displayName": "Etsy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tags_Etsy",
+              "displayName": "Tags_Etsy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Ready_to_post",
+              "displayName": "Ready_to_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Fields_to_update",
+              "displayName": "Fields_to_update",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Shopify_Product_URL",
+              "displayName": "Shopify_Product_URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Shopify_Update_product_URL",
+              "displayName": "Shopify_Update_product_URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "create_time",
+              "displayName": "create_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_update_time",
+              "displayName": "last_update_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sheet_name",
+              "displayName": "sheet_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "IMAGE URL12",
+              "displayName": "IMAGE URL12",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "locationDefine": {
+            "values": {
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        -176
+      ],
+      "id": "9627ab18-b43e-4add-b985-a4fabe961f35",
+      "name": "🔗 Sync Image URL11 from CAD Drawing",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const GOOGLE_SHEETS = [\n  '2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration',\n  'Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab',\n  'Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround',\n  // 'Test data'  // Uncomment for testing\n];\n\nreturn GOOGLE_SHEETS\n  .filter(Boolean)  // Remove any empty/null values\n  .map(sheet_name => ({ json: { sheet_name } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -192
+      ],
+      "id": "711a22c5-92a5-49dc-b5e4-0db82c01c765",
+      "name": "📋 Get Sheet Names"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Non-fatal by design -- this is the reconciliation pass itself; a failure\n// here just means it gets retried on the next scheduled run's check.\nreturn $input.all().map(item => {\n  const res = item.json;\n  const errors = res?.errors;\n  const userErrors = res?.data?.publishablePublish?.userErrors;\n  if (errors?.length || userErrors?.length) {\n    return { json: { published: false, publish_error: JSON.stringify(errors?.length ? errors : userErrors) } };\n  }\n  return { json: { published: true } };\n});"
+      },
+      "id": "7345698b-1290-4878-b5ad-df40e096f455",
+      "name": "🩺 Check Publish Result (Reconcile)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        -192
+      ],
+      "id": "1d0dd21c-a8dc-4b7a-9f85-09bb8c391712",
+      "name": "🔄 Loop Through Sheets"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1Ks3df50pputAXUE",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/1Ks3df50pputAXUE",
+          "cachedResultName": "Shopify Merge product sync Pipeline (GraphQL) - Process Product"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            ""
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "id": "c9b1c0af-ecb6-4da9-a871-c622ffc0ffba",
+      "name": "▶️ Process Product (per item)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        -656
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## FIXED VERSION -- review before importing\n\nThis replaces the old \"🔁 Process Each Product\" SplitInBatches loop (and everything it drove downstream) with a single \"▶️ Process Product (per item)\" Execute Sub-workflow node running in \"Run once for each item\" mode, calling the new **Shopify Merge product sync Pipeline (GraphQL) - Process Product** sub-workflow.\n\nWhy: the old nested SplitInBatches setup hit a confirmed n8n platform bug -- live execution data showed it running 289 times but only producing real output twice, silently dropping almost every create/update for the rest of the catalog every run. See the sub-workflow's own README sticky note for the full explanation.\n\n**Import both files, then**: open \"▶️ Process Product (per item)\" here and pick the sub-workflow from its dropdown (its ID doesn't exist until you import it, so it can't be pre-wired). Nothing else changed -- every other node, mutation, and piece of business logic is untouched, just relocated.\n\nThe original file this was built from is left completely unmodified.",
+        "height": 668,
+        "width": 480
+      },
+      "id": "e64463ea-7025-4a25-9c0c-9be6ea19172f",
+      "name": "README - FIXED VERSION",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🔄 Loop Through Sheets' \"Done\" output is a known-unreliable n8n\n// SplitInBatches behavior (n8n issue #21376: it can fire more than once\n// instead of exactly once after all sheets finish), which means Switch --\n// and everything downstream, including this pipeline -- can receive the\n// exact same create&update batch more than once in a single execution.\n// Rather than depend on that firing exactly once, track which items have\n// already been sent to Process Product THIS run (by sheet+row+operation,\n// the same identity Fields_to_update/row_number already use elsewhere in\n// this pipeline) and drop exact repeats before they reach Shopify twice.\n//\n// $getWorkflowStaticData persists in the SAVED WORKFLOW, across every\n// future execution, not just this one -- confirmed live: a second, later\n// execution inherited the first execution's \"seen\" memory and dropped\n// every item, since the same row_number/sheet_name/operation identity is\n// identical from one day's run to the next. Guard against that by keying\n// the memory to the CURRENT execution id and wiping it whenever that id\n// changes, so it only ever catches duplicates within a single run.\nconst staticData = $getWorkflowStaticData('node');\nconst currentExecutionId = $execution.id;\nif (staticData.executionId !== currentExecutionId) {\n  staticData.executionId = currentExecutionId;\n  staticData.seenKeys = [];\n}\nconst seen = new Set(staticData.seenKeys);\n\nconst out = [];\nfor (const item of $input.all()) {\n  const p = item.json.product || {};\n  const key = `${p.sheet_name}:${p.row_number}:${item.json.operation}`;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  out.push(item);\n}\nstaticData.seenKeys = Array.from(seen);\nreturn out;"
+      },
+      "id": "e9140ff3-2397-454c-a636-a3fb76993ebe",
+      "name": "🛡️ Dedupe Duplicate Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -656
+      ]
+    }
+  ],
+  "pinData": {
+    "⏰ Daily Trigger at 9 AM": [
+      {
+        "json": {
+          "timestamp": "2026-04-07T09:00:09.003-04:00",
+          "Readable date": "April 7th 2026, 9:00:09 am",
+          "Readable time": "9:00:09 am",
+          "Day of week": "Tuesday",
+          "Year": "2026",
+          "Month": "April",
+          "Day of month": "07",
+          "Hour": "09",
+          "Minute": "00",
+          "Second": "09",
+          "Timezone": "America/New_York (UTC-04:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "⏰ Daily Trigger at 9 AM": {
+      "main": [
+        [
+          {
+            "node": "📋 Get Sheet Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Get Sheet Names": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Loop Through Sheets": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📖 Read Sheet Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Read Sheet Data": {
+      "main": [
+        [
+          {
+            "node": "✅ Filter Unacknowledged & Ready to Post",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🗑️ Detect CAD-Image11 Sync",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🩺 Find Recently Created Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✅ Filter Unacknowledged & Ready to Post": {
+      "main": [
+        [
+          {
+            "node": "⏸️ Rate Limit (200ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏸️ Rate Limit (200ms)": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "💾 Update Google Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🛡️ Dedupe Duplicate Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔗 Sync Image URL11 from CAD Drawing": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗑️ Detect CAD-Image11 Sync": {
+      "main": [
+        [
+          {
+            "node": "🔗 Sync Image URL11 from CAD Drawing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Find Recently Created Products": {
+      "main": [
+        [
+          {
+            "node": "🩺 Any Products to Check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Any Products to Check?": {
+      "main": [
+        [
+          {
+            "node": "🩺 Build GraphQL: Check Publication",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build GraphQL: Check Publication": {
+      "main": [
+        [
+          {
+            "node": "🩺 Check Publication Status (GraphQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Check Publication Status (GraphQL)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Needs Publish?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Needs Publish?": {
+      "main": [
+        [
+          {
+            "node": "🩺 Build GraphQL: Get Publication (Reconcile)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build GraphQL: Get Publication (Reconcile)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Get Publication (Reconcile) (GraphQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Get Publication (Reconcile) (GraphQL)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Build GraphQL: Publish (Reconcile)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Build GraphQL: Publish (Reconcile)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Publish (Reconcile) (GraphQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Publish (Reconcile) (GraphQL)": {
+      "main": [
+        [
+          {
+            "node": "🩺 Check Publish Result (Reconcile)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩺 Check Publish Result (Reconcile)": {
+      "main": [
+        [
+          {
+            "node": "🔄 Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🛡️ Dedupe Duplicate Batches": {
+      "main": [
+        [
+          {
+            "node": "▶️ Process Product (per item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "aa08b846-4d75-4127-b9ac-ef82d251c56b",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "DxnDOB7RYiLfWx5E",
+  "tags": []
+}
