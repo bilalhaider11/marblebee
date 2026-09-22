@@ -6,8 +6,7 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 10
+              "field": "hours"
             }
           ]
         }
@@ -43,10 +42,6 @@
             },
             {
               "lookupColumn": "source"
-            },
-            {
-              "lookupColumn": "mainf4_id",
-              "lookupValue": "1mPRYdqz3GMiow9QCuuK-gsL8ebPg1pNl"
             }
           ]
         },
@@ -353,7 +348,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\n// Track each candidate's own ARRAY POSITION in `candidates` (this node's\n// real $input), not just which attachment it belongs to. pairedItem must\n// point at a real index into this node's own input for n8n to keep the\n// lineage chain unbroken -- using the attachment's index instead (0, 1, 2..)\n// breaks the moment any earlier attachment returns more than one candidate\n// (search node's 'Drive | Find Existing Attachment' has alwaysOutputData on\n// so every attachment adds at least one, but not always exactly one, entry\n// to this flat list), which shifts every later attachment's true position\n// out from under that naive index and corrupts the chain downstream --\n// every $('SomeNode').item lookup after this node (the message-metadata\n// read in 'Merge | Add Drive Links', the folder id read in 'Drive | Upload\n// Attachment') then throws \"Cannot read properties of undefined (reading\n// 'pairedItem')\" for any email whose attachment search fanned out.\nconst byOrigin = new Map();\ncandidates.forEach((c, candidateIndex) => {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) return;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, { items: [], firstCandidateIndex: candidateIndex });\n  byOrigin.get(idx).items.push(c);\n});\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx);\n  const items = group?.items || [];\n  const exact = items.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: group ? group.firstCandidateIndex : 0\n  };\n});"
+        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\n// Track each candidate's own ARRAY POSITION in `candidates` (this node's\n// real $input), not just which attachment it belongs to. pairedItem must\n// point at a real index into this node's own input for n8n to keep the\n// lineage chain unbroken -- using the attachment's index instead (0, 1, 2..)\n// breaks the moment any earlier attachment returns more than one candidate\n// (search node's 'Drive | Find Existing Attachment' has alwaysOutputData on\n// so every attachment adds at least one, but not always exactly one, entry\n// to this flat list), which shifts every later attachment's true position\n// out from under that naive index and corrupts the chain downstream --\n// every $('SomeNode').item lookup after this node (the message-metadata\n// read in 'Merge | Add Drive Links', the folder id read in 'Drive | Upload\n// Attachment') then throws \"Cannot read properties of undefined (reading\n// 'pairedItem')\" for any email whose attachment search fanned out.\nconst byOrigin = new Map();\ncandidates.forEach((c, candidateIndex) => {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) return;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, { items: [], firstCandidateIndex: candidateIndex });\n  byOrigin.get(idx).items.push(c);\n});\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx);\n  const items = group?.items || [];\n  const exact = items.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: group ? group.firstCandidateIndex : 0\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -437,7 +432,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 'Pick Exact Attachment Match' only sets _existingFileWebViewLink from\n// the Drive search result's own webViewLink -- that search response isn't\n// guaranteed to include it either, so fall back to the same canonical\n// Drive URL format built from the file id it always does return.\nreturn $input.all().map(item => ({\n  json: {\n    webViewLink: item.json._existingFileWebViewLink\n      || (item.json._existingFileId ? `https://drive.google.com/file/d/${item.json._existingFileId}/view?usp=drivesdk` : null)\n  },\n  pairedItem: item.pairedItem\n}));"
+        "jsCode": "// 'Pick Exact Attachment Match' only sets _existingFileWebViewLink from\n// the Drive search result's own webViewLink -- that search response isn't\n// guaranteed to include it either, so fall back to the same canonical\n// Drive URL format built from the file id it always does return.\nreturn $input.all().map(item => ({\n  json: {\n    webViewLink: item.json._existingFileWebViewLink\n      || (item.json._existingFileId ? `https://drive.google.com/file/d/${item.json._existingFileId}/view?usp=drivesdk` : null)\n  },\n  pairedItem: item.pairedItem\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1074,7 +1069,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "426d792c-8a4b-45f9-abe9-75c52e21aa44",
+  "versionId": "4effbad1-1c4c-4016-a854-e58069915b62",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
