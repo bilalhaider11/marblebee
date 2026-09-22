@@ -7,12 +7,12 @@
         "height": 476,
         "width": 420
       },
-      "id": "133cb4db-362f-489e-9f55-96b90357b21c",
+      "id": "e6ab377d-7023-433c-a4f2-f99c2dba48a4",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        9296,
+        10192,
         1040
       ]
     },
@@ -27,12 +27,12 @@
           ]
         }
       },
-      "id": "bebde79a-0b9e-4d95-8cbd-987d26706faa",
+      "id": "57be16b6-92c7-4c72-a701-219b5d5aac01",
       "name": "Hourly Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        9808,
+        10704,
         1168
       ]
     },
@@ -81,17 +81,23 @@
               "name": "retryHours",
               "type": "string",
               "value": "9,10"
+            },
+            {
+              "id": "37ee411f-f5fd-4e70-ac91-1cd618a34ff0",
+              "name": "tailwindAccountId",
+              "type": "string",
+              "value": "919328"
             }
           ]
         },
         "options": {}
       },
-      "id": "ba58dd41-04ca-4dfc-b792-91cbcb695730",
+      "id": "8f98ad40-409c-48f0-b1eb-0515a5ec0691",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        10032,
+        10928,
         1168
       ]
     },
@@ -109,12 +115,12 @@
         },
         "options": {}
       },
-      "id": "8d991f2c-325f-411f-b1ba-4826f76d9669",
+      "id": "e137ab7e-f7a6-4427-943c-307d1c5cfcd0",
       "name": "Get Pins",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        10256,
+        11152,
         1168
       ],
       "executeOnce": true,
@@ -127,14 +133,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nfunction norm(s){ return (s==null?'':String(s)).trim().toLowerCase(); }\nconst out = [];\nfor (const p of pins) {\n  if (norm(p['Status']) !== 'scheduled') continue;\n  const postId = (p['Metricool Post ID']==null?'':String(p['Metricool Post ID'])).trim();\n  if (!postId) continue;\n  out.push({ json: { rowPinId: p['Pin ID'], postId, row_number: p['row_number'], sourceTab: p._sourceTab, retryCount: parseInt(p['Retry Count'], 10) || 0 } });\n}\nreturn out;\n"
+        "jsCode": "const pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: $('Set Config').first().json.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nfunction norm(s){ return (s==null?'':String(s)).trim().toLowerCase(); }\nconst out = [];\nfor (const p of pins) {\n  if (norm(p['Status']) !== 'scheduled') continue;\n  const metricoolId = (p['Metricool Post ID']==null?'':String(p['Metricool Post ID'])).trim();\n  const tailwindId = (p['Tailwind Post ID']==null?'':String(p['Tailwind Post ID'])).trim();\n  const platformCell = norm(p['Platform']);\n  // Prefer whichever platform the row itself claims; fall back to whichever ID is actually populated\n  // (covers legacy rows written before the Platform column existed).\n  let platform = null, postId = '';\n  if (platformCell === 'tailwind' && tailwindId) { platform = 'tailwind'; postId = tailwindId; }\n  else if (platformCell === 'metricool' && metricoolId) { platform = 'metricool'; postId = metricoolId; }\n  else if (metricoolId) { platform = 'metricool'; postId = metricoolId; }\n  else if (tailwindId) { platform = 'tailwind'; postId = tailwindId; }\n  if (!platform) continue;\n  out.push({ json: { rowPinId: p['Pin ID'], postId, platform, row_number: p['row_number'], sourceTab: p._sourceTab, retryCount: parseInt(p['Retry Count'], 10) || 0 } });\n}\nreturn out;"
       },
-      "id": "dc113903-d1c3-45b4-ae64-a2aa754154c5",
+      "id": "72c1cae1-5327-4380-a25b-8fa92ae0e979",
       "name": "Select Scheduled",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        10640,
+        11536,
         1168
       ]
     },
@@ -158,13 +164,13 @@
         },
         "options": {}
       },
-      "id": "9e044a14-a555-4db1-8e38-1718d5422f1d",
+      "id": "f3d49d43-bbad-44be-9b49-327b53decb26",
       "name": "Get Post",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10864,
-        1168
+        11008,
+        1584
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -176,15 +182,78 @@
     },
     {
       "parameters": {
-        "jsCode": "const responses = $input.all();\nconst sel = $('Select Scheduled').all();\nconst cfg = $('Set Config').first().json;\nconst maxRetries = cfg.maxRetries || 3;\nconst retryHours = (cfg.retryHours || '9,10').split(',').map(h => parseInt(h.trim(), 10)).filter(h => !isNaN(h)).sort((a, b) => a - b);\n\nfunction nextRetrySlot() {\n  const zone = 'America/Toronto'; // retryHours (9,10) mean local business hours -- anchor explicitly, don't rely on n8n's ambient default zone\n  const nowPlus15 = $now.plus({ minutes: 15 });\n  const nowLocal = $now.setZone(zone);\n  for (const h of retryHours) {\n    const slot = nowLocal.set({ hour: h, minute: 0, second: 0, millisecond: 0 });\n    if (slot > nowPlus15) return slot;\n  }\n  // none of today's configured hours are far enough out -- use the earliest one tomorrow\n  return nowLocal.plus({ days: 1 }).set({ hour: retryHours[0], minute: 0, second: 0, millisecond: 0 });\n}\n\nfunction pickPost(r){ const o = Array.isArray(r)?(r[0]||{}):r; return (o && o.data) || o || {}; }\nfunction pickPinterestProvider(post){ const providers = post.providers || []; return providers.find(p => p.network === 'pinterest') || providers[0] || {}; }\nfunction pickHttpError(r){\n  // Get Post has onError: continueRegularOutput, so a failed lookup (e.g. a\n  // leftover pre-Metricool Tailwind post ID -- Metricool's API only accepts\n  // integer ids and 500s on those) comes through as { error: {...} } instead\n  // of throwing. Without this check those rows would silently look like\n  // \"still pending\" forever and retry-500 every single hourly run.\n  // Return a short, human-readable reason rather than the raw API error dump.\n  const o = Array.isArray(r) ? (r[0]||{}) : r;\n  if (o && o.error) return 'Could not verify this post on Metricool (invalid or pre-migration post ID)';\n  return null;\n}\nfunction pinnedTimeIso(post){\n  const pd = post.publicationDate;\n  if (!pd || !pd.dateTime) return '';\n  const dt = DateTime.fromISO(pd.dateTime, { zone: pd.timezone || 'utc' });\n  return dt.isValid ? dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : '';\n}\n\nconst out = [];\nfor (let i=0;i<responses.length;i++){\n  const raw = responses[i].json || {};\n  const httpError = pickHttpError(raw);\n  const post = httpError ? {} : pickPost(raw);\n  const provider = pickPinterestProvider(post);\n  const rowPinId = (sel[i] && sel[i].json.rowPinId) || '';\n  const rowNumber = (sel[i] && sel[i].json.row_number);\n  const sourceTab = (sel[i] && sel[i].json.sourceTab);\n  const retryCount = (sel[i] && sel[i].json.retryCount) || 0;\n  const postId = (sel[i] && sel[i].json.postId) || '';\n  if (!rowPinId) continue;\n  const status = httpError ? 'ERROR' : (provider.status || '').toString().toUpperCase();\n\n  if (status === 'PUBLISHED' && provider.publicUrl) {\n    out.push({ json: {\n      'row_number': rowNumber,\n      '_sourceTab': sourceTab,\n      'Pin ID': rowPinId,\n      'Status': 'Published',\n      'Pin URL': provider.publicUrl,\n      'Pinned Time': pinnedTimeIso(post),\n      'Error': '',\n      'Metricool Post ID': postId,\n      'Retry Count': retryCount,\n      'Scheduled Date': ''\n    } });\n  } else if (status === 'ERROR') {\n    const reason = httpError || String(provider.detailedStatus || 'Metricool reported this post as failed');\n    const newRetryCount = retryCount + 1;\n    if (newRetryCount <= maxRetries) {\n      // Auto-retry: hand it back to WF2 as a fresh Review row, with the stale\n      // Post ID cleared and a new near-future Scheduled Date (otherwise WF2 would\n      // immediately reject it again for having a past-due schedule instead of actually\n      // retrying it).\n      out.push({ json: {\n        'row_number': rowNumber,\n        '_sourceTab': sourceTab,\n        'Pin ID': rowPinId,\n        'Status': 'Review',\n        'Pin URL': '',\n        'Pinned Time': '',\n        'Metricool Post ID': '',\n        'Retry Count': newRetryCount,\n        'Scheduled Date': nextRetrySlot().toFormat('yyyy-LL-dd HH:mm'),\n        'Error': reason.slice(0, 250) + ' (retry ' + newRetryCount + '/' + maxRetries + ')'\n      } });\n    } else {\n      // Exhausted retries -- leave it as a terminal error for manual review\n      out.push({ json: {\n        'row_number': rowNumber,\n        '_sourceTab': sourceTab,\n        'Pin ID': rowPinId,\n        'Status': 'Error',\n        'Pin URL': '',\n        'Pinned Time': '',\n        'Metricool Post ID': '',\n        'Retry Count': newRetryCount,\n        'Scheduled Date': '',\n        'Error': reason.slice(0, 250) + ' (gave up after ' + maxRetries + ' retries)'\n      } });\n    }\n  }\n  // any other status (PENDING, PUBLISHING, AWAITING_CONFIRMATION, DRAFT) is still pending -- skip, checked again next run\n}\nreturn out;\n"
+        "jsCode": "const responses = $input.all();\nconst sel = $('Select Scheduled').all().map(i => i.json);\nconst cfg = $('Set Config').first().json;\nconst maxRetries = cfg.maxRetries || 3;\nconst retryHours = (cfg.retryHours || '9,10').split(',').map(h => parseInt(h.trim(), 10)).filter(h => !isNaN(h)).sort((a, b) => a - b);\n\nfunction nextRetrySlot() {\n  const zone = 'America/Toronto';\n  const nowPlus15 = $now.plus({ minutes: 15 });\n  const nowLocal = $now.setZone(zone);\n  for (const h of retryHours) {\n    const slot = nowLocal.set({ hour: h, minute: 0, second: 0, millisecond: 0 });\n    if (slot > nowPlus15) return slot;\n  }\n  return nowLocal.plus({ days: 1 }).set({ hour: retryHours[0], minute: 0, second: 0, millisecond: 0 });\n}\n\n// Route by Platform sent 'tailwind' items down output 0 -> Merge Post Checks input 1 (Get Tailwind Post),\n// and everything else ('metricool') down output 1 -> Merge Post Checks input 0 (Get Post). Merge in\n// 'append' mode puts input-1 items first, then input-2 items -- so responses[] here is laid out as\n// [ all metricool responses in metricoolSel order ] followed by [ all tailwind responses in tailwindSel order ].\nconst metricoolSel = sel.filter(s => s.platform !== 'tailwind');\nconst tailwindSel = sel.filter(s => s.platform === 'tailwind');\nconst pairs = [\n  ...metricoolSel.map((s, i) => ({ sel: s, raw: responses[i] && responses[i].json, platform: 'metricool' })),\n  ...tailwindSel.map((s, i) => ({ sel: s, raw: responses[metricoolSel.length + i] && responses[metricoolSel.length + i].json, platform: 'tailwind' })),\n];\n\nfunction pickPost(r) { const o = Array.isArray(r) ? (r[0] || {}) : r; return (o && o.data) || o || {}; }\nfunction pickPinterestProvider(post) { const providers = post.providers || []; return providers.find(p => p.network === 'pinterest') || providers[0] || {}; }\nfunction pickTw(r) { const o = Array.isArray(r) ? (r[0] || {}) : r; return (o && o.data && (o.data.post || o.data)) || (o && o.post) || o || {}; }\nfunction pickHttpError(r) {\n  // Both Get Post and Get Tailwind Post have onError: continueRegularOutput, so a failed\n  // lookup (bad/pre-migration id, or a Metricool id that's actually a Tailwind id or vice\n  // versa) comes through as { error: {...} } instead of throwing -- without this check\n  // those rows would silently look \"still pending\" forever and retry the same failure\n  // every single hourly run.\n  const o = Array.isArray(r) ? (r[0] || {}) : r;\n  if (o && o.error) return 'Could not verify this post (invalid or wrong-platform post ID)';\n  return null;\n}\nfunction pinnedTimeIso(dateTime, zone) {\n  if (!dateTime) return '';\n  const dt = DateTime.fromISO(dateTime, { zone: zone || 'utc' });\n  return dt.isValid ? dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : '';\n}\nfunction pinnedTimeFromEpoch(ts) {\n  // Tailwind returns sentAt/sendAt as a Unix epoch number (seconds OR milliseconds --\n  // both are seen in practice), not an ISO string like Metricool's publicationDate.\n  if (ts == null || ts === '') return '';\n  let n = Number(ts);\n  if (isNaN(n)) return '';\n  if (n < 1e12) n *= 1000; // seconds -> ms\n  const dt = DateTime.fromMillis(n);\n  return dt.isValid ? dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : '';\n}\n\nconst out = [];\nfor (const { sel: s, raw, platform } of pairs) {\n  const httpError = pickHttpError(raw);\n  const rowPinId = s.rowPinId, rowNumber = s.row_number, sourceTab = s.sourceTab, retryCount = s.retryCount || 0, postId = s.postId;\n  if (!rowPinId) continue;\n\n  let status, publicUrl = '', pinnedTime = '', reason = '';\n  if (httpError) {\n    status = 'ERROR'; reason = httpError;\n  } else if (platform === 'metricool') {\n    const post = pickPost(raw);\n    const provider = pickPinterestProvider(post);\n    status = (provider.status || '').toString().toUpperCase();\n    publicUrl = provider.publicUrl || '';\n    pinnedTime = pinnedTimeIso((post.publicationDate || {}).dateTime, (post.publicationDate || {}).timezone);\n    reason = String(provider.detailedStatus || 'Metricool reported this post as failed');\n  } else {\n    // Tailwind: status is 'queued' | 'uploading' (still pending) | 'sent' (published, has pinId) |\n    // anything else is treated as failed -- better to surface + retry an unrecognized state than\n    // silently leave the row stuck on Scheduled forever.\n    const post = pickTw(raw);\n    const twStatus = String(post.status || '').toLowerCase();\n    if (twStatus === 'sent' && post.pinId) {\n      status = 'PUBLISHED';\n      publicUrl = 'https://www.pinterest.com/pin/' + post.pinId + '/';\n      pinnedTime = pinnedTimeFromEpoch(post.sentAt || post.sendAt);\n    } else if (twStatus === 'queued' || twStatus === 'uploading') {\n      status = 'PENDING';\n    } else {\n      status = 'ERROR';\n      reason = 'Tailwind reported this post as ' + (twStatus || '(unknown status)');\n    }\n  }\n\n  if (status === 'PUBLISHED' && publicUrl) {\n    out.push({ json: {\n      'row_number': rowNumber, '_sourceTab': sourceTab, 'Pin ID': rowPinId,\n      'Status': 'Published', 'Pin URL': publicUrl, 'Pinned Time': pinnedTime, 'Error': '',\n      'Metricool Post ID': platform === 'metricool' ? postId : '',\n      'Tailwind Post ID': platform === 'tailwind' ? postId : '',\n      'Platform': platform === 'metricool' ? 'Metricool' : 'Tailwind',\n      'Retry Count': retryCount, 'Scheduled Date': ''\n    } });\n  } else if (status === 'ERROR') {\n    const newRetryCount = retryCount + 1;\n    if (newRetryCount <= maxRetries) {\n      // Auto-retry: hand it back to WF2 as a fresh Review row (WF2 only ever creates via\n      // Metricool, so both post-ID columns and Platform are cleared regardless of which\n      // platform this attempt came from) with a new near-future Scheduled Date.\n      out.push({ json: {\n        'row_number': rowNumber, '_sourceTab': sourceTab, 'Pin ID': rowPinId,\n        'Status': 'Review', 'Pin URL': '', 'Pinned Time': '',\n        'Metricool Post ID': '', 'Tailwind Post ID': '', 'Platform': '',\n        'Retry Count': newRetryCount,\n        'Scheduled Date': nextRetrySlot().toFormat('yyyy-LL-dd HH:mm'),\n        'Error': reason.slice(0, 250) + ' (retry ' + newRetryCount + '/' + maxRetries + ')'\n      } });\n    } else {\n      out.push({ json: {\n        'row_number': rowNumber, '_sourceTab': sourceTab, 'Pin ID': rowPinId,\n        'Status': 'Error', 'Pin URL': '', 'Pinned Time': '',\n        'Metricool Post ID': '', 'Tailwind Post ID': '', 'Platform': '',\n        'Retry Count': newRetryCount, 'Scheduled Date': '',\n        'Error': reason.slice(0, 250) + ' (gave up after ' + maxRetries + ' retries)'\n      } });\n    }\n  }\n  // PENDING (still queued/uploading/awaiting confirmation/draft) -- skip, checked again next run\n}\nreturn out;"
       },
-      "id": "044731a6-e6fe-464c-9425-6d23a8b59f3f",
+      "id": "363c68a3-4061-4aa1-8abf-85248b38dc39",
       "name": "Build Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11088,
+        11552,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "328fbd0d-350e-47e5-b034-59b8ebae9718",
+      "name": "Get Pins 2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        11344,
         1168
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "efec24ed-2617-46c4-9386-0aa19a29684b",
+              "leftValue": "={{ $json._sourceTab }}",
+              "rightValue": "={{ $('Set Config').first().json.pinsTab }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9120e7c6-7133-4a7f-8eb4-29169d9225ce",
+      "name": "Route by Sheet",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        11776,
+        1440
       ]
     },
     {
@@ -197,7 +266,7 @@
         },
         "sheetName": {
           "__rl": true,
-          "value": "={{ $json._sourceTab }}",
+          "value": "={{ $('Set Config').first().json.pinsTab }}",
           "mode": "name"
         },
         "columns": {
@@ -211,7 +280,9 @@
             "Error": "={{ $json['Error'] }}",
             "Metricool Post ID": "={{ $json['Metricool Post ID'] }}",
             "Retry Count": "={{ $json['Retry Count'] }}",
-            "Scheduled Date": "={{ $json['Scheduled Date'] }}"
+            "Scheduled Date": "={{ $json['Scheduled Date'] }}",
+            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}",
+            "Platform": "={{ $json['Platform'] }}"
           },
           "matchingColumns": [
             "row_number"
@@ -475,14 +546,16 @@
         },
         "options": {}
       },
-      "id": "2bba94cc-bd7e-4993-8a63-163da9a0e1ec",
-      "name": "Update Pin Row",
+      "id": "80af314b-8615-4a36-9748-3b3a62143541",
+      "name": "Update Pin Row (Pinterest Pins)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        11312,
-        1168
+        12016,
+        1344
       ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -492,6 +565,7 @@
     },
     {
       "parameters": {
+        "operation": "update",
         "documentId": {
           "__rl": true,
           "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
@@ -502,23 +576,373 @@
           "value": "={{ $('Set Config').first().json.pinsTab2 }}",
           "mode": "name"
         },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Pin ID": "={{ $json['Pin ID'] }}",
+            "Status": "={{ $json['Status'] }}",
+            "Pin URL": "={{ $json['Pin URL'] }}",
+            "Pinned Time": "={{ $json['Pinned Time'] }}",
+            "Error": "={{ $json['Error'] }}",
+            "Metricool Post ID": "={{ $json['Metricool Post ID'] }}",
+            "Retry Count": "={{ $json['Retry Count'] }}",
+            "Scheduled Date": "={{ $json['Scheduled Date'] }}",
+            "Tailwind Post ID": "={{ $json['Tailwind Post ID'] }}",
+            "Platform": "={{ $json['Platform'] }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Pin ID",
+              "displayName": "Pin ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Blog No.",
+              "displayName": "Blog No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Blog Title",
+              "displayName": "Blog Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Type",
+              "displayName": "Pin Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 1",
+              "displayName": "Preview 1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 2",
+              "displayName": "Preview 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 3",
+              "displayName": "Preview 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 1 URL",
+              "displayName": "Image 1 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 2 URL",
+              "displayName": "Image 2 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 3 URL",
+              "displayName": "Image 3 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Title",
+              "displayName": "Pin Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pin Description",
+              "displayName": "Pin Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Alt Text",
+              "displayName": "Alt Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Blog Link",
+              "displayName": "Blog Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Board",
+              "displayName": "Board",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Board ID",
+              "displayName": "Board ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Scheduled Date",
+              "displayName": "Scheduled Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Approval",
+              "displayName": "Approval",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Metricool Post ID",
+              "displayName": "Metricool Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pin URL",
+              "displayName": "Pin URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created Time",
+              "displayName": "Created Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Pinned Time",
+              "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true
+            },
+            {
+              "id": "Retry Count",
+              "displayName": "Retry Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
         "options": {}
       },
-      "id": "c7dab37b-ed82-47ba-8a31-ea364893cf63",
-      "name": "Get Pins 2",
+      "id": "ae22c82f-2079-4522-857d-6da6f9f4175e",
+      "name": "Update Pin Row (Pinterest2:3 Pins)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        10448,
-        1168
+        12016,
+        1568
       ],
-      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
           "name": "Template_control"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9f979a0a-4b8a-45de-b435-96663b38f662",
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "tailwind",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6040148f-ffe5-4d08-a983-4ff64da631ad",
+      "name": "Route by Platform",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        10736,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api-v1.tailwind.ai/v1/accounts/{{ $('Set Config').first().json.tailwindAccountId }}/posts/{{ $json.postId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        }
+      },
+      "id": "53d24d6f-6acf-4900-b154-c84fef576c3a",
+      "name": "Get Tailwind Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10992,
+        1392
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "04bNNmDkPyRmwKce",
+          "name": "Tailwind App"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "33676d81-9ef3-48dc-b9f9-b23d3a8a037f",
+      "name": "Merge Post Checks",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        11328,
+        1440
+      ]
     }
   ],
   "pinData": {},
@@ -560,7 +984,7 @@
       "main": [
         [
           {
-            "node": "Get Post",
+            "node": "Route by Platform",
             "type": "main",
             "index": 0
           }
@@ -571,7 +995,7 @@
       "main": [
         [
           {
-            "node": "Build Update",
+            "node": "Merge Post Checks",
             "type": "main",
             "index": 0
           }
@@ -582,7 +1006,7 @@
       "main": [
         [
           {
-            "node": "Update Pin Row",
+            "node": "Route by Sheet",
             "type": "main",
             "index": 0
           }
@@ -599,6 +1023,64 @@
           }
         ]
       ]
+    },
+    "Route by Sheet": {
+      "main": [
+        [
+          {
+            "node": "Update Pin Row (Pinterest Pins)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Pin Row (Pinterest2:3 Pins)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "Get Tailwind Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tailwind Post": {
+      "main": [
+        [
+          {
+            "node": "Merge Post Checks",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Post Checks": {
+      "main": [
+        [
+          {
+            "node": "Build Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -610,7 +1092,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "90b25e6c-2621-40d8-84e1-066bfbe86895",
+  "versionId": "8606b22f-296a-4d55-9aa2-aa1c684a3bbd",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"

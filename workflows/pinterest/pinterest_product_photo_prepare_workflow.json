@@ -7,13 +7,13 @@
         "height": 476,
         "width": 480
       },
-      "id": "b6c74e4e-072c-4737-9e99-79b0258e725d",
+      "id": "caf6099a-965b-469a-a300-e27abfc811b0",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -6240,
-        3376
+        -8704,
+        3520
       ]
     },
     {
@@ -27,13 +27,13 @@
           ]
         }
       },
-      "id": "ff9301f8-ff02-46ed-8c95-9b66a23a7396",
+      "id": "3b15eecd-a80b-4393-a99b-bae052a9b438",
       "name": "⏰ Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -5680,
-        3520
+        -8128,
+        4176
       ]
     },
     {
@@ -129,18 +129,24 @@
               "name": "boardsTab",
               "type": "string",
               "value": "Pinterest Boards"
+            },
+            {
+              "id": "63a63516-f910-4ee5-86fc-84c07fb05166",
+              "name": "imageHashCacheTab",
+              "type": "string",
+              "value": "Image Hash Cache"
             }
           ]
         },
         "options": {}
       },
-      "id": "52ab2e34-cd29-4464-a15a-c584260381ab",
+      "id": "0f29427a-05fe-400a-be23-a5d816873163",
       "name": "⚙️ Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -5456,
-        3520
+        -7904,
+        4176
       ]
     },
     {
@@ -157,13 +163,13 @@
         },
         "options": {}
       },
-      "id": "c07bf7cd-a73f-4604-bd48-650869ebf0dc",
+      "id": "002e8724-aa14-4736-a09c-2b4d27296659",
       "name": "📋 Get Existing Pin Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -5232,
-        3520
+        -7680,
+        4176
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -190,13 +196,13 @@
         },
         "options": {}
       },
-      "id": "5ac703dd-0f89-4b4a-8211-bdd55d79a32d",
+      "id": "95583651-58c9-46d2-9df1-5d48e1c0af58",
       "name": "🚫 Get Failed Images",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -5008,
-        3520
+        -7472,
+        4176
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -222,13 +228,13 @@
         },
         "options": {}
       },
-      "id": "a6c6097f-cdff-4094-8ba1-142671556f78",
+      "id": "6d8255ad-2270-449d-95b5-a13b8fb10b41",
       "name": "📁 List All Drive Folders",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -4560,
-        3520
+        -6848,
+        4176
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -244,26 +250,26 @@
       "parameters": {
         "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst sd = $getWorkflowStaticData('global');\n// Clear any leftover state from a previous (possibly interrupted) run\nsd.candidates = [];\nsd.unmatchedImages = [];\nsd.skippedNoUrlCount = 0;\nsd.skippedAlreadyFailedCount = 0;\nsd.skippedCategories = [];\n\nconst folders = $input.all().map(i => i.json);\nconst categories = (cfg.categories || '').split(',').map(s => s.trim()).filter(Boolean);\n\nfunction norm(s) {\n  return String(s || '')\n    .toLowerCase()\n    .replace(/[\\s_-]+/g, '')\n    .trim();\n}\n\nconst out = [];\nfor (const category of categories) {\n  const target = norm(category);\n  const match = folders.find(f => norm(f.name) === target);\n  if (!match) {\n    sd.skippedCategories.push(category);\n    continue;\n  }\n  out.push({ json: { category, folderId: match.id } });\n}\nreturn out;\n"
       },
-      "id": "a598c6b2-301a-4d7f-84d2-4c244404bd59",
+      "id": "3b65738e-ff3f-418b-a40c-2bede6ec3efb",
       "name": "🧭 Resolve Category Folders",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4336,
-        3520
+        -6624,
+        4176
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "f1426a99-c8ce-4034-ac40-c4a4bf8988a6",
+      "id": "dd0dd841-2903-416c-beb6-79a05eaea4df",
       "name": "🔁 Iterate Category Folders",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -4112,
-        3520
+        -6400,
+        4176
       ]
     },
     {
@@ -279,13 +285,13 @@
         },
         "options": {}
       },
-      "id": "1a2ead22-167c-49ef-8582-c49bf2dd3b22",
+      "id": "ec05aa1e-8018-4469-98db-19d54327f03c",
       "name": "🗂️ List Images in Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -4048,
-        3856
+        -6336,
+        4512
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -300,13 +306,13 @@
       "parameters": {
         "jsCode": "return $input.all()\n  .filter(({ json }) => /\\.(png|jpe?g|webp)$/i.test(json.name || ''))\n  .map(({ json }) => ({ json: { id: json.id, name: json.name, mimeType: json.mimeType || '' } }));\n"
       },
-      "id": "719e8acb-ecfb-4d85-abb8-4d957f1beffc",
+      "id": "5f17b685-8623-42c5-b0b5-eaab138732b0",
       "name": "🖼️ Filter Image Files",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3824,
-        3856
+        -6112,
+        4512
       ]
     },
     {
@@ -323,13 +329,13 @@
         },
         "options": {}
       },
-      "id": "fdd505d9-3ac6-4b03-afb9-3e9b47806af1",
+      "id": "21845385-89e8-46b2-af44-1f52ca46bb38",
       "name": "📊 Get Product Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -3600,
-        3856
+        -5888,
+        4512
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -343,28 +349,28 @@
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst category = $('🔁 Iterate Category Folders').item.json.category;\n\n// Some category tabs have a plain single-row header (row 1 = real headers,\n// data from row 2). Others have a 2-row header (row 1 = assorted notes/labels,\n// row 2 = the real headers, data from row 3) -- the same layout already known\n// from the Wall-Coverings tab. Rather than hardcode which tabs use which\n// layout (fragile -- a single miscategorized tab silently returns zero\n// matches), detect it directly from the data: if 'Product No.' isn't already\n// a usable key, find the row whose VALUES contain 'Product No.' literally --\n// that's the real header row -- and remap every row after it accordingly.\nfunction remapProductRows(rows) {\n  const alreadyGood = rows.some(r => Object.prototype.hasOwnProperty.call(r, 'Product No.') && String(r['Product No.'] || '').trim());\n  if (alreadyGood) return rows;\n\n  const headerRowIndex = rows.findIndex(r => Object.values(r).some(v => String(v ?? '').trim() === 'Product No.'));\n  if (headerRowIndex === -1) return []; // headers not found in any layout -- nothing usable for this tab\n\n  const headerRow = rows[headerRowIndex];\n  const keyToRealHeader = {};\n  for (const [key, value] of Object.entries(headerRow)) {\n    const label = String(value ?? '').trim();\n    if (label) keyToRealHeader[key] = label;\n  }\n\n  return rows.slice(headerRowIndex + 1).map(r => {\n    const remapped = {};\n    for (const [key, value] of Object.entries(r)) {\n      remapped[keyToRealHeader[key] || key] = value;\n    }\n    return remapped;\n  });\n}\n\nconst productRows = remapProductRows($input.all().map(i => i.json));\nconst images = $('🖼️ Filter Image Files').all().map(i => i.json);\n\nconst sd = $getWorkflowStaticData('global');\n\nconst pinnedFileIds = new Set(\n  $('📋 Get Existing Pin Rows').all()\n    .map(i => String(i.json['Image File ID'] || '').trim())\n    .filter(Boolean)\n);\n\nconst failedAttempts = new Map();\nfor (const row of $('🚫 Get Failed Images').all()) {\n  const fid = String(row.json['Image File ID'] || '').trim();\n  const count = parseInt(row.json['Attempt Count'], 10) || 0;\n  if (fid) failedAttempts.set(fid, count);\n}\n\n// Build product lookup: every Product No. in this tab, whether or not it has a Shopify URL yet\nconst productMap = new Map();       // canonical Product No. -> {shopifyUrl, material, keyword}\nconst productNoByUpper = new Map(); // UPPERCASE(Product No.) -> canonical Product No. (for exact lookup)\nfor (const row of productRows) {\n  const no = String(row['Product No.'] || '').trim();\n  if (!no) continue;\n  productMap.set(no, {\n    shopifyUrl: String(row['Shopify_Product_URL'] || '').trim(),\n    material:   row['Material'] || '',\n    keyword:    row['Keywords (Luna)'] || '',\n  });\n  productNoByUpper.set(no.toUpperCase(), no);\n}\n\n// The Product No. is the leading alphanumeric token of the filename\n// (e.g. \"LSBLD178- (1)_2x3.jpg\" -> \"LSBLD178\"). Matched by EXACT equality\n// against the sheet's Product No. values -- no substring/\"contains\" logic,\n// so \"LSBLD178\" can never accidentally match \"LSBLD17\" or vice versa.\nfunction matchProductNo(fileName) {\n  const m = String(fileName || '').match(/^[A-Za-z0-9]+/);\n  if (!m) return null;\n  return productNoByUpper.get(m[0].toUpperCase()) || null;\n}\n\nconst groups = {};\nlet skippedNoUrlCount = 0;\nlet skippedAlreadyFailedCount = 0;\nconst unmatchedImages = [];\n\nfor (const img of images) {\n  const productNo = matchProductNo(img.name || '');\n  if (!productNo) { unmatchedImages.push({ category, name: img.name }); continue; }\n\n  const info = productMap.get(productNo);\n  if (!info.shopifyUrl) { skippedNoUrlCount++; continue; }\n\n  if (pinnedFileIds.has(img.id)) continue; // already pinned -- the actual dedup guarantee\n\n  const attempts = failedAttempts.get(img.id) || 0;\n  if (attempts >= (cfg.maxUploadAttempts || 3)) { skippedAlreadyFailedCount++; continue; }\n\n  if (!groups[productNo]) {\n    groups[productNo] = {\n      productNo, category,\n      shopifyUrl: info.shopifyUrl,\n      material: info.material,\n      keyword: info.keyword,\n      images: [],\n    };\n  }\n  groups[productNo].images.push(img);\n}\n\nfunction naturalCompare(a, b) {\n  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });\n}\n\nconst perProductCap = cfg.perProductDailyCap || 10;\nconst entries = Object.values(groups).map(g => {\n  g.images.sort((a, b) => naturalCompare(a.name, b.name));\n  g.images = g.images.slice(0, perProductCap);\n  return g;\n}).filter(g => g.images.length > 0);\n\nsd.candidates = (sd.candidates || []).concat(entries);\nsd.unmatchedImages = (sd.unmatchedImages || []).concat(unmatchedImages);\nsd.skippedNoUrlCount = (sd.skippedNoUrlCount || 0) + skippedNoUrlCount;\nsd.skippedAlreadyFailedCount = (sd.skippedAlreadyFailedCount || 0) + skippedAlreadyFailedCount;\n\nreturn [{ json: { category, matchedProducts: entries.length, imagesQueued: entries.reduce((n, e) => n + e.images.length, 0) } }];\n"
+        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst category = $('🔁 Iterate Category Folders').item.json.category;\n\n// Some category tabs have a plain single-row header (row 1 = real headers,\n// data from row 2). Others have a 2-row header (row 1 = assorted notes/labels,\n// row 2 = the real headers, data from row 3) -- the same layout already known\n// from the Wall-Coverings tab. Rather than hardcode which tabs use which\n// layout (fragile -- a single miscategorized tab silently returns zero\n// matches), detect it directly from the data: if 'Product No.' isn't already\n// a usable key, find the row whose VALUES contain 'Product No.' literally --\n// that's the real header row -- and remap every row after it accordingly.\nfunction remapProductRows(rows) {\n  const alreadyGood = rows.some(r => Object.prototype.hasOwnProperty.call(r, 'Product No.') && String(r['Product No.'] || '').trim());\n  if (alreadyGood) return rows;\n\n  const headerRowIndex = rows.findIndex(r => Object.values(r).some(v => String(v ?? '').trim() === 'Product No.'));\n  if (headerRowIndex === -1) return []; // headers not found in any layout -- nothing usable for this tab\n\n  const headerRow = rows[headerRowIndex];\n  const keyToRealHeader = {};\n  for (const [key, value] of Object.entries(headerRow)) {\n    const label = String(value ?? '').trim();\n    if (label) keyToRealHeader[key] = label;\n  }\n\n  return rows.slice(headerRowIndex + 1).map(r => {\n    const remapped = {};\n    for (const [key, value] of Object.entries(r)) {\n      remapped[keyToRealHeader[key] || key] = value;\n    }\n    return remapped;\n  });\n}\n\nconst productRows = remapProductRows($input.all().map(i => i.json));\nconst images = $('🖼️ Filter Image Files').all().map(i => i.json);\n\nconst sd = $getWorkflowStaticData('global');\n\nconst pinnedById = new Map(\n  $('📋 Get Existing Pin Rows').all()\n    .map(i => i.json)\n    .filter(r => String(r['Image File ID'] || '').trim())\n    .map(r => [String(r['Image File ID']).trim(), r])\n);\n\n// Board-candidate lookup, same rule \"🧩 Check Upload Result\" uses for new pins --\n// a board's Category cell can list several categories separated by \"|\" or \",\".\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(category);\nconst candidateBoardsForCategory = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst failedAttempts = new Map();\nfor (const row of $('🚫 Get Failed Images').all()) {\n  const fid = String(row.json['Image File ID'] || '').trim();\n  const count = parseInt(row.json['Attempt Count'], 10) || 0;\n  if (fid) failedAttempts.set(fid, count);\n}\n\n// Build product lookup: every Product No. in this tab, whether or not it has a Shopify URL yet\nconst productMap = new Map();       // canonical Product No. -> {shopifyUrl, material, keyword}\nconst productNoByUpper = new Map(); // UPPERCASE(Product No.) -> canonical Product No. (for exact lookup)\nfor (const row of productRows) {\n  const no = String(row['Product No.'] || '').trim();\n  if (!no) continue;\n  productMap.set(no, {\n    shopifyUrl: String(row['Shopify_Product_URL'] || '').trim(),\n    material:   row['Material'] || '',\n    keyword:    row['Keywords (Luna)'] || '',\n  });\n  productNoByUpper.set(no.toUpperCase(), no);\n}\n\n// The Product No. is the leading alphanumeric token of the filename\n// (e.g. \"LSBLD178- (1)_2x3.jpg\" -> \"LSBLD178\"). Matched by EXACT equality\n// against the sheet's Product No. values -- no substring/\"contains\" logic,\n// so \"LSBLD178\" can never accidentally match \"LSBLD17\" or vice versa.\nfunction matchProductNo(fileName) {\n  const m = String(fileName || '').match(/^[A-Za-z0-9]+/);\n  if (!m) return null;\n  return productNoByUpper.get(m[0].toUpperCase()) || null;\n}\n\nconst groups = {};\nlet skippedNoUrlCount = 0;\nlet skippedAlreadyFailedCount = 0;\nconst unmatchedImages = [];\n\nfor (const img of images) {\n  const productNo = matchProductNo(img.name || '');\n  if (!productNo) { unmatchedImages.push({ category, name: img.name }); continue; }\n\n  const info = productMap.get(productNo);\n  if (!info.shopifyUrl) { skippedNoUrlCount++; continue; }\n\n  const existingRow = pinnedById.get(img.id);\n  if (existingRow) {\n    // Already has a row -- never create a duplicate. But if it's still stuck on\n    // \"Needs Board\" from an earlier run (no board matched its category back then)\n    // and a board for this category now exists (e.g. the client just added one),\n    // self-heal it here instead of leaving it stuck forever waiting for a human\n    // to notice and fix Status+Approval by hand.\n    const st = String(existingRow['Status'] || '').trim().toLowerCase();\n    const ap = String(existingRow['Approval'] || '').trim().toLowerCase();\n    const isProductPhotoRow = String(existingRow['Source'] || '').trim() === 'product-photo';\n    if (isProductPhotoRow && (st === 'needs board' || ap === 'needs board') && candidateBoardsForCategory.length) {\n      sd.needsBoardHeal = sd.needsBoardHeal || [];\n      sd.needsBoardHeal.push({\n        rowNumber: existingRow.row_number,\n        board: candidateBoardsForCategory[0].name,\n        boardId: candidateBoardsForCategory[0].id,\n      });\n    }\n    continue; // already pinned -- the actual dedup guarantee\n  }\n\n  const attempts = failedAttempts.get(img.id) || 0;\n  if (attempts >= (cfg.maxUploadAttempts || 3)) { skippedAlreadyFailedCount++; continue; }\n\n  if (!groups[productNo]) {\n    groups[productNo] = {\n      productNo, category,\n      shopifyUrl: info.shopifyUrl,\n      material: info.material,\n      keyword: info.keyword,\n      images: [],\n    };\n  }\n  groups[productNo].images.push(img);\n}\n\nfunction naturalCompare(a, b) {\n  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });\n}\n\nconst perProductCap = cfg.perProductDailyCap || 10;\nconst entries = Object.values(groups).map(g => {\n  g.images.sort((a, b) => naturalCompare(a.name, b.name));\n  g.images = g.images.slice(0, perProductCap);\n  return g;\n}).filter(g => g.images.length > 0);\n\nsd.candidates = (sd.candidates || []).concat(entries);\nsd.unmatchedImages = (sd.unmatchedImages || []).concat(unmatchedImages);\nsd.skippedNoUrlCount = (sd.skippedNoUrlCount || 0) + skippedNoUrlCount;\nsd.skippedAlreadyFailedCount = (sd.skippedAlreadyFailedCount || 0) + skippedAlreadyFailedCount;\n\nreturn [{ json: { category, matchedProducts: entries.length, imagesQueued: entries.reduce((n, e) => n + e.images.length, 0) } }];\n"
       },
-      "id": "ecd82475-f126-4318-a6dd-866cb40a8ad7",
+      "id": "02d6dcfe-3325-4cf9-ae90-57edb571ee81",
       "name": "🔗 Match & Filter",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3392,
-        3856
+        -5680,
+        4512
       ]
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst candidates = sd.candidates || [];\n\nconst pinnedRows = $('📋 Get Existing Pin Rows').all().map(i => i.json);\n\n// Fairness ordering: products with fewest ALREADY-PUBLISHED-OR-QUEUED images\n// (from actual Pinterest Pins history) go first, so no product gets starved\n// while others pile up.\nfunction pinnedCountFor(productNo) {\n  return pinnedRows.filter(r => String(r['Product No.'] || '').trim() === productNo).length;\n}\n\nconst sorted = [...candidates].sort((a, b) => {\n  const diff = pinnedCountFor(a.productNo) - pinnedCountFor(b.productNo);\n  if (diff !== 0) return diff;\n  return a.productNo.localeCompare(b.productNo);\n});\n\n// Round-robin flatten: one image at a time from each product in priority\n// order, cycling until EVERY eligible image is included (not capped to a\n// subset) -- a product with 2 images now always gets 2 rows, just possibly\n// scheduled on different days.\nconst pointers = sorted.map(() => 0);\nconst flatList = [];\nlet progressed = true;\nwhile (progressed) {\n  progressed = false;\n  for (let i = 0; i < sorted.length; i++) {\n    const group = sorted[i];\n    if (pointers[i] >= group.images.length) continue;\n    const img = group.images[pointers[i]];\n    pointers[i]++;\n    progressed = true;\n    flatList.push({\n      productNo: group.productNo, category: group.category,\n      shopifyUrl: group.shopifyUrl, material: group.material, keyword: group.keyword,\n      fileId: img.id, fileName: img.name, mimeType: img.mimeType,\n    });\n  }\n}\n\n// Clear accumulated state now that it's been consumed\nsd.candidates = [];\n\n// -- Scheduling: pinsPerDay new pins per day, each scheduleHourSpacing hours\n// apart, continuing from whatever slot the last already-scheduled\n// product-photo pin used (so re-running this daily extends the schedule\n// further out instead of double-booking the same slots).\nconst pinsPerDay = cfg.pinsPerDay || 10;\nconst hourSpacing = cfg.scheduleHourSpacing || 2;\nconst dayStartHour = cfg.scheduleDayStartHour || 4;\n\nconst existingScheduled = pinnedRows\n  .filter(r => String(r['Source'] || '').trim() === 'product-photo')\n  .map(r => String(r['Scheduled Date'] || '').trim())\n  .filter(Boolean)\n  .map(s => DateTime.fromFormat(s, 'yyyy-LL-dd HH:mm'))\n  .filter(d => d.isValid);\n\nconst tomorrowStart = $now.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 });\n\nlet cursor = existingScheduled.length ? DateTime.max(...existingScheduled).plus({ hours: hourSpacing }) : tomorrowStart;\nif (cursor < tomorrowStart) cursor = tomorrowStart; // never schedule earlier than tomorrow\n\n// If the last existing slot wasn't day-aligned to pinsPerDay (e.g. config\n// changed), just keep incrementing by hourSpacing and roll to the next\n// day's start hour once a day's quota is filled from THIS point forward.\nconst finalList = flatList.map((item, idx) => {\n  if (idx > 0) {\n    const daySlot = idx % pinsPerDay;\n    cursor = daySlot === 0\n      ? cursor.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 })\n      : cursor.plus({ hours: hourSpacing });\n  }\n  return { json: { ...item, scheduledDate: cursor.toFormat('yyyy-LL-dd HH:mm') } };\n});\n\nconsole.log(JSON.stringify({\n  totalProducts: sorted.length,\n  totalImagesScheduled: finalList.length,\n  daysSpanned: Math.ceil(finalList.length / pinsPerDay),\n  firstScheduledDate: finalList[0] ? finalList[0].json.scheduledDate : null,\n  lastScheduledDate: finalList.length ? finalList[finalList.length - 1].json.scheduledDate : null,\n  unmatchedImages: sd.unmatchedImages,\n  skippedNoUrlCount: sd.skippedNoUrlCount,\n  skippedAlreadyFailedCount: sd.skippedAlreadyFailedCount,\n  skippedCategories: sd.skippedCategories,\n}));\n\nreturn finalList.length ? finalList : [{ json: { _noImagesToProcess: true } }];\n"
+        "jsCode": "const cfg = $('⚙️ Set Config').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst candidates = sd.candidates || [];\n\nconst pinnedRows = $('📋 Get Existing Pin Rows').all().map(i => i.json);\n\n// Fairness ordering: products with fewest ALREADY-PUBLISHED-OR-QUEUED images\n// (from actual Pinterest Pins history) go first, so no product gets starved\n// while others pile up.\nfunction pinnedCountFor(productNo) {\n  return pinnedRows.filter(r => String(r['Product No.'] || '').trim() === productNo).length;\n}\n\nconst sorted = [...candidates].sort((a, b) => {\n  const diff = pinnedCountFor(a.productNo) - pinnedCountFor(b.productNo);\n  if (diff !== 0) return diff;\n  return a.productNo.localeCompare(b.productNo);\n});\n\n// Round-robin flatten: one image at a time from each product in priority\n// order, cycling until EVERY eligible image is included (not capped to a\n// subset) -- a product with 2 images now always gets 2 rows, just possibly\n// scheduled on different days.\nconst pointers = sorted.map(() => 0);\nconst flatList = [];\nlet progressed = true;\nwhile (progressed) {\n  progressed = false;\n  for (let i = 0; i < sorted.length; i++) {\n    const group = sorted[i];\n    if (pointers[i] >= group.images.length) continue;\n    const img = group.images[pointers[i]];\n    pointers[i]++;\n    progressed = true;\n    flatList.push({\n      productNo: group.productNo, category: group.category,\n      shopifyUrl: group.shopifyUrl, material: group.material, keyword: group.keyword,\n      fileId: img.id, fileName: img.name, mimeType: img.mimeType,\n    });\n  }\n}\n\n// Clear accumulated state now that it's been consumed\nsd.candidates = [];\nconst healItems = sd.needsBoardHeal || [];\nsd.needsBoardHeal = [];\n\n// -- Scheduling: pinsPerDay new pins per day, each scheduleHourSpacing hours\n// apart, continuing from whatever slot the last already-scheduled\n// product-photo pin used (so re-running this daily extends the schedule\n// further out instead of double-booking the same slots).\nconst pinsPerDay = cfg.pinsPerDay || 10;\nconst hourSpacing = cfg.scheduleHourSpacing || 2;\nconst dayStartHour = cfg.scheduleDayStartHour || 4;\n\nconst existingScheduled = pinnedRows\n  .filter(r => String(r['Source'] || '').trim() === 'product-photo')\n  .map(r => String(r['Scheduled Date'] || '').trim())\n  .filter(Boolean)\n  .map(s => DateTime.fromFormat(s, 'yyyy-LL-dd HH:mm'))\n  .filter(d => d.isValid);\n\nconst tomorrowStart = $now.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 });\n\nlet cursor = existingScheduled.length ? DateTime.max(...existingScheduled).plus({ hours: hourSpacing }) : tomorrowStart;\nif (cursor < tomorrowStart) cursor = tomorrowStart; // never schedule earlier than tomorrow\n\n// If the last existing slot wasn't day-aligned to pinsPerDay (e.g. config\n// changed), just keep incrementing by hourSpacing and roll to the next\n// day's start hour once a day's quota is filled from THIS point forward.\nconst finalList = flatList.map((item, idx) => {\n  if (idx > 0) {\n    const daySlot = idx % pinsPerDay;\n    cursor = daySlot === 0\n      ? cursor.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 })\n      : cursor.plus({ hours: hourSpacing });\n  }\n  return { json: { ...item, scheduledDate: cursor.toFormat('yyyy-LL-dd HH:mm') } };\n});\n\nconsole.log(JSON.stringify({\n  totalProducts: sorted.length,\n  totalImagesScheduled: finalList.length,\n  daysSpanned: Math.ceil(finalList.length / pinsPerDay),\n  firstScheduledDate: finalList[0] ? finalList[0].json.scheduledDate : null,\n  lastScheduledDate: finalList.length ? finalList[finalList.length - 1].json.scheduledDate : null,\n  unmatchedImages: sd.unmatchedImages,\n  skippedNoUrlCount: sd.skippedNoUrlCount,\n  skippedAlreadyFailedCount: sd.skippedAlreadyFailedCount,\n  skippedCategories: sd.skippedCategories,\n}));\n\n// Needs-Board rows being self-healed just need a Sheets update (no new image/AI\n// pipeline), so they don't compete with new pins for the round-robin fairness\n// ordering above -- but they DO share the same cursor/spacing so healing never\n// bunches a batch of updates into one timestamp either.\nconst healList = healItems.map((item, idx) => {\n  if (finalList.length + idx > 0) {\n    const globalIdx = finalList.length + idx;\n    const daySlot = globalIdx % pinsPerDay;\n    cursor = daySlot === 0\n      ? cursor.plus({ days: 1 }).set({ hour: dayStartHour, minute: 0, second: 0, millisecond: 0 })\n      : cursor.plus({ hours: hourSpacing });\n  }\n  return { json: { isHeal: true, fileId: 'heal-' + item.rowNumber, rowNumber: item.rowNumber, board: item.board, boardId: item.boardId, scheduledDate: cursor.toFormat('yyyy-LL-dd HH:mm') } };\n});\n\nconst combined = [...finalList, ...healList];\nreturn combined.length ? combined : [{ json: { _noImagesToProcess: true } }];\n"
       },
-      "id": "735c7720-3fa5-41f7-acd3-d79f53e8ba57",
+      "id": "d28121a3-ab19-4d23-a7df-302f4b720e0b",
       "name": "🗓️ Schedule All Pins (Round Robin)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3872,
-        3504
+        -6160,
+        4160
       ]
     },
     {
@@ -392,26 +398,26 @@
         },
         "options": {}
       },
-      "id": "a6c29c11-705b-4917-91c0-b2932575f126",
+      "id": "e9d4126f-fbde-456a-bf8f-3e0f35a99dee",
       "name": "🚦 IF Has Images",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -3648,
-        3504
+        -5936,
+        4160
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "f2cbc86f-ed4b-46da-a952-13a132213249",
+      "id": "8007a36f-1e20-410c-a9a8-8bf19140ad5b",
       "name": "🔁 Iterate Final Images",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -3344,
-        3488
+        -7904,
+        3616
       ]
     },
     {
@@ -426,15 +432,15 @@
           "fileName": "={{ $json.fileName }}"
         }
       },
-      "id": "7cf3c496-4107-4a9e-a2fb-f5e321b42fcb",
+      "id": "3a835b70-5b4f-4410-b536-9049d6a4162a",
       "name": "⬇️ Download from Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "position": [
-        -3008,
-        3728
+        -7552,
+        3920
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -454,13 +460,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation stagedUploadsCreate($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }', variables: { input: [{ resource: 'IMAGE', filename: $('🔁 Iterate Final Images').item.json.fileName, mimeType: $('🔁 Iterate Final Images').item.json.mimeType || 'image/jpeg', httpMethod: 'POST' }] } }) }}",
         "options": {}
       },
-      "id": "8b00df18-ee4f-49f1-9008-772562cda1b3",
+      "id": "1745e32a-246c-4cd2-8a9b-cad694c11961",
       "name": "🎯 Staged Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -3024,
-        3504
+        -7056,
+        3648
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -523,13 +529,13 @@
         },
         "options": {}
       },
-      "id": "e2ecb795-357c-4686-964d-81b83cb505c5",
+      "id": "af0507a2-4da6-4ac4-ab38-f72a00ea5b56",
       "name": "☁️ Upload to Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -2304,
-        3520
+        -6336,
+        3664
       ],
       "onError": "continueRegularOutput"
     },
@@ -544,13 +550,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('🔁 Iterate Final Images').item.json.productNo, contentType: 'IMAGE', originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
         "options": {}
       },
-      "id": "74e8ee95-6cfc-4ed6-8557-99cee04e9e1e",
+      "id": "9cd52916-b3f7-4322-90a6-0791c2fc4a4b",
       "name": "📎 File Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -2080,
-        3520
+        -6112,
+        3664
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -564,13 +570,13 @@
       "parameters": {
         "amount": 15
       },
-      "id": "49ecf71e-113a-4772-a285-8ededea1dcab",
+      "id": "07beae36-3934-4776-8b42-c4a149f7d8a8",
       "name": "⏳ Wait 15s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -1840,
-        3520
+        -5872,
+        3664
       ],
       "webhookId": "ed35756e-146f-4eb4-b75a-c79e57bdeaaf"
     },
@@ -585,13 +591,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'query getFiles($ids: [ID!]!) { nodes(ids: $ids) { ... on GenericFile { id alt fileStatus url } ... on MediaImage { id alt fileStatus image { url width height } } } }', variables: { ids: [ ($('📎 File Create').item.json.data && $('📎 File Create').item.json.data.fileCreate && $('📎 File Create').item.json.data.fileCreate.files && $('📎 File Create').item.json.data.fileCreate.files[0] && $('📎 File Create').item.json.data.fileCreate.files[0].id) || '' ] } }) }}",
         "options": {}
       },
-      "id": "1ecd79c1-47cf-459f-b456-5dabe2b8a72d",
+      "id": "bf50c508-6134-48b3-ae2a-b22e218fc25e",
       "name": "🔗 Get CDN URL",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -3040,
-        3232
+        -7072,
+        3376
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -603,15 +609,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('🔁 Iterate Final Images').item.json;\nconst staged = $('🎯 Staged Create').item.json;\nconst uploadResp = $('☁️ Upload to Storage').item.json;\nconst fileCreateResp = $('📎 File Create').item.json;\nconst cdnResp = $json; // Get CDN URL output\n\nfunction errText(r) {\n  if (!r) return '';\n  if (r.error) return typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\n  const ue = r.data && (r.data.stagedUploadsCreate || r.data.fileCreate);\n  if (ue && ue.userErrors && ue.userErrors.length) return ue.userErrors.map(e => e.message).join('; ');\n  return '';\n}\n\nlet error = errText(staged) || errText(uploadResp) || errText(fileCreateResp) || errText(cdnResp);\n\nconst fileId = fileCreateResp?.data?.fileCreate?.files?.[0]?.id;\nlet cdnUrl = '';\nif (!error && fileId) {\n  const nodesArr = cdnResp?.data?.nodes || [];\n  const node = nodesArr.find(n => n && n.id === fileId);\n  cdnUrl = node?.url || node?.image?.url || '';\n  if (!cdnUrl) error = 'No CDN URL returned';\n}\n\nconst success = !error && !!cdnUrl;\n\n// Resolve candidate boards for this pin's category from the Pinterest Boards tab.\n// A board's Category cell can list more than one category (e.g. \"Bathtub | Fireplace\"),\n// so split on \"|\" (and \",\" as a safety net) rather than requiring an exact single match.\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst needsBoardChoice = success && candidateBoards.length > 1;\nconst boardInstruction = needsBoardChoice\n  ? ('\\n\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): '\n    + candidateBoards.map(b => b.name).join(' | '))\n  : '';\nconst jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\nconst promptText = success\n  ? ('You are a Pinterest SEO copywriter for a luxury natural stone product. Look at the image and return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Category: ' + ctx.category + '\\nMaterial: ' + (ctx.material || 'natural stone') + '\\nKeyword: ' + (ctx.keyword || '')\n    + '\\nThis pin links to the product page: ' + ctx.shopifyUrl\n    + boardInstruction)\n  : '';\n\nreturn [{\n  json: {\n    ...ctx,\n    success,\n    cdnUrl,\n    errorMessage: error,\n    promptText,\n    candidateBoards,\n  },\n}];\n"
+        "jsCode": "const ctx = { ...$('🔁 Iterate Final Images').item.json, contentHash: $('#️⃣ Hash Image').item.json.contentHash };\nconst staged = $('🎯 Staged Create').item.json;\nconst uploadResp = $('☁️ Upload to Storage').item.json;\nconst fileCreateResp = $('📎 File Create').item.json;\nconst cdnResp = $json; // Get CDN URL output\n\nfunction errText(r) {\n  if (!r) return '';\n  if (r.error) return typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error));\n  const ue = r.data && (r.data.stagedUploadsCreate || r.data.fileCreate);\n  if (ue && ue.userErrors && ue.userErrors.length) return ue.userErrors.map(e => e.message).join('; ');\n  return '';\n}\n\nlet error = errText(staged) || errText(uploadResp) || errText(fileCreateResp) || errText(cdnResp);\n\nconst shopifyFileId = fileCreateResp?.data?.fileCreate?.files?.[0]?.id;\nlet cdnUrl = '';\nif (!error && shopifyFileId) {\n  const nodesArr = cdnResp?.data?.nodes || [];\n  const node = nodesArr.find(n => n && n.id === shopifyFileId);\n  cdnUrl = node?.url || node?.image?.url || '';\n  if (!cdnUrl) error = 'No CDN URL returned';\n}\n\nconst success = !error && !!cdnUrl;\n\n// Resolve candidate boards for this pin's category from the Pinterest Boards tab.\n// A board's Category cell can list more than one category (e.g. \"Bathtub | Fireplace\"),\n// so split on \"|\" (and \",\" as a safety net) rather than requiring an exact single match.\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst needsBoardChoice = success && candidateBoards.length > 1;\nconst boardInstruction = needsBoardChoice\n  ? ('\\n\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): '\n    + candidateBoards.map(b => b.name).join(' | '))\n  : '';\nconst jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\nconst promptText = success\n  ? ('You are a Pinterest SEO copywriter for a luxury natural stone product. Look at the image and return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Category: ' + ctx.category + '\\nMaterial: ' + (ctx.material || 'natural stone') + '\\nKeyword: ' + (ctx.keyword || '')\n    + '\\nThis pin links to the product page: ' + ctx.shopifyUrl\n    + boardInstruction)\n  : '';\n\nreturn [{\n  json: {\n    ...ctx,\n    success,\n    cdnUrl,\n    shopifyFileId: shopifyFileId || '',\n    errorMessage: error,\n    promptText,\n    candidateBoards,\n  },\n}];\n"
       },
-      "id": "11a29280-c12c-44f0-9e3d-3ee3c9163b79",
+      "id": "3906d14a-69a9-44fb-83c8-939e011dad07",
       "name": "🧩 Check Upload Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2816,
-        3232
+        -6848,
+        3376
       ]
     },
     {
@@ -639,13 +645,13 @@
         },
         "options": {}
       },
-      "id": "ffa2efc4-4f9a-4064-9aef-caefa2a6973d",
+      "id": "5db1aabd-3055-4072-be6f-c8b03645e3dc",
       "name": "✅ IF Upload Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -2512,
-        3232
+        -6544,
+        3376
       ]
     },
     {
@@ -662,13 +668,13 @@
         "imageUrls": "={{ $json.cdnUrl }}",
         "options": {}
       },
-      "id": "4c5ff52c-9974-4f77-8aa2-246f6ca08a16",
+      "id": "13a535f5-0371-43ff-aea2-4efc91176f1c",
       "name": "🧠 AI Vision Copy",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        -2608,
-        3024
+        -6624,
+        3168
       ],
       "credentials": {
         "openAiApi": {
@@ -679,15 +685,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('🧩 Check Upload Result').item.json;\nconst resp = $json;\nlet content = resp.content || resp.text || (resp.message && resp.message.content) || '';\nif (!content && resp.choices && resp.choices[0] && resp.choices[0].message) content = resp.choices[0].message.content || '';\ncontent = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\nlet ai = {};\ntry { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\nfunction preview(u) { return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\n\n// Resolve the board: single candidate -> use it directly; multiple candidates ->\n// use the AI's pick (falling back to the first one if the AI's answer doesn't match\n// any candidate name exactly); zero candidates -> leave blank for manual assignment.\nconst candidateBoards = ctx.candidateBoards || [];\nlet board = '', boardId = '';\nif (candidateBoards.length === 1) {\n  board = candidateBoards[0].name;\n  boardId = candidateBoards[0].id;\n} else if (candidateBoards.length > 1) {\n  const aiChoice = String(ai.board || '').trim().toLowerCase();\n  const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n  const chosen = matched || candidateBoards[0];\n  board = chosen.name;\n  boardId = chosen.id;\n}\n\nreturn [{\n  json: {\n    'Pin ID': ctx.productNo + '-' + ctx.fileId,\n    'Product No.': ctx.productNo,\n    'Image File ID': ctx.fileId,\n    'Source': 'product-photo',\n    'Blog No.': '',\n    'Blog Title': '',\n    'Pin Type': 'single',\n    'Preview 1': preview(ctx.cdnUrl),\n    'Image 1 URL': ctx.cdnUrl,\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': ctx.shopifyUrl,\n    // Auto-filled from the Pinterest Boards tab by category (AI-picked when a\n    // category has more than one candidate board). If no board matches, hold\n    // for a human instead of auto-approving something WF2 can never publish.\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': ctx.scheduledDate || '',\n    'Approval': boardId ? 'Approved' : 'Needs Board',\n    'Status': boardId ? 'Review' : 'Needs Board',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': '',\n  },\n}];\n"
+        "jsCode": "const ctx = $('🧾 Preserve Context for AI').item.json;\nconst resp = $json;\nlet content = resp.content || resp.text || (resp.message && resp.message.content) || '';\nif (!content && resp.choices && resp.choices[0] && resp.choices[0].message) content = resp.choices[0].message.content || '';\ncontent = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\nlet ai = {};\ntry { ai = JSON.parse(content); } catch (e) { ai = {}; }\n\nfunction preview(u) { return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\n\n// Resolve the board: single candidate -> use it directly; multiple candidates ->\n// use the AI's pick (falling back to the first one if the AI's answer doesn't match\n// any candidate name exactly); zero candidates -> leave blank for manual assignment.\nconst candidateBoards = ctx.candidateBoards || [];\nlet board = '', boardId = '';\nif (candidateBoards.length === 1) {\n  board = candidateBoards[0].name;\n  boardId = candidateBoards[0].id;\n} else if (candidateBoards.length > 1) {\n  const aiChoice = String(ai.board || '').trim().toLowerCase();\n  const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n  const chosen = matched || candidateBoards[0];\n  board = chosen.name;\n  boardId = chosen.id;\n}\n\nreturn [{\n  json: {\n    'Pin ID': ctx.productNo + '-' + ctx.fileId,\n    'Product No.': ctx.productNo,\n    'Image File ID': ctx.fileId,\n    'Source': 'product-photo',\n    // no Blog No./Blog Title here -- those columns don't exist on Pinterest2:3 Pins\n    'Pin Type': 'single',\n    'Preview 1': preview(ctx.cdnUrl),\n    'Image 1 URL': ctx.cdnUrl,\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Product Link': ctx.shopifyUrl, // this tab's pins link to a Shopify product page, not a blog post\n    // Auto-filled from the Pinterest Boards tab by category (AI-picked when a\n    // category has more than one candidate board). If no board matches, hold\n    // for a human instead of auto-approving something WF2 can never publish.\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': ctx.scheduledDate || '',\n    'Approval': boardId ? 'Approved' : 'Needs Board',\n    'Status': boardId ? 'Review' : 'Needs Board',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': '',\n  },\n}];\n"
       },
-      "id": "5a959057-ca24-41db-92ea-740c4c171b7b",
+      "id": "0716d49f-af47-4fab-b2c7-e489c2fa0eeb",
       "name": "🏷️ Build Pin Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2384,
-        3024
+        -6400,
+        3168
       ]
     },
     {
@@ -916,13 +922,13 @@
           "cellFormat": "USER_ENTERED"
         }
       },
-      "id": "8a9027e2-fde4-430e-a474-9f632c0031af",
+      "id": "49a7d5d1-379f-4ba3-903b-cc8dc02efe7d",
       "name": "📤 Append Pin Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -2128,
-        3024
+        -6144,
+        3168
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -937,13 +943,13 @@
       "parameters": {
         "jsCode": "const ctx = $json; // Check Upload Result output, false branch\nconst existing = $('🚫 Get Failed Images').all().map(i => i.json);\nconst prior = existing.find(r => String(r['Image File ID'] || '').trim() === ctx.fileId);\nconst attemptCount = (prior ? (parseInt(prior['Attempt Count'], 10) || 0) : 0) + 1;\n\nreturn [{\n  json: {\n    'Image File ID': ctx.fileId,\n    'Product No.': ctx.productNo,\n    'Last Error': ctx.errorMessage || 'Unknown error',\n    'Attempt Count': attemptCount,\n    'Last Attempt': $now.toISO(),\n  },\n}];\n"
       },
-      "id": "abaca525-0fb1-4a71-8743-877c1ef3b594",
+      "id": "bb85c15f-13ba-406d-bf9a-3fefacf62918",
       "name": "🧯 Build Failure Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2176,
-        3248
+        -6208,
+        3392
       ]
     },
     {
@@ -1023,13 +1029,13 @@
         },
         "options": {}
       },
-      "id": "f11b1c64-381e-433f-8f79-60cc9c726558",
+      "id": "6f84dcf1-ca9f-400a-9680-06056940043c",
       "name": "📥 Upsert Failed Image Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -1952,
-        3248
+        -5984,
+        3392
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1054,13 +1060,13 @@
         },
         "options": {}
       },
-      "id": "10e388f0-dc68-46af-add3-7c195806bf18",
+      "id": "c0a204c3-310b-47bb-a13e-1bd9b47f8ccc",
       "name": "🗂️ Get Pinterest Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        -4784,
-        3520
+        -7072,
+        4176
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -1075,29 +1081,314 @@
     },
     {
       "parameters": {},
-      "id": "e2269674-36af-4ca4-a447-7e4621e51fba",
+      "id": "972103c8-60e3-4394-8636-6ff302e34787",
       "name": "🔀 Merge Binary + Staged",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        -2720,
-        3520
+        -6736,
+        3664
       ]
     },
     {
       "parameters": {
         "jsCode": "// Runs once per loop iteration (Iterate Final Images has batchSize 1).\n// After the Merge (append mode) the paired-item lineage is broken, so read\n// each source node with .first() instead of .item, and re-anchor pairedItem\n// to input item 0 (the Staged Create branch of the merge) so downstream nodes\n// that reference $('🎯 Staged Create').item / $('🔁 Iterate Final Images').item\n// can still resolve.\nconst staged = $('🎯 Staged Create').first().json;\nconst downloadItem = $('⬇️ Download from Drive').first();\nreturn [{ json: staged, binary: downloadItem.binary, pairedItem: { item: 0 } }];\n"
       },
-      "id": "98b31d8f-b7e5-403b-b0b0-b9468bca6643",
+      "id": "f7343230-9e29-4b26-8d1b-77de4d081d7e",
       "name": "🧷 Attach Binary to Staged Upload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2496,
-        3520
+        -6528,
+        3664
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "85582eb7-a5d4-4c30-aa40-7e2e8b253d7d",
+              "leftValue": "={{ $json.isHeal }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -7632,
+        3632
+      ],
+      "id": "5478d42f-a5cb-425e-938f-5aaa2dcbb0cf",
+      "name": "🩹 IF Needs Heal"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "row_number"
+          ],
+          "value": {
+            "row_number": "={{ $json.rowNumber }}",
+            "Board": "={{ $json.board }}",
+            "Board ID": "={{ $json.boardId }}",
+            "Approval": "Approved",
+            "Status": "Review",
+            "Scheduled Date": "={{ $json.scheduledDate }}"
+          },
+          "matchingColumnsHint": null
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -7328,
+        3616
+      ],
+      "id": "6500e17b-f597-4bec-9f16-0b944ad51541",
+      "name": "🩹 Update Needs-Board Row",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.imageHashCacheTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "735748bc-414f-434d-b93a-9674dab18da1",
+      "name": "🗄️ Get Image Hash Cache",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -7280,
+        4176
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// SHA-256 of the actual downloaded bytes -- an exact content fingerprint, not a\n// filename or a Drive file ID (two different Drive files can hold the identical\n// image, and this catches that; a filename never could, reliably).\nconst crypto = require('crypto');\nconst ctx = $('🔁 Iterate Final Images').item.json;\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst contentHash = crypto.createHash('sha256').update(buffer).digest('hex');\n\nconst cacheRows = $('🗄️ Get Image Hash Cache').all().map(i => i.json);\nconst cached = cacheRows.find(r => String(r['Content Hash'] || '').trim() === contentHash);\n\nreturn [{\n  json: { ...ctx, contentHash, cacheHit: !!cached, cachedCdnUrl: cached ? String(cached['CDN URL'] || '').trim() : '' },\n  binary: $input.item.binary,\n}];\n"
+      },
+      "id": "c58ff6c1-7e54-4ccd-b6e4-b54ee97613c6",
+      "name": "#️⃣ Hash Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7312,
+        3920
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7f0a1593-bbcf-475c-9384-0941e9c2f66b",
+              "leftValue": "={{ $json.cacheHit }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2e5bd031-8649-450e-8d30-a24d3b876998",
+      "name": "🔍 IF Cache Hit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -7024,
+        3920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $json; // Hash Image output: fileId, fileName, productNo, category, shopifyUrl, material, keyword, cachedCdnUrl, ...\n\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\nconst needsBoardChoice = candidateBoards.length > 1;\nconst boardInstruction = needsBoardChoice\n  ? ('\\n\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): '\n    + candidateBoards.map(b => b.name).join(' | '))\n  : '';\nconst jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\nconst promptText = 'You are a Pinterest SEO copywriter for a luxury natural stone product. Look at the image and return ONLY a JSON object with keys: ' + jsonKeys + '. '\n  + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n  + 'Do not include any text or markdown outside the JSON.\\n\\n'\n  + 'Category: ' + ctx.category + '\\nMaterial: ' + (ctx.material || 'natural stone') + '\\nKeyword: ' + (ctx.keyword || '')\n  + '\\nThis pin links to the product page: ' + ctx.shopifyUrl\n  + boardInstruction;\n\nreturn [{\n  json: { ...ctx, success: true, cdnUrl: ctx.cachedCdnUrl, errorMessage: '', promptText, candidateBoards },\n}];\n"
+      },
+      "id": "08ba8489-cab7-4c3d-ae80-3a1d589917e3",
+      "name": "🎯 Use Cached CDN URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6496,
+        3904
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $json;\nif (!ctx.success || !ctx.cdnUrl || !ctx.contentHash) return [];\nreturn [{ json: {\n  'Content Hash': ctx.contentHash,\n  'CDN URL': ctx.cdnUrl,\n  'Shopify File ID': ctx.shopifyFileId || '',\n  'First Uploaded': $now.toISO(),\n} }];\n"
+      },
+      "id": "adc7ed6f-52b2-4f51-9a38-7c94b55c0ed9",
+      "name": "💾 Build Hash Cache Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6544,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.pinterestSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('⚙️ Set Config').first().json.imageHashCacheTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Content Hash": "={{ $json['Content Hash'] }}",
+            "CDN URL": "={{ $json['CDN URL'] }}",
+            "Shopify File ID": "={{ $json['Shopify File ID'] }}",
+            "First Uploaded": "={{ $json['First Uploaded'] }}"
+          },
+          "matchingColumns": [
+            "Content Hash"
+          ],
+          "schema": [
+            {
+              "id": "Content Hash",
+              "displayName": "Content Hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CDN URL",
+              "displayName": "CDN URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shopify File ID",
+              "displayName": "Shopify File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "First Uploaded",
+              "displayName": "First Uploaded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b5fb0e93-af7d-4db6-820b-975926f1e3a1",
+      "name": "📇 Append Hash Cache Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -6320,
+        2992
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Both the fresh-upload path (🧩 Check Upload Result) and the cache-hit path\n// (🎯 Use Cached CDN URL) converge here with the SAME shape (success, cdnUrl,\n// promptText, candidateBoards, productNo, fileId, ...). 🧠 AI Vision Copy right\n// after this REPLACES the item's json with its own response, so 🏷️ Build Pin Row\n// can't read $json after it -- it needs a fixed, always-executed node name to look\n// back to instead. Using $('🧩 Check Upload Result') directly breaks on cache hits\n// (that node never runs then); this node runs on BOTH paths, so it's safe.\nreturn [{ json: $json }];"
+      },
+      "id": "ecd32fc3-24a5-4864-b04e-a3db4aded19c",
+      "name": "🧾 Preserve Context for AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6864,
+        3168
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "⏰ Daily Trigger": {
       "main": [
@@ -1136,7 +1427,7 @@
       "main": [
         [
           {
-            "node": "🗂️ Get Pinterest Boards",
+            "node": "🗄️ Get Image Hash Cache",
             "type": "main",
             "index": 0
           }
@@ -1243,12 +1534,7 @@
         [],
         [
           {
-            "node": "⬇️ Download from Drive",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "🎯 Staged Create",
+            "node": "🩹 IF Needs Heal",
             "type": "main",
             "index": 0
           }
@@ -1259,9 +1545,9 @@
       "main": [
         [
           {
-            "node": "🔀 Merge Binary + Staged",
+            "node": "#️⃣ Hash Image",
             "type": "main",
-            "index": 1
+            "index": 0
           }
         ]
       ]
@@ -1328,6 +1614,11 @@
             "node": "✅ IF Upload Success",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "💾 Build Hash Cache Row",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1336,7 +1627,7 @@
       "main": [
         [
           {
-            "node": "🧠 AI Vision Copy",
+            "node": "🧾 Preserve Context for AI",
             "type": "main",
             "index": 0
           }
@@ -1448,9 +1739,116 @@
           }
         ]
       ]
+    },
+    "🩹 IF Needs Heal": {
+      "main": [
+        [
+          {
+            "node": "🩹 Update Needs-Board Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⬇️ Download from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🩹 Update Needs-Board Row": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Final Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "#️⃣ Hash Image": {
+      "main": [
+        [
+          {
+            "node": "🔍 IF Cache Hit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 IF Cache Hit": {
+      "main": [
+        [
+          {
+            "node": "🎯 Use Cached CDN URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🎯 Staged Create",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔀 Merge Binary + Staged",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "🎯 Use Cached CDN URL": {
+      "main": [
+        [
+          {
+            "node": "✅ IF Upload Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Build Hash Cache Row": {
+      "main": [
+        [
+          {
+            "node": "📇 Append Hash Cache Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗄️ Get Image Hash Cache": {
+      "main": [
+        [
+          {
+            "node": "🗂️ Get Pinterest Boards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧾 Preserve Context for AI": {
+      "main": [
+        [
+          {
+            "node": "🧠 AI Vision Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
@@ -1459,7 +1857,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "25cdc6cf-1798-4b56-b625-1c8bb8a9667f",
+  "versionId": "edf13b7e-f6b5-4f90-89d6-125782ad2adb",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"

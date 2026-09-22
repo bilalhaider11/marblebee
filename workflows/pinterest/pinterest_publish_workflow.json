@@ -7,13 +7,13 @@
         "height": 1788,
         "width": 420
       },
-      "id": "38bca3b0-0591-43e5-8199-8f57903f2d8f",
+      "id": "56a0ef81-09dc-49d3-9f32-9f87bdd41bc0",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        17760,
-        4320
+        21056,
+        6736
       ]
     },
     {
@@ -24,13 +24,13 @@
           ]
         }
       },
-      "id": "105a16f6-710d-40bd-a3df-51ce9de363e0",
+      "id": "1438ff55-d3e1-468d-a2f2-a9d37f5e925c",
       "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        18320,
-        4944
+        21616,
+        7360
       ]
     },
     {
@@ -77,25 +77,43 @@
               "id": "a6",
               "name": "maxPublishPerRun",
               "type": "number",
-              "value": 20
+              "value": 100
             },
             {
               "id": "a7",
               "name": "newRowsOnlyAfter",
               "type": "string",
-              "value": "2026-09-10T00:00:00-04:00"
+              "value": ""
+            },
+            {
+              "id": "69a28910-da1c-411a-bb6e-01f15cdd3491",
+              "name": "rescheduleSpacingMinutes",
+              "type": "number",
+              "value": 20
+            },
+            {
+              "id": "da26eb24-5af8-4cd3-84ec-1b8c7b356332",
+              "name": "pinterestMonthlyCap",
+              "type": "number",
+              "value": 900
+            },
+            {
+              "id": "6f88255e-1068-4ab9-a1fe-d51a84c685ef",
+              "name": "reservedForNewPins",
+              "type": "number",
+              "value": 60
             }
           ]
         },
         "options": {}
       },
-      "id": "180671a4-2d63-478a-b06b-8f5044dbcfae",
+      "id": "d35e7350-a825-41fb-a17a-414d939e8da8",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        18544,
-        4944
+        21840,
+        7360
       ]
     },
     {
@@ -112,13 +130,13 @@
         },
         "options": {}
       },
-      "id": "0f6e41fb-1f2e-46dd-9b4b-ca2751ccee9c",
+      "id": "e8a39de0-8ea7-484e-869e-304ae77ca253",
       "name": "Get Pins",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        18752,
-        4944
+        22048,
+        7360
       ],
       "executeOnce": true,
       "credentials": {
@@ -142,13 +160,13 @@
         },
         "options": {}
       },
-      "id": "d6a97380-4cbe-49fe-9ad6-40e392514ed3",
+      "id": "ce648521-d7d8-4743-8bbd-0156a6c9c985",
       "name": "Get Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        19152,
-        4944
+        22448,
+        7360
       ],
       "executeOnce": true,
       "credentials": {
@@ -160,15 +178,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $('Set Config').first().json;\nconst pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[\\u2013-\\u2015]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Board Name'] || r['Pinterest Board'] || r['Board'] || ''; }\nfunction bId(r){ return r['Board ID'] || r['Tailwind Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  const zone = 'America/Toronto'; // sheet stores naive local time -- anchor explicitly, don't rely on n8n's ambient default zone\n  let dt = DateTime.fromISO(s, { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm', { zone });\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d, { zone }); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  const st = norm(pin['Status']);\n  if (st !== 'review' && st !== 'error') continue;\n\n  // A row already tagged with this run's monthly-quota marker (see Build\n  // Result) is known to be blocked for the rest of the CURRENT calendar\n  // month -- Metricool won't accept it no matter how many times it's\n  // retried. Resending it anyway was exactly what caused ~700 \"post not\n  // published\" notification emails in a single day once the backlog\n  // built up: every row still eligible got re-attempted, and re-failed,\n  // every single day. Skip it silently -- no Metricool call, no sheet\n  // write -- until the marker's month no longer matches today's, at\n  // which point it falls through to the normal ready/retry logic below\n  // and gets a fresh attempt automatically.\n  const quotaMatch = st === 'error' && /^Metricool monthly quota reached \\((\\d{4}-\\d{2})\\)/.exec(String(pin['Error'] || ''));\n  if (quotaMatch && quotaMatch[1] === $now.setZone('America/Toronto').toFormat('yyyy-LL')) continue;\n\n  // Computed up front (before the cutoff branch) so a legacy row's explanatory\n  // note can mention its REAL underlying problems too (e.g. a missing board),\n  // not just its age -- fixing only the age wouldn't make it publishable anyway.\n  const boardId = resolveBoardId(pin);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  const rawSendAt = toSendAt(pin['Scheduled Date']);\n\n  if (cfg.newRowsOnlyAfter) {\n    // Existing backlog rows are left completely alone -- not retried, not\n    // rescheduled. Only rows created on/after this cutoff are eligible for\n    // actual processing. A missing/unparseable Created Time is treated as\n    // pre-cutoff (old), not as eligible.\n    const cutoff = DateTime.fromISO(cfg.newRowsOnlyAfter);\n    const created = DateTime.fromISO(String(pin['Created Time'] || ''));\n    if (!created.isValid || created < cutoff) {\n      // Silently skipping an overdue legacy row is confusing on the sheet --\n      // nothing changes, no error, no explanation. So if its own Scheduled\n      // Date has already passed, leave ONE explanatory note (never rewritten\n      // again once present, same dedupe principle as below) instead of\n      // leaving it looking untouched with no indication why.\n      const legacyOverdue = rawSendAt && DateTime.fromISO(rawSendAt) <= $now;\n      if (legacyOverdue) {\n        const otherIssues = [];\n        if (!mediaUrl) otherIssues.push('No image URL');\n        if (!boardId) otherIssues.push('Board not found: ' + (pin['Board'] || '(blank)'));\n        if (!rawSendAt) otherIssues.push('Invalid scheduled date');\n        const legacyNote = 'Not auto-processed: pre-existing row (created before ' + cfg.newRowsOnlyAfter + '). Scheduled time has passed -- update manually if you want this published.'\n          + (otherIssues.length ? ' Also: ' + otherIssues.join('; ') + '.' : '');\n        if (String(pin['Error'] || '') !== legacyNote) {\n          out.push({ json: {\n            row_number: pin['row_number'], sourceTab: pin._sourceTab, pinId: pin['Pin ID'],\n            ready: false, reason: legacyNote,\n            mediaUrl: '', title: '', description: '', url: '', boardId: '', altText: '', sendAt: ''\n          } });\n        }\n      }\n      continue;\n    }\n  }\n\n  let sendAt = rawSendAt;\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) {\n    // Overdue -- give the human at least a full 24h approval window instead of\n    // rejecting it forever with no recovery path (business rule: 24h minimum).\n    sendAt = $now.plus({ hours: 24 }).toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n  }\n  if (!ready && reason === String(pin['Error'] || '')) {\n    // This exact failure is already recorded on the row -- nothing changed\n    // since last run (e.g. a permanently blank Board that only a human can\n    // fix), so don't burn a sheet write re-stating the same dead error every\n    // single day. Only a NEW or CHANGED reason gets written.\n    continue;\n  }\n  out.push({ json: {\n    row_number: pin['row_number'],\n    sourceTab: pin._sourceTab,\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt,\n    // Kept so a failed Create Pin call (Build Result) can write the sheet's\n    // Scheduled Date column back unchanged instead of blanking it -- only a\n    // row that actually got scheduled should have this cell overwritten.\n    scheduledDateRaw: pin['Scheduled Date'] || ''\n  } });\n}\n\n// Cap how many READY pins actually get published this run -- Create Pin does\n// real network calls to Metricool per pin, so a sudden backlog (e.g. right\n// after this fix ships) could otherwise blow past n8n's execution memory/time\n// limits or hammer Metricool with hundreds of requests in one run. Not-ready\n// items are cheap (no external call, just a status write) so they're never\n// capped. Deferred ready items are left untouched -- still Review/Error in\n// the sheet -- so the NEXT run picks them up, prioritizing the most overdue.\nconst maxPerRun = cfg.maxPublishPerRun || 50;\nconst notReady = out.filter(i => !i.json.ready);\nconst ready = out.filter(i => i.json.ready)\n  .sort((a, b) => (a.json.sendAt || '').localeCompare(b.json.sendAt || ''))\n  .slice(0, maxPerRun);\nreturn [...notReady, ...ready];\n"
+        "jsCode": "const cfg = $('Set Config').first().json;\nconst pins1 = $('Get Pins').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab }));\nconst pins2 = $('Get Pins 2').all().map(i => ({ ...i.json, _sourceTab: cfg.pinsTab2 }));\nconst pins = [...pins1, ...pins2];\nconst boards = $('Get Boards').all().map(i => i.json);\nfunction norm(s){ return (s==null?'':String(s)).replace(/[\\u2013-\\u2015]/g,'-').replace(/\\s+/g,' ').trim().toLowerCase(); }\nfunction bName(r){ return r['Board Name'] || r['Pinterest Board'] || r['Board'] || ''; }\nfunction bId(r){ return r['Board ID'] || r['Tailwind Board ID'] || ''; }\nfunction resolveBoardId(pin){\n  const direct = (pin['Board ID']==null?'':String(pin['Board ID'])).trim();\n  if (direct) return direct;\n  const name = norm(pin['Board']);\n  if (!name) return '';\n  let b = boards.find(r => norm(bName(r)) === name);\n  if (!b) b = boards.find(r => { const bn = norm(bName(r)); return bn && (bn.includes(name) || name.includes(bn)); });\n  return b ? String(bId(b)).trim() : '';\n}\nfunction toSendAt(v){\n  if (v==null || v==='') return '';\n  const s = String(v).trim();\n  const zone = 'America/Toronto'; // sheet stores naive local time -- anchor explicitly, don't rely on n8n's ambient default zone\n  let dt = DateTime.fromISO(s, { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd HH:mm', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'yyyy-LL-dd H:mm', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy HH:mm:ss', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm:ss', { zone });\n  if(!dt.isValid) dt = DateTime.fromFormat(s,'M/d/yyyy H:mm', { zone });\n  if(!dt.isValid){ const d=new Date(s); if(!isNaN(d.getTime())) dt=DateTime.fromJSDate(d, { zone }); }\n  if(!dt || !dt.isValid) return '';\n  return dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n}\nfunction bigImg(u){ u=String(u||''); if(/cdn\\.shopify\\.com/i.test(u)){ return u.split('?')[0] + '?width=1000'; } return u; }\nconst nowPlus15 = $now.plus({ minutes: 15 });\n// Every overdue row used to get the IDENTICAL $now+24h timestamp -- hundreds of posts\n// landing on the exact same minute is what tripped Pinterest's spam block on Sept 11.\n// This cursor gives each one its own slot instead, spaced apart, still honoring the\n// 24h-minimum-approval-window business rule as the earliest possible slot.\nlet rescheduleCursor = $now.plus({ hours: 24 });\nconst rescheduleSpacingMinutes = cfg.rescheduleSpacingMinutes || 20;\nconst out = [];\nfor (const pin of pins) {\n  if (norm(pin['Approval']) !== 'approved') continue;\n  const st = norm(pin['Status']);\n  if (st !== 'review' && st !== 'error') continue;\n\n  // A row already tagged with this run's monthly-quota marker (see Build\n  // Result) is known to be blocked for the rest of the CURRENT calendar\n  // month -- Metricool won't accept it no matter how many times it's\n  // retried. Resending it anyway was exactly what caused ~700 \"post not\n  // published\" notification emails in a single day once the backlog\n  // built up: every row still eligible got re-attempted, and re-failed,\n  // every single day. Skip it silently -- no Metricool call, no sheet\n  // write -- until the marker's month no longer matches today's, at\n  // which point it falls through to the normal ready/retry logic below\n  // and gets a fresh attempt automatically.\n  const quotaMatch = st === 'error' && /^Metricool monthly quota reached \\((\\d{4}-\\d{2})\\)/.exec(String(pin['Error'] || ''));\n  if (quotaMatch && quotaMatch[1] === $now.setZone('America/Toronto').toFormat('yyyy-LL')) continue;\n\n  // Computed up front (before the cutoff branch) so a legacy row's explanatory\n  // note can mention its REAL underlying problems too (e.g. a missing board),\n  // not just its age -- fixing only the age wouldn't make it publishable anyway.\n  const boardId = resolveBoardId(pin);\n  const mediaUrl = bigImg(pin['Image 1 URL'] || '');\n  const rawSendAt = toSendAt(pin['Scheduled Date']);\n\n  if (cfg.newRowsOnlyAfter) {\n    // Existing backlog rows are left completely alone -- not retried, not\n    // rescheduled. Only rows created on/after this cutoff are eligible for\n    // actual processing. A missing/unparseable Created Time is treated as\n    // pre-cutoff (old), not as eligible.\n    const cutoff = DateTime.fromISO(cfg.newRowsOnlyAfter);\n    const created = DateTime.fromISO(String(pin['Created Time'] || ''));\n    if (!created.isValid || created < cutoff) {\n      // Silently skipping an overdue legacy row is confusing on the sheet --\n      // nothing changes, no error, no explanation. So if its own Scheduled\n      // Date has already passed, leave ONE explanatory note (never rewritten\n      // again once present, same dedupe principle as below) instead of\n      // leaving it looking untouched with no indication why.\n      const legacyOverdue = rawSendAt && DateTime.fromISO(rawSendAt) <= $now;\n      if (legacyOverdue) {\n        const otherIssues = [];\n        if (!mediaUrl) otherIssues.push('No image URL');\n        if (!boardId) otherIssues.push('Board not found: ' + (pin['Board'] || '(blank)'));\n        if (!rawSendAt) otherIssues.push('Invalid scheduled date');\n        const legacyNote = 'Not auto-processed: pre-existing row (created before ' + cfg.newRowsOnlyAfter + '). Scheduled time has passed -- update manually if you want this published.'\n          + (otherIssues.length ? ' Also: ' + otherIssues.join('; ') + '.' : '');\n        if (String(pin['Error'] || '') !== legacyNote) {\n          out.push({ json: {\n            row_number: pin['row_number'], sourceTab: pin._sourceTab, pinId: pin['Pin ID'],\n            ready: false, reason: legacyNote,\n            mediaUrl: '', title: '', description: '', url: '', boardId: '', altText: '', sendAt: ''\n          } });\n        }\n      }\n      continue;\n    }\n  }\n\n  let sendAt = rawSendAt;\n  let ready = true, reason = '';\n  if (!mediaUrl) { ready=false; reason='No image URL'; }\n  else if (!boardId) { ready=false; reason='Board not found: ' + (pin['Board']||'(blank)'); }\n  else if (!sendAt) { ready=false; reason='Invalid scheduled date'; }\n  else if (DateTime.fromISO(sendAt) <= nowPlus15) {\n    // Overdue -- give the human at least a full 24h approval window instead of\n    // rejecting it forever with no recovery path (business rule: 24h minimum),\n    // but give EACH overdue row its own spaced-out slot -- never reuse the same\n    // instant for the next one.\n    sendAt = rescheduleCursor.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n    rescheduleCursor = rescheduleCursor.plus({ minutes: rescheduleSpacingMinutes });\n  }\n  if (!ready && reason === String(pin['Error'] || '')) {\n    // This exact failure is already recorded on the row -- nothing changed\n    // since last run (e.g. a permanently blank Board that only a human can\n    // fix), so don't burn a sheet write re-stating the same dead error every\n    // single day. Only a NEW or CHANGED reason gets written.\n    continue;\n  }\n  out.push({ json: {\n    row_number: pin['row_number'],\n    sourceTab: pin._sourceTab,\n    pinId: pin['Pin ID'], ready, reason,\n    mediaUrl,\n    title: String(pin['Pin Title']||'').slice(0,100),\n    description: String(pin['Pin Description']||'').slice(0,500),\n    url: pin['Blog Link'] || pin['Product Link'] || '',\n    boardId, altText: String(pin['Alt Text']||'').slice(0,500),\n    sendAt,\n    // Kept so a failed Create Pin call (Build Result) can write the sheet's\n    // Scheduled Date column back unchanged instead of blanking it -- only a\n    // row that actually got scheduled should have this cell overwritten.\n    scheduledDateRaw: pin['Scheduled Date'] || ''\n  } });\n}\n\n// Cap how many READY pins actually get published this run -- Create Pin does\n// real network calls to Metricool per pin, so a sudden backlog (e.g. right\n// after this fix ships) could otherwise blow past n8n's execution memory/time\n// limits or hammer Metricool with hundreds of requests in one run. Not-ready\n// items are cheap (no external call, just a status write) so they're never\n// capped. Deferred ready items are left untouched -- still Review/Error in\n// the sheet -- so the NEXT run picks them up, prioritizing the most overdue.\n// -- Monthly budget check: Metricool's cap counts EVERY Pinterest post attempt\n// for the account, published AND errored alike (confirmed 2026-09-21 -- the\n// September spam-block errors alone used ~650 of the 1050 slots). Attempting\n// a Create Pin call that's doomed to fail from quota still burns one of those\n// slots, so this checks usage BEFORE calling Metricool at all, not after.\nconst budgetPosts = safe(() => $('Get Metricool Posts (Budget Check)').all(), []);\nfunction safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\nconst usedByMonth = {};\nconst seenBudgetIds = new Set();\nfor (const it of budgetPosts) {\n  const j = it.json || {};\n  if (j.error) continue;\n  const list = Array.isArray(j.data) ? j.data : Array.isArray(j.posts) ? j.posts : Array.isArray(j) ? j : (j.id ? [j] : []);\n  for (const p of list) {\n    const key = String(p.id); if (seenBudgetIds.has(key)) continue; seenBudgetIds.add(key);\n    if (!(p.providers || []).some(x => String(x.network).toLowerCase() === 'pinterest')) continue;\n    const mo = String((p.publicationDate || {}).dateTime || '').slice(0, 7);\n    if (mo) usedByMonth[mo] = (usedByMonth[mo] || 0) + 1;\n  }\n}\nconst monthlyCap = Number(cfg.pinterestMonthlyCap) || 900, reserve = Number(cfg.reservedForNewPins) || 0;\nconst budgetRemaining = {}; // lazily computed per month below, decremented as pins are accepted this run\n\nconst maxPerRun = cfg.maxPublishPerRun || 50;\nconst notReady = out.filter(i => !i.json.ready);\nconst readySorted = out.filter(i => i.json.ready)\n  .sort((a, b) => (a.json.sendAt || '').localeCompare(b.json.sendAt || ''));\n\nconst ready = [];\nfor (const item of readySorted) {\n  if (ready.length >= maxPerRun) break;\n  const mo = String(item.json.sendAt || '').slice(0, 7);\n  if (mo) {\n    if (!(mo in budgetRemaining)) budgetRemaining[mo] = monthlyCap - reserve - (usedByMonth[mo] || 0);\n    if (budgetRemaining[mo] <= 0) continue; // this month is full -- leave the row untouched, try again next run (maybe next month)\n    budgetRemaining[mo]--;\n  }\n  ready.push(item);\n}\nreturn [...notReady, ...ready];\n"
       },
-      "id": "ec210f50-041c-4a88-8d68-c187c2a2dc2d",
+      "id": "fd469b51-1ad6-4328-a5ab-103bb48e8f74",
       "name": "Prepare",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        19376,
-        4944
+        22320,
+        7632
       ]
     },
     {
@@ -196,13 +214,13 @@
         },
         "options": {}
       },
-      "id": "b680691f-1264-4801-8395-a553d2174657",
+      "id": "9a280bb4-8e88-4524-b88e-c6f9d6bf7c78",
       "name": "IF Ready",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        19600,
-        4944
+        22544,
+        7632
       ]
     },
     {
@@ -229,15 +247,15 @@
         },
         "options": {}
       },
-      "id": "2708ac5e-7f33-49cf-9b2b-b262323d7ed3",
+      "id": "806a70bf-e5aa-490c-b4ee-a6a4649dc0d9",
       "name": "Normalize Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "position": [
-        19872,
-        4928
+        22816,
+        7616
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -250,13 +268,13 @@
       "parameters": {
         "jsCode": "// One input item per ready pin, in the same order \"IF Ready\" emitted them\n// (Normalize Image doesn't filter or reorder). Combine the normalized image\n// URL with the rest of the pin's data from \"IF Ready\" by index, and convert\n// the UTC sendAt into the local time + timezone Metricool expects.\nconst pins = $('IF Ready').all();\nconst tz = 'America/Toronto';\n\nreturn $input.all().map((item, index) => {\n  const pin = (pins[index] && pins[index].json) || {};\n  const normalizedUrl = (item.json && item.json.data) || pin.mediaUrl;\n  const localDt = DateTime.fromISO(pin.sendAt, { zone: 'utc' }).setZone(tz).toFormat(\"yyyy-LL-dd'T'HH:mm:ss\");\n  return { json: {\n    text: pin.description,\n    publicationDate: { dateTime: localDt, timezone: tz },\n    providers: [{ network: 'pinterest' }],\n    media: [normalizedUrl],\n    mediaAltText: [pin.altText],\n    autoPublish: true,\n    draft: false,\n    pinterestData: {\n      boardId: pin.boardId,\n      pinTitle: pin.title,\n      pinLink: pin.url\n    }\n  } };\n});"
       },
-      "id": "c89125a8-6233-4355-ad40-1c706976bb87",
+      "id": "a43106b9-587b-4df9-8338-ef0e058fd517",
       "name": "Build Metricool Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        20080,
-        4928
+        23056,
+        7616
       ]
     },
     {
@@ -290,13 +308,13 @@
           }
         }
       },
-      "id": "2ea1ef77-0cd0-4410-9676-cf44aedbc2e2",
+      "id": "c56ae5b2-d190-488c-8f5b-a8cbd1ed184e",
       "name": "Create Pin",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        20272,
-        4928
+        23248,
+        7616
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -310,13 +328,13 @@
       "parameters": {
         "jsCode": "// Each input item is one Metricool API response from \"Create Pin\",\n// in the same order as the pins that fed it. The pin metadata\n// (Pin ID, row_number, blog url) lives on \"IF Ready\", not on the\n// HTTP response, so pull it from there by index.\nconst responses = $input.all();\nconst pins = $('IF Ready').all();\nconst blogId = $('Set Config').first().json.blogId;\n\n// A failed Create Pin call reaches here as a raw axios-shaped error object\n// (message/name/stack/code/status), not a clean JSON body -- Metricool's\n// actual error detail is buried as an escaped JSON string inside `message`\n// (e.g. `400 - \"{\\\"status\\\":...,\\\"detail\\\":\\\"...\\\"}\"`). Pull that detail out\n// so the sheet shows a human sentence instead of a stack-trace blob.\nfunction humanError(resp) {\n  const data = resp?.response?.data || resp?.error?.response?.data;\n  const raw = String(resp?.message || resp?.error?.message || resp?.error || '');\n  let detail = null;\n  if (data && typeof data === 'object') {\n    detail = data.detail || data.message || data.title;\n  } else {\n    const jsonMatch = raw.match(/\\{.*\\}/s);\n    if (jsonMatch) {\n      try {\n        const parsed = JSON.parse(jsonMatch[0].replace(/\\\\\"/g, '\"'));\n        detail = parsed && (parsed.detail || parsed.message || parsed.title);\n      } catch (e) { /* not parseable -- fall through to the raw text below */ }\n    }\n  }\n  detail = detail || raw || 'Metricool API error';\n\n  // The scheduled-post cap is shared across every network on this Metricool\n  // account (Pinterest, Facebook, Instagram, YouTube...) and won't lift\n  // until the calendar month rolls over. Tag it with the month it happened\n  // in so Prepare can recognize this exact row next run and stop retrying\n  // it daily -- see the quota-marker skip there.\n  if (/reached the limit of \\d+ posts scheduled for the month/i.test(detail)) {\n    const monthKey = $now.setZone('America/Toronto').toFormat('yyyy-LL');\n    return 'Metricool monthly quota reached (' + monthKey + ') -- will auto-retry once it resets next month.';\n  }\n  return detail;\n}\n\nreturn responses.map((item, index) => {\n  const response = item.json || {};\n  const pin = (pins[index] && pins[index].json) || {};\n  const post = response.data || {};\n  const ok = !!post.id;\n\n  return {\n    json: {\n      \"Row Number\": pin.row_number,\n      \"_sourceTab\": pin.sourceTab,\n      \"Pin ID\": pin.pinId,\n      \"Pin URL\": pin.url,\n      \"Status\": ok ? \"Scheduled\" : \"Error\",\n      \"Metricool Post ID\": post.id || \"\",\n      \"Metricool Link\": post.uuid ? ('https://app.metricool.com/planner/calendar?blogId=' + blogId + '&openWithPostUuid=' + post.uuid) : \"\",\n      \"Error\": ok ? \"\" : humanError(response),\n      // Only overwrite the sheet's Scheduled Date when the post actually got\n      // scheduled (it may have been bumped forward off its original stale\n      // value -- see Prepare). On failure, echo the original cell back\n      // unchanged instead of blanking it; the row keeps retrying daily\n      // (Prepare treats Status \"Error\" the same as \"Review\") and this column\n      // will fill in with the real date the moment it succeeds -- e.g. once\n      // Metricool's monthly quota resets, no manual fix needed.\n      \"Scheduled Date\": ok && pin.sendAt\n        ? DateTime.fromISO(pin.sendAt).setZone('America/Toronto').toFormat('M/d/yyyy HH:mm:ss')\n        : (pin.scheduledDateRaw || '')\n    }\n  };\n});"
       },
-      "id": "470092bc-7742-4df5-b9a7-e7987a5b6770",
+      "id": "e8020145-7c14-49e2-a701-0bf41d34a00c",
       "name": "Build Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        20448,
-        4928
+        23424,
+        7616
       ]
     },
     {
@@ -343,13 +361,13 @@
         },
         "options": {}
       },
-      "id": "fb280018-618b-44f7-8c91-4c40c4addaad",
+      "id": "eee2113d-1bfc-4b25-87dc-2e97f7107fc4",
       "name": "Route by Sheet",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        20112,
-        5200
+        23088,
+        7888
       ]
     },
     {
@@ -373,7 +391,8 @@
             "Metricool Post ID": "={{ $json['Metricool Post ID'] }}",
             "Metricool Link": "={{ $json['Metricool Link'] }}",
             "row_number": "={{ $json['Row Number'] }}",
-            "Scheduled Date": "={{ $json['Scheduled Date'] }}"
+            "Scheduled Date": "={{ $json[\"Scheduled Date\"] }}",
+            "Platform": "Metricool"
           },
           "matchingColumns": [
             "row_number"
@@ -430,48 +449,8 @@
               "removed": true
             },
             {
-              "id": "Preview 2",
-              "displayName": "Preview 2",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Preview 3",
-              "displayName": "Preview 3",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
               "id": "Image 1 URL",
               "displayName": "Image 1 URL",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Image 2 URL",
-              "displayName": "Image 2 URL",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Image 3 URL",
-              "displayName": "Image 3 URL",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -546,7 +525,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Approval",
@@ -565,7 +545,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Metricool Post ID",
@@ -574,7 +555,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Metricool Link",
@@ -583,7 +565,18 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tailwind Post ID",
+              "displayName": "Tailwind Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Pin URL",
@@ -596,13 +589,24 @@
               "removed": true
             },
             {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
               "id": "Error",
               "displayName": "Error",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Created Time",
@@ -617,6 +621,56 @@
             {
               "id": "Pinned Time",
               "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 2",
+              "displayName": "Preview 2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Preview 3",
+              "displayName": "Preview 3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 2 URL",
+              "displayName": "Image 2 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image 3 URL",
+              "displayName": "Image 3 URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Retry Count",
+              "displayName": "Retry Count",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -641,14 +695,16 @@
         },
         "options": {}
       },
-      "id": "b53ba4a1-08c6-4dea-b3bc-6c56f2cfd4f3",
+      "id": "77a6fd19-52ab-4aad-a834-09bd1972b8f0",
       "name": "Update Pin Row (Pinterest Pins)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        20480,
-        5184
+        23456,
+        7872
       ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -677,7 +733,8 @@
             "Metricool Post ID": "={{ $json['Metricool Post ID'] }}",
             "Metricool Link": "={{ $json['Metricool Link'] }}",
             "row_number": "={{ $json['Row Number'] }}",
-            "Scheduled Date": "={{ $json['Scheduled Date'] }}"
+            "Scheduled Date": "={{ $json['Scheduled Date'] }}",
+            "Platform": "Metricool"
           },
           "matchingColumns": [
             "row_number"
@@ -686,26 +743,6 @@
             {
               "id": "Pin ID",
               "displayName": "Pin ID",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Blog No.",
-              "displayName": "Blog No.",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Blog Title",
-              "displayName": "Blog Title",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -734,48 +771,8 @@
               "removed": true
             },
             {
-              "id": "Preview 2",
-              "displayName": "Preview 2",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Preview 3",
-              "displayName": "Preview 3",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
               "id": "Image 1 URL",
               "displayName": "Image 1 URL",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Image 2 URL",
-              "displayName": "Image 2 URL",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "Image 3 URL",
-              "displayName": "Image 3 URL",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -814,14 +811,14 @@
               "removed": true
             },
             {
-              "id": "Blog Link",
-              "displayName": "Blog Link",
+              "id": "Product Link",
+              "displayName": "Product Link",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
-              "removed": true
+              "removed": false
             },
             {
               "id": "Board",
@@ -850,7 +847,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Approval",
@@ -869,7 +867,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Metricool Post ID",
@@ -878,7 +877,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Metricool Link",
@@ -887,7 +887,18 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tailwind Post ID",
+              "displayName": "Tailwind Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Pin URL",
@@ -900,13 +911,24 @@
               "removed": true
             },
             {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
               "id": "Error",
               "displayName": "Error",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "Created Time",
@@ -921,6 +943,46 @@
             {
               "id": "Pinned Time",
               "displayName": "Pinned Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Product No.",
+              "displayName": "Product No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Image File ID",
+              "displayName": "Image File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Retry Count",
+              "displayName": "Retry Count",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -945,14 +1007,16 @@
         },
         "options": {}
       },
-      "id": "ff57a9b9-f2ce-43da-8556-eb289cd48790",
+      "id": "60da2c0d-bfc1-4a2e-9dfc-e0ca0d71b9d4",
       "name": "Update Pin Row (Pinterest2:3 Pins)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        20288,
-        5328
+        23264,
+        8016
       ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
@@ -964,13 +1028,13 @@
       "parameters": {
         "jsCode": "// Emit one row per not-ready pin (runs once for all items).\nreturn $input.all().map(item => {\n  const p = item.json || {};\n  return {\n    json: {\n      'Row Number': p.row_number,\n      '_sourceTab': p.sourceTab,\n      'Pin ID': p.pinId,\n      'Status': 'Review',\n      'Metricool Post ID': '',\n      'Metricool Link': '',\n      'Error': p.reason || 'Not ready'\n    }\n  };\n});"
       },
-      "id": "7377a002-1ad1-4420-ba5e-24ebdfc52dd4",
+      "id": "6871ada7-b9f0-4932-90da-e4ece2da909f",
       "name": "Build Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        19872,
-        5200
+        22816,
+        7888
       ]
     },
     {
@@ -987,13 +1051,13 @@
         },
         "options": {}
       },
-      "id": "67365892-7f7b-4b8d-9153-0020c257a593",
+      "id": "e8eda853-fb28-4c8f-a725-e155d062a84d",
       "name": "Get Pins 2",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        18960,
-        4944
+        22256,
+        7360
       ],
       "executeOnce": true,
       "credentials": {
@@ -1002,6 +1066,70 @@
           "name": "Template_control"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One request window per 14 days, covering from the start of THIS month through\n// the end of NEXT month -- wide enough to cover both an overdue-reschedule burst\n// (which can push a little into next month near a month boundary) and normally\n// already-dated rows, without pulling the whole account's history every run.\nconst cfg = $('Set Config').first().json;\nconst start = $now.startOf('month');\nconst end = $now.plus({ months: 1 }).endOf('month');\nconst out = [];\nlet cur = start;\nwhile (cur < end) {\n  const winEnd = DateTime.min(cur.plus({ days: 13 }).endOf('day'), end);\n  out.push({ json: { start: cur.toFormat(\"yyyy-LL-dd'T'HH:mm:ss\"), end: winEnd.toFormat(\"yyyy-LL-dd'T'HH:mm:ss\") } });\n  cur = cur.plus({ days: 14 }).startOf('day');\n}\nreturn out;\n"
+      },
+      "id": "4cb211db-723e-441a-9a23-a78d096c8fba",
+      "name": "Build Budget Windows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21872,
+        7632
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://app.metricool.com/api/v2/scheduler/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $('Set Config').first().json.userId }}"
+            },
+            {
+              "name": "blogId",
+              "value": "={{ $('Set Config').first().json.blogId }}"
+            },
+            {
+              "name": "start",
+              "value": "={{ $json.start }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $json.end }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "id": "d90bad54-4a6f-4e6d-bf0b-57103af27e7c",
+      "name": "Get Metricool Posts (Budget Check)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        22080,
+        7632
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HyOn8LPYniNVacXo",
+          "name": "Metricool API"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -1043,7 +1171,7 @@
       "main": [
         [
           {
-            "node": "Prepare",
+            "node": "Build Budget Windows",
             "type": "main",
             "index": 0
           }
@@ -1162,6 +1290,28 @@
           }
         ]
       ]
+    },
+    "Build Budget Windows": {
+      "main": [
+        [
+          {
+            "node": "Get Metricool Posts (Budget Check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Metricool Posts (Budget Check)": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1173,7 +1323,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "b96f21ed-befa-4eac-8f51-09f9ece15a8c",
+  "versionId": "152803a0-49e9-4549-a432-6a6c88534c4b",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
