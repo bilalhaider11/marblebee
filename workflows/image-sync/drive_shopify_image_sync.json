@@ -396,7 +396,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || '',\n  // Drive reports pixel dimensions for images (requires the \"*\" fields option\n  // on the listing node); undefined when Drive could not extract them.\n  width:    item.json.imageMediaMetadata?.width,\n  height:   item.json.imageMediaMetadata?.height\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\n// Deterministic order so re-running against the same Drive contents always\n// assigns the same slot numbers -- Drive's API listing order is not guaranteed\n// stable, which previously made \"other\" slot assignment look arbitrary.\nothers.sort((a, b) => a.name.localeCompare(b.name));\n\nconst ordered = [];\nconst entry = (f, slot, role) => ({ id: f.id, fileName: f.name, mimeType: mime(f.name), width: f.width, height: f.height, slot, role });\nif (primary)   ordered.push(entry(primary, 'IMAGE URL1', 'primary'));\nif (secondary) ordered.push(entry(secondary, 'IMAGE URL2', 'secondary'));\nothers.forEach((f, i) => ordered.push(entry(f, `IMAGE URL${i + 3}`, 'other')));\n\nreturn [{ json: { images: ordered, hasImages: ordered.length > 0, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
+        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || '',\n  // Drive reports pixel dimensions for images (requires the \"*\" fields option\n  // on the listing node); undefined when Drive could not extract them.\n  width:    item.json.imageMediaMetadata?.width,\n  height:   item.json.imageMediaMetadata?.height\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\n// Deterministic order so re-running against the same Drive contents always\n// assigns the same slot numbers -- Drive's API listing order is not guaranteed\n// stable, which previously made \"other\" slot assignment look arbitrary.\nothers.sort((a, b) => a.name.localeCompare(b.name));\n\nconst ordered = [];\nconst entry = (f, slot, role) => ({ id: f.id, fileName: f.name, mimeType: mime(f.name), width: f.width, height: f.height, slot, role });\nif (primary)   ordered.push(entry(primary, 'IMAGE URL1', 'primary'));\nif (secondary) ordered.push(entry(secondary, 'IMAGE URL2', 'secondary'));\nothers.forEach((f, i) => ordered.push(entry(f, `IMAGE URL${i + 3}`, 'other')));\n\n// A product needs BOTH a primary (-p) and secondary (-s) image to be usable --\n// a folder that only has unlabeled/\"other\" photos (e.g. plain numbered files\n// with no -p or -s suffix) must NOT proceed and fill IMAGE URL3+ while leaving\n// the primary/secondary slots empty. hasImages therefore requires both, not\n// just \"the folder has at least one image of any kind\".\nconst hasImages = Boolean(primary) && Boolean(secondary);\n\nreturn [{ json: { images: ordered, hasImages, missingPrimary: !primary, missingSecondary: !secondary, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
       },
       "id": "c72bd572-2cee-4493-8667-530152fdef41",
       "name": "🏷️ Classify Images",
@@ -432,7 +432,7 @@
         "options": {}
       },
       "id": "8502fbbf-8afc-4b6a-acf4-9913a34f26e6",
-      "name": "🖼️ Has Images?",
+      "name": "🖼️ Has Primary & Secondary?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
@@ -890,7 +890,7 @@
         "options": {}
       },
       "id": "d40014c6-50ef-49dc-a882-3855832b6065",
-      "name": "If",
+      "name": "If LOGO Folder Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
@@ -1447,7 +1447,7 @@
       "main": [
         [
           {
-            "node": "If",
+            "node": "If LOGO Folder Found",
             "type": "main",
             "index": 0
           }
@@ -1480,25 +1480,7 @@
       "main": [
         [
           {
-            "node": "🖼️ Has Images?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "🖼️ Has Images?": {
-      "main": [
-        [
-          {
-            "node": "🔀 Split Per Image",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "🔁 Iterate Products",
+            "node": "🖼️ Has Primary & Secondary?",
             "type": "main",
             "index": 0
           }
@@ -1598,24 +1580,6 @@
         [
           {
             "node": "🔍 Find Existing File By Filename",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "🔁 Iterate Products",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "📂 Get Image Folder",
             "type": "main",
             "index": 0
           }
@@ -1805,6 +1769,42 @@
         [
           {
             "node": "🔗 Get CDN URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🖼️ Has Primary & Secondary?": {
+      "main": [
+        [
+          {
+            "node": "🔀 Split Per Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Iterate Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If LOGO Folder Found": {
+      "main": [
+        [
+          {
+            "node": "🔁 Iterate Products",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📂 Get Image Folder",
             "type": "main",
             "index": 0
           }
