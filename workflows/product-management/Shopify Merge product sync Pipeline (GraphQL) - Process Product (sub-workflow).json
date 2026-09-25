@@ -7,13 +7,13 @@
         "height": 1008,
         "width": 480
       },
-      "id": "672deca6-5705-44e7-9223-8c0f3c37da68",
+      "id": "2408c5d8-a969-42f0-bce8-5dc1f35ec36d",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -3920,
-        368
+        -2720,
+        960
       ]
     },
     {
@@ -21,13 +21,13 @@
         "inputSource": "passthrough",
         "returnOutput": "allRuns"
       },
-      "id": "8ded5d8f-8774-41a7-bbb5-5bfc334f39d1",
+      "id": "cd160639-c083-4d1c-be5e-1058ed1884eb",
       "name": "🚀 Triggered by Main Pipeline (per product)",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -2864,
-        1360
+        -1664,
+        1952
       ]
     },
     {
@@ -37,49 +37,49 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        704
+        1424,
+        1296
       ],
-      "id": "cf7444cf-73bc-4611-a36f-cadb699fdfdc",
+      "id": "241071dd-5aaa-40cd-bf36-32a48a08eaa7",
       "name": "🔗 Build Collection Mappings"
     },
     {
       "parameters": {
         "jsCode": "// metafieldsSet is a true upsert -- it needs ownerId + namespace + key, not the\n// metafield's own id. owner_id/namespace/key were added onto this \"update\"\n// operation object in \"🧠 Sync Metafields\" (additive fields only, the\n// create/update/delete decision logic there is untouched).\nconst QUERY = `mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {\n  metafieldsSet(metafields: $metafields) {\n    metafields { id }\n    userErrors { field message code }\n  }\n}`;\n\n// Runs once per input item -- multiple metafield updates can be in flight at\n// once (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const op = item.json;\n  const m = op.payload.metafield;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${op.owner_id}`,\n            namespace: op.namespace,\n            key: op.key,\n            type: m.type,\n            value: m.value\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "82165bb2-d64d-4b02-abf2-c86057e0a708",
+      "id": "57b0a938-201f-453f-a20c-4de6981e8f30",
       "name": "🔀 Build GraphQL: Update Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -896,
-        -336
+        304,
+        256
       ]
     },
     {
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple collection-add calls can be in flight\n// at once, each with its own response to check. A failure here (e.g. the\n// product already existed on Shopify from a race, or a transient Shopify\n// error) must not throw and abort the run -- collection assignment is a lesser\n// concern than blocking the rest of this product's processing over it.\nreturn $input.all().map(item => {\n  const res = item.json;\n  const errors = res?.errors;\n  const userErrors = res?.data?.collectionAddProducts?.userErrors;\n  if (errors?.length || userErrors?.length) {\n    return { json: { added: false, error: JSON.stringify(errors?.length ? errors : userErrors) } };\n  }\n  return { json: { added: true } };\n});"
       },
-      "id": "da718dc4-3230-4553-923f-daead1322afc",
+      "id": "7406cb0b-23c6-48aa-b09a-fb91e43928a4",
       "name": "✅ Check Add to Collection Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
-        512
+        1920,
+        1104
       ]
     },
     {
       "parameters": {
         "jsCode": "// REST auto-publishes a newly created product to the Online Store sales\n// channel; GraphQL's productSet/productCreate does not -- status: ACTIVE only\n// means \"publishable\", not published to any channel. This looks up the\n// store's \"Online Store\" publication and explicitly publishes the product to\n// it, so newly created products actually appear on the live storefront.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get publications): ' + JSON.stringify(res.errors));\n}\nconst pubs = res?.data?.publications?.nodes || [];\nconst onlineStore = pubs.find(p => p.name === 'Online Store');\nif (!onlineStore) {\n  throw new Error('Could not find an \"Online Store\" publication/sales channel on this shop: ' + JSON.stringify(pubs));\n}\n\nconst product = $('🔀 Adapt Response: Create Product').item.json.product;\n\nconst QUERY = `mutation PublishProduct($id: ID!, $input: [PublicationInput!]!) {\n  publishablePublish(id: $id, input: $input) {\n    publishable {\n      ... on Product { id }\n    }\n    userErrors { field message }\n  }\n}`;\n\nreturn [{\n  json: {\n    body: {\n      query: QUERY,\n      variables: {\n        id: `gid://shopify/Product/${product.id}`,\n        input: [{ publicationId: onlineStore.id }]\n      }\n    }\n  }\n}];"
       },
-      "id": "b6e6837a-8c36-43f1-b8b0-51564b204cd7",
+      "id": "75611134-14f4-4d65-8f88-a77e5cadac5c",
       "name": "🔀 Build GraphQL: Publish Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        288,
-        2128
+        1488,
+        2720
       ]
     },
     {
@@ -89,10 +89,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1632,
-        1344
+        -432,
+        1936
       ],
-      "id": "6961379f-40cd-4ca2-ab1d-a33125ae03c1",
+      "id": "fd7c5e79-1104-4872-862a-cf7aa5b8c08a",
       "name": "🩺 Check For Dead Images"
     },
     {
@@ -102,10 +102,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1712,
-        1760
+        2912,
+        2352
       ],
-      "id": "8355284a-4ae1-495e-9cc3-20aa22b8cd67",
+      "id": "8637e033-4366-4264-a5ce-e783240d01f7",
       "name": "Wait",
       "webhookId": "0379cbb1-959e-4dac-8288-de3b3fd763bc"
     },
@@ -197,10 +197,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1024,
-        960
+        176,
+        1552
       ],
-      "id": "5234d9b2-b3b4-4e32-ad5c-f99ec7eec301",
+      "id": "22022a0f-8b4d-4874-830c-2b5b2e819009",
       "name": "❓Check if update request needed",
       "alwaysOutputData": false
     },
@@ -208,13 +208,13 @@
       "parameters": {
         "jsCode": "const res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productVariantsBulkUpdate): ' + JSON.stringify(res.errors));\n}\nconst userErrors = res?.data?.productVariantsBulkUpdate?.userErrors;\nif (userErrors?.length) {\n  throw new Error('Shopify productVariantsBulkUpdate userErrors: ' + JSON.stringify(userErrors));\n}\nreturn [{ json: {} }];"
       },
-      "id": "142602a4-9633-41d8-ae81-05411b5eb35f",
+      "id": "9382b13c-8c3b-42d3-bb5c-b00fef092f97",
       "name": "✅ Check Variant Update Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1088,
-        928
+        2288,
+        1520
       ]
     },
     {
@@ -237,13 +237,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "fea87b04-46ce-4847-b079-39f7e7c86e32",
+      "id": "61545ee7-fdd4-409b-9273-73d4a755711d",
       "name": "➕ Shopify: Create Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -976,
-        -592
+        224,
+        0
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -258,27 +258,61 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield deletes can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsDelete): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsDelete?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsDelete userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "f999bd9f-aed7-45ba-984c-6ab9c4ff7232",
+      "id": "10a15c56-e661-4a02-a7b4-40d95b718a5c",
       "name": "✅ Check Delete Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -288,
-        -128
+        912,
+        464
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes into the REST-shaped { collects: [{id, collection_id}] } array that\n// \"❓ Has Existing Collections?\" and \"🔧 Extract Collects to update or delete\"\n// already expect unchanged. GraphQL has no separate \"collect join-record id\"\n// concept -- a collection's own id doubles as the collect_id here, which is\n// exactly what the new collection-removal call needs anyway.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get collections): ' + JSON.stringify(res.errors));\n}\nconst productId = $('📝 Format Update Request').item.json.product.id;\nconst edges = res?.data?.product?.collections?.edges || [];\nconst collects = edges.map(e => ({\n  id: e.node.legacyResourceId,\n  collection_id: e.node.legacyResourceId,\n  product_id: productId\n}));\nreturn [{ json: { collects } }];"
       },
-      "id": "0244b359-9645-4d4c-871e-590a93df6cfa",
+      "id": "4e729402-a842-48ca-857e-27411067b2b0",
       "name": "🔀 Adapt Response: Product Collections",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -752,
-        688
+        448,
+        1280
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cad-images-has-body",
+              "leftValue": "={{ $json.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1152,
+        1104
+      ],
+      "id": "7fa18895-3b0b-4352-b080-5c612f702ea1",
+      "name": "❓ Has Image Operations to Sync?"
     },
     {
       "parameters": {
@@ -303,10 +337,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -2128,
-        704
+        -864,
+        1088
       ],
-      "id": "80e9ac51-8552-433a-bd3a-7d8acbe9afc9",
+      "id": "23860ffb-b341-49be-bac4-68077c1b3bbf",
       "name": "➕ Shopify: Sync Product Images (GraphQL)",
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -354,10 +388,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -3104,
-        720
+        -1904,
+        1312
       ],
-      "id": "d43fbf8d-2669-47dc-b86d-f9be5345c33a",
+      "id": "e249dc40-fde1-403f-9e33-aceb01866fab",
       "name": "✅ Check if Image Update Needed",
       "alwaysOutputData": false
     },
@@ -368,10 +402,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -128,
-        704
+        1072,
+        1296
       ],
-      "id": "6095f13e-00c9-4ce2-b198-a5dcaeddb7da",
+      "id": "7455ab6a-e61f-4f08-b4f1-a74a03930526",
       "name": "🔗 Pass Update Request"
     },
     {
@@ -381,10 +415,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1456,
-        1760
+        -256,
+        2352
       ],
-      "id": "8794c887-a062-4f29-ad30-7252aa9b8773",
+      "id": "938154a5-1973-4af1-947b-5b40257c0d24",
       "name": "📝 Format Create Request"
     },
     {
@@ -407,13 +441,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "44613856-3be0-4bdc-ba0f-539826af9e56",
+      "id": "da062645-ced5-4f32-bd7d-c9d559300f9b",
       "name": "📥 Get Online Store Publication (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        32,
-        2128
+        1232,
+        2720
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -461,10 +495,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1968,
-        1344
+        -768,
+        1936
       ],
-      "id": "195785c3-9e50-4189-9dd0-1788ce687039",
+      "id": "a9c966e4-0e5b-4ea7-ac33-754155d032b8",
       "name": "🩺 HEAD Check Image URL",
       "onError": "continueRegularOutput"
     },
@@ -472,26 +506,26 @@
       "parameters": {
         "jsCode": "// Reshapes into the SAME { product: { id, title, handle, variants: [{id}] } }\n// shape \"Adapt Response: Create Product\" produces on a normal success, so\n// everything downstream (publish, collection mapping, sheet write-back) works\n// identically whether the product was just created or recovered here.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (find product by handle): ' + JSON.stringify(res.errors));\n}\nconst product = res?.data?.productByHandle;\nif (!product) {\n  // Shopify said the handle was taken, but a direct lookup by that same\n  // handle found nothing -- a genuinely confusing state worth surfacing\n  // loudly rather than silently creating a duplicate or looping forever.\n  const attemptedHandle = $('🔍 Build GraphQL: Find Product By Handle').item.json.body.variables.handle;\n  throw new Error(`Handle \"${attemptedHandle}\" was reported as already in use, but no product with that handle could be found.`);\n}\n\nconst variantEdge = product.variants?.edges?.[0]?.node;\n\nreturn [{\n  json: {\n    product: {\n      id: product.legacyResourceId,\n      title: product.title,\n      handle: product.handle,\n      variants: [{ id: variantEdge?.legacyResourceId ?? '' }]\n    }\n  }\n}];"
       },
-      "id": "b12f9256-0542-42f4-b5c6-90a8e2f00672",
+      "id": "dd17e05b-2088-4bab-9f2c-df89b0f0e031",
       "name": "🔄 Adapt Response: Recovered Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        240,
-        1744
+        1440,
+        2336
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Runs once per input item -- an update batch and a create batch can both\n// be in flight from the same run.\nreturn $input.all().map((item, i) => {\n  const res = item.json;\n  const type = $('🔀 Build GraphQL: Sync Product Images').all()[i]?.json?.type;\n\n  if (res?.errors?.length) {\n    throw new Error(`Shopify GraphQL error (${type || 'sync images'}): ` + JSON.stringify(res.errors));\n  }\n\n  const userErrors = type === 'update'\n    ? res?.data?.fileUpdate?.userErrors\n    : type === 'delete'\n    ? res?.data?.fileDelete?.userErrors\n    : res?.data?.productCreateMedia?.mediaUserErrors;\n\n  if (userErrors?.length) {\n    throw new Error(`Shopify ${type} image userErrors: ` + JSON.stringify(userErrors));\n  }\n\n  return { json: {} };\n});"
+        "jsCode": "// Runs once per input item -- an update batch and a create batch can both\n// be in flight from the same run.\nreturn $input.all().map((item, i) => {\n  const res = item.json;\n  const type = $('🔀 Build GraphQL: Sync Product Images').all()[i]?.json?.type;\n\n  if (res?.errors?.length) {\n    throw new Error(`Shopify GraphQL error (${type || 'sync images'}): ` + JSON.stringify(res.errors));\n  }\n\n  const userErrors = type === 'update'\n    ? res?.data?.fileUpdate?.userErrors\n    : type === 'delete'\n    ? res?.data?.fileDelete?.userErrors\n    : res?.data?.productCreateMedia?.mediaUserErrors;\n\n  if (userErrors?.length) {\n    // Shopify processes a freshly uploaded/created file asynchronously (download,\n    // transcode, thumbnail) before it reaches READY state -- fileUpdate rejects\n    // any attempt to touch a file that's still processing (NON_READY_STATE).\n    // This is transient: the file becomes updatable within moments on Shopify's\n    // own side, and the next image-triggered sync pass will pick up the\n    // correction then. Halting the ENTIRE product's sync (body_html, metafields,\n    // collections all run in parallel branches feeding the same Merge) over a\n    // timing race that resolves itself on its own is worse than skipping this\n    // one file update for now.\n    const onlyTransient = userErrors.every(e => e.code === 'NON_READY_STATE');\n    if (onlyTransient) {\n      return { json: { skipped: true, reason: 'NON_READY_STATE', userErrors } };\n    }\n    throw new Error(`Shopify ${type} image userErrors: ` + JSON.stringify(userErrors));\n  }\n\n  return { json: {} };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1904,
-        704
+        -640,
+        1088
       ],
-      "id": "8dee5f0a-6e43-4039-a221-98ff6209fcfe",
+      "id": "363a8742-4d04-43d6-9d3f-124b9fc7881d",
       "name": "✅ Check Sync Images Result"
     },
     {
@@ -501,10 +535,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1360,
-        960
+        -160,
+        1552
       ],
-      "id": "01111c05-bb07-4292-b339-28f0df0575de",
+      "id": "510101a7-35fe-40b2-8525-0268f92a81e6",
       "name": "📝 Format Update Request"
     },
     {
@@ -535,10 +569,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -208,
-        496
+        992,
+        1088
       ],
-      "id": "1634adef-a88f-48db-aec7-7f5b6db00229",
+      "id": "f56e2998-04e2-4c43-b54a-494cc80cd930",
       "name": "❓Check for update or delete"
     },
     {
@@ -599,10 +633,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1392,
-        48
+        -192,
+        640
       ],
-      "id": "49b1cdd4-1672-4b95-b050-087ddaeaa02d",
+      "id": "1dd90ee0-0e18-406e-a7fd-ce701a633f64",
       "name": "Check Metafields Update",
       "alwaysOutputData": false
     },
@@ -626,13 +660,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "db828dfa-c678-4165-82bd-5e9c43f8da69",
+      "id": "b9eb41ee-53de-42df-a41e-5b7e31747f82",
       "name": "📥 Get Existing Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1856,
-        -336
+        -656,
+        256
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -647,39 +681,39 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield updates can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsSet/update): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsSet?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsSet (update) userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "c998ada5-cded-48cf-90df-9472bb1ade63",
+      "id": "eabb9794-4973-490a-aeb3-15eee01a9fd1",
       "name": "✅ Check Update Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -432,
-        -336
+        768,
+        256
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes the GraphQL productSet response back into the REST-shaped\n// { product: { id, title, handle, variants: [{id}] } } object that\n// \"📦 Parse Create Response\" and \"🔗 Build Collection Mappings\" already expect,\n// so those nodes did not need to change at all.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productSet): ' + JSON.stringify(res.errors));\n}\nconst result = res?.data?.productSet;\n\n// A HANDLE_NOT_UNIQUE error here almost always means this exact product was\n// already created successfully on a prior run, but that run failed somewhere\n// between the create call and the sheet write-back (so the row still looks\n// \"never created\" and retries productSet with the same deterministic handle\n// every time, colliding with itself forever). Recover instead of failing\n// permanently: look up the existing product by the handle Shopify just told\n// us is taken, and reconcile the sheet with it.\nconst handleCollision = result?.userErrors?.some(e => e.code === 'HANDLE_NOT_UNIQUE');\nif (handleCollision) {\n  const attemptedHandle = $('🔀 Build GraphQL: Create Product').item.json.body.variables.input.handle;\n  return [{ json: { handle_collision: true, attempted_handle: attemptedHandle } }];\n}\n\nif (result?.userErrors?.length) {\n  throw new Error('Shopify productSet userErrors: ' + JSON.stringify(result.userErrors));\n}\n\nconst product = result?.product;\nif (!product) {\n  throw new Error('Shopify productSet returned no product: ' + JSON.stringify(res));\n}\n\nconst variantEdge = product.variants?.edges?.[0]?.node;\n\nreturn [{\n  json: {\n    handle_collision: false,\n    product: {\n      id: product.legacyResourceId,\n      title: product.title,\n      handle: product.handle,\n      variants: [{ id: variantEdge?.legacyResourceId ?? '' }]\n    }\n  }\n}];"
       },
-      "id": "6d5dee2f-fc92-4f3c-8708-48bf71a2b520",
+      "id": "db31bf80-7c95-45ae-a015-2e68f46fbd05",
       "name": "🔀 Adapt Response: Create Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -800,
-        1760
+        400,
+        2352
       ]
     },
     {
       "parameters": {
         "jsCode": "const productId = $json.product.id;\nconst QUERY = `query GetProductCollections($id: ID!) {\n  product(id: $id) {\n    collections(first: 250) {\n      edges { node { id legacyResourceId title } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
       },
-      "id": "d476c97e-4ee6-4e5f-9250-055de0330f80",
+      "id": "bb5cfc66-595e-4730-9bc9-593b63da85ff",
       "name": "🔀 Build GraphQL: Get Product Collections",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1328,
-        688
+        -128,
+        1280
       ]
     },
     {
@@ -702,13 +736,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "4e5e3d0b-b3df-403e-83d2-5672ad78ed2a",
+      "id": "f7bcd639-b008-4840-a19d-9cc76b0f3f1d",
       "name": "🗑️ Remove from Collections (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -64,
-        288
+        1136,
+        880
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -739,13 +773,13 @@
         "jsonBody": "={{ $json.variantBody }}",
         "options": {}
       },
-      "id": "ab7ea847-4395-43f3-a6cd-d233d4993a64",
+      "id": "54902ecc-7b8d-42f8-89c6-b0fc8619f17e",
       "name": "🔄 Shopify: Update Variant (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        688,
-        928
+        1888,
+        1520
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -763,10 +797,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -544,
-        496
+        656,
+        1088
       ],
-      "id": "315572d2-c8a3-4b16-8f58-18564a90c656",
+      "id": "4f7fea0f-e5a4-4cb6-952d-88911730624a",
       "name": "🔧 Extract Collects to update or delete",
       "alwaysOutputData": false
     },
@@ -774,13 +808,13 @@
       "parameters": {
         "jsCode": "// Note: unlike REST's synchronous DELETE, collectionRemoveProducts is\n// asynchronous (returns a background job). Nothing downstream in this\n// workflow depends on immediate removal, so we only check for userErrors.\n// Runs once per input item -- multiple removals can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (collectionRemoveProducts): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.collectionRemoveProducts?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify collectionRemoveProducts userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "e5a95ace-44a4-46d5-9bdf-eba9a362e171",
+      "id": "35147bf2-897c-4257-b2da-544f5fe98a0e",
       "name": "✅ Check Remove from Collection Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        176,
-        288
+        1376,
+        880
       ]
     },
     {
@@ -790,23 +824,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2560,
-        1360
+        -1360,
+        1952
       ],
-      "id": "2d947122-ee87-432a-8267-788ddd204aa8",
+      "id": "048210b7-77bd-47be-9f81-251154fea912",
       "name": "🩺 Build Image Checks"
     },
     {
       "parameters": {
         "jsCode": "const GID = (type, id) => `gid://shopify/${type}/${id}`;\nconst QUERY = `mutation CollectionAddProducts($id: ID!, $productIds: [ID!]!) {\n  collectionAddProducts(id: $id, productIds: $productIds) {\n    collection { id }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- \"🔧 Extract Collects to update or delete\" and\n// \"🔗 Build Collection Mappings\" can both emit multiple items at once (e.g.\n// several collections to add), and this node must build one request per item,\n// not just the first (the default \"run once for all items\" Code node mode\n// only sees $json as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const collect = item.json.collect;\n\n  // \"🔧 Extract Collects to update or delete\"'s add branch depends on\n  // product_id coming through the collections-fetch response -- fall back to\n  // the same source \"🔀 Build GraphQL: Remove from Collection\" already uses,\n  // and fail loudly rather than silently sending an invalid gid to Shopify.\n  const productId = collect.product_id ?? $('📝 Format Update Request').item.json.product.id;\n  if (!productId) {\n    throw new Error('Add to Collection: could not resolve a product_id. collect=' + JSON.stringify(collect));\n  }\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          id: GID('Collection', collect.collection_id),\n          productIds: [GID('Product', productId)]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "37901b23-a681-4f6c-bb1e-9ea9aa0060c8",
+      "id": "129260d0-c7a7-4590-8a0a-8c5194a5f089",
       "name": "🔀 Build GraphQL: Add to Collection",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        160,
-        512
+        1360,
+        1104
       ]
     },
     {
@@ -829,13 +863,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "fefa8c41-dabf-4422-8a5a-d9d8a37280d7",
+      "id": "b1e47e97-1c67-4981-887a-b89e0afead43",
       "name": "📥 Find Product By Handle (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -96,
-        1744
+        1104,
+        2336
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -875,36 +909,36 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2288,
-        1360
+        -1088,
+        1952
       ],
-      "id": "a7c7beca-85af-48dd-b9bf-d2d46a911be9",
+      "id": "1d14f23a-7ef3-4ec7-9f1c-371659d61595",
       "name": "🩺 Any Images to Check?"
     },
     {
       "parameters": {
-        "jsCode": "const sheet = $('🔀 Route: Create or Update').item.json.product.sheet_name;\nconst row_number = $('🔀 Route: Create or Update').item.json.product.row_number;\n\nreturn [\n  {\n    json: {\n      \"sheet_name\":sheet,\n      \"row_number\":row_number,\n      \"Ready_to_post\": \"no\",\n      \"Fields_to_update\": \"\",\n      \"last_update_time\": $now\n    },\n  },\n];\n"
+        "jsCode": "const sheet = $('🔀 Route: Create or Update').item.json.product.sheet_name;\nconst row_number = $('🔀 Route: Create or Update').item.json.product.row_number;\n// The exact Fields_to_update value THIS update was built from -- not what's on\n// the sheet right now. A parallel branch (e.g. the CAD-Image11 sync) can add a\n// NEW token to this same row's Fields_to_update while this update was in flight;\n// blindly writing '' here would silently erase that new token before it's ever\n// acted on. Only the fields actually processed in THIS update are removed --\n// see 🔀 Compute Field Diff, which re-reads the live sheet and subtracts just\n// these, preserving anything added concurrently.\nconst processedFields = $('🔀 Route: Create or Update').item.json.product.updating_fields || '';\n\nreturn [\n  {\n    json: {\n      \"sheet_name\":sheet,\n      \"row_number\":row_number,\n      \"Ready_to_post\": \"no\",\n      \"processedFields\": processedFields,\n      \"last_update_time\": $now,\n    },\n  },\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1296,
-        16
+        2496,
+        608
       ],
-      "id": "466ab361-4132-4d23-a505-66b8c328ced4",
+      "id": "82bf3058-c086-481f-9174-0fef480a6dbe",
       "name": "📦 Parse Update Response"
     },
     {
       "parameters": {
-        "jsCode": "const productId = $json.product.id;\nconst QUERY = `query GetProductMedia($id: ID!) {\n  product(id: $id) {\n    media(first: 50) {\n      nodes {\n        id\n        alt\n        ... on MediaImage { image { url } }\n      }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
+        "jsCode": "const productId = $json.product.id;\n// first: 250 (not the original 50) -- a product this pipeline manages should\n// never legitimately exceed 11 media items (IMAGE URL1-11), but a product\n// that already accumulated duplicate media (see the existingBySlot fix in\n// \"\\ud83d\\udd00 Build GraphQL: Sync Product Images\") could easily have passed 50.\n// Silently truncating to the first 50 would hide the very duplicates this\n// fix exists to clean up, letting the problem recur indefinitely.\nconst QUERY = `query GetProductMedia($id: ID!) {\n  product(id: $id) {\n    media(first: 250) {\n      nodes {\n        id\n        alt\n        ... on MediaImage { image { url } }\n      }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2816,
-        704
+        -1616,
+        1296
       ],
-      "id": "4db4d8f4-5abc-4eb9-b5c9-a983bec75579",
+      "id": "34e93517-dbce-4cdd-bbf9-67beaafde72f",
       "name": "🔀 Build GraphQL: Get Product Media (Update)"
     },
     {
@@ -914,10 +948,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        1760
+        2112,
+        2352
       ],
-      "id": "fb4aceef-23b8-4d50-bd82-8f076ddd9084",
+      "id": "99697a71-46a8-4446-9754-84758c47b54b",
       "name": "📦 Parse Create Response"
     },
     {
@@ -940,13 +974,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "e16727c8-dd4e-4587-bc0a-38760938bd90",
+      "id": "b77b1669-34f8-443a-a6c6-1a1c8e9188e5",
       "name": "🔄 Shopify: Update Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -208,
-        944
+        992,
+        1536
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -984,10 +1018,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1280,
-        1344
+        -80,
+        1936
       ],
-      "id": "7561df9c-a47d-4d02-b893-5e952c35b858",
+      "id": "ae195147-d774-4c38-99fc-67089b44a999",
       "name": "🔀 Route: Create or Update"
     },
     {
@@ -1010,13 +1044,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "a6e6d39d-ebca-4863-a6e9-5ef80bf3ea49",
+      "id": "2b80ffb1-4ccd-4b8d-8e48-7a4405c55807",
       "name": "📥 Get Product Collections (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1072,
-        688
+        128,
+        1280
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1029,15 +1063,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// productUpdate's `media` argument only ever ADDS new media -- it can never\n// replace an existing image in place. Correlate each desired image slot\n// against the product's existing media using ONLY the slot number encoded at\n// the end of the alt text (e.g. \"... - Image 3\") -- never the full alt string,\n// and never a positional count.\n//\n// Matching on the FULL alt string (including the human-readable \"{keyword} in\n// {material}\" prefix) meant any later edit to the Keyword or Material column\n// changed every image's computed alt text, made this node think every\n// existing photo was an \"orphan\" with no match, and deleted them all --\n// even though nothing about the actual photos had changed. Matching by\n// positional count (Nth image seen this run) had the same failure mode\n// whenever a slot was added, removed, or deduped (e.g. the IMAGE URL11\n// CAD-drawing sync toggling on and off), which silently renumbered every\n// later slot's identity. Both caused real, live product photos to be deleted\n// from Shopify while the sheet was left pointing at the now-dead URL forever\n// (nothing writes new URLs back to the sheet after this runs).\n//\n// Slot number is tied to the underlying sheet column (IMAGE URL1 -> 1 ...\n// IMAGE URL11 -> 11, set in extractImages/buildAltText), so it survives both\n// kinds of unrelated edits: a legitimate Keyword/Material change now becomes\n// a safe in-place alt-text update via fileUpdate, never a delete+recreate.\n// Only media carrying this pipeline's own \"... - Image N\" alt suffix is ever\n// considered at all -- a manually-added product image with unrelated alt\n// text is never touched, matching the original safety property.\nconst SLOT_SUFFIX = / - Image (\\d+)$/;\nconst slotOf = (alt) => {\n  const m = SLOT_SUFFIX.exec(alt || '');\n  return m ? Number(m[1]) : null;\n};\n\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get product media): ' + JSON.stringify(res.errors));\n}\n\n// Same `v=`-cache-buster-insensitive comparison used everywhere else in this\n// pipeline to decide \"is this actually the same image\" -- exact URL only,\n// never a fuzzy filename/suffix match.\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\nconst existingNodes = res?.data?.product?.media?.nodes || [];\nconst existingBySlot = new Map();\n// A photo uploaded directly in Shopify Admin (never touched by this pipeline)\n// keeps whatever alt Shopify gave it -- almost never our \"... - Image N\"\n// convention -- so it will never appear in existingBySlot. Without a second\n// lookup by URL, every such photo looks like \"no existing media for this\n// slot\" on every relevant run, and this node would keep trying to CREATE a\n// duplicate using the photo's own already-Shopify-hosted URL as the source\n// (the same unsupported originalSource-reuse pattern flagged elsewhere in\n// this pipeline) instead of recognizing it's the same file already there.\nconst existingByUrl = new Map();\nfor (const n of existingNodes) {\n  const slot = slotOf(n.alt);\n  const url = normalizeImageUrl(n.image?.url || '');\n  if (slot !== null) existingBySlot.set(slot, { id: n.id, alt: n.alt, url: n.image?.url || '' });\n  else if (url) existingByUrl.set(url, { id: n.id, alt: n.alt, url: n.image?.url || '' });\n}\n\nconst desiredImages = $('📝 Format Update Request').item.json.product.images || [];\nconst productId = $('📝 Format Update Request').item.json.product.id;\n\nconst desiredBySlot = new Map();\nfor (const img of desiredImages) {\n  const slot = slotOf(img.alt);\n  if (slot !== null) desiredBySlot.set(slot, img);\n}\n\nconst filesToUpdate = [];\nconst mediaToCreate = [];\nconst mediaToDelete = [];\n\nfor (const [slot, img] of desiredBySlot) {\n  const existing = existingBySlot.get(slot);\n  if (existing) {\n    // Same slot -- only issue a fileUpdate when something about it actually\n    // changed (alt text or the underlying image). Re-sending an identical\n    // fileUpdate for every untouched photo on every run that happens to\n    // touch ANY image slot is unnecessary Shopify API load at catalog scale,\n    // and every such call is one more chance for a transient failure.\n    const unchanged = existing.alt === (img.alt || '') && normalizeImageUrl(existing.url) === normalizeImageUrl(img.src);\n    if (!unchanged) {\n      filesToUpdate.push({ id: existing.id, originalSource: img.src, alt: img.alt || '' });\n    }\n    continue;\n  }\n\n  // No match by our own alt convention -- before assuming this is a brand\n  // new photo, check whether a manually-uploaded (or otherwise foreign-alt)\n  // media already exists at this EXACT URL. If so, it's the same file a\n  // human already put on Shopify -- just relabel its alt to bring it under\n  // our convention (in-place, no content re-fetch) so future runs recognize\n  // it via existingBySlot instead of repeating this fallback every time.\n  const byUrl = existingByUrl.get(normalizeImageUrl(img.src));\n  if (byUrl) {\n    filesToUpdate.push({ id: byUrl.id, originalSource: img.src, alt: img.alt || '' });\n    continue;\n  }\n\n  mediaToCreate.push({ originalSource: img.src, alt: img.alt || '', mediaContentType: 'IMAGE' });\n}\n\n// Only delete a slot's media when the sheet itself no longer has that slot\n// populated at all -- a genuine, deliberate removal reflected in the data,\n// never a byproduct of a text or ordering mismatch.\nfor (const [slot, existing] of existingBySlot) {\n  if (!desiredBySlot.has(slot)) {\n    mediaToDelete.push(existing.id);\n  }\n}\n\nconst operations = [];\n\nif (filesToUpdate.length > 0) {\n  const FILE_UPDATE_MUTATION = `mutation FileUpdate($files: [FileUpdateInput!]!) {\n  fileUpdate(files: $files) {\n    files { id }\n    userErrors { field message code }\n  }\n}`;\n  operations.push({\n    type: 'update',\n    body: { query: FILE_UPDATE_MUTATION, variables: { files: filesToUpdate } }\n  });\n}\n\nif (mediaToCreate.length > 0) {\n  const PRODUCT_CREATE_MEDIA_MUTATION = `mutation ProductCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {\n  productCreateMedia(productId: $productId, media: $media) {\n    media { id }\n    mediaUserErrors { field message }\n  }\n}`;\n  operations.push({\n    type: 'create',\n    body: {\n      query: PRODUCT_CREATE_MEDIA_MUTATION,\n      variables: { productId: `gid://shopify/Product/${productId}`, media: mediaToCreate }\n    }\n  });\n}\n\nif (mediaToDelete.length > 0) {\n  const FILE_DELETE_MUTATION = `mutation FileDelete($fileIds: [ID!]!) {\n  fileDelete(fileIds: $fileIds) {\n    deletedFileIds\n    userErrors { field message }\n  }\n}`;\n  operations.push({\n    type: 'delete',\n    body: { query: FILE_DELETE_MUTATION, variables: { fileIds: mediaToDelete } }\n  });\n}\n\nif (operations.length === 0) {\n  return [{ json: { message: 'No image changes to sync' } }];\n}\n\nreturn operations.map(op => ({ json: op }));"
+        "jsCode": "// productUpdate's `media` argument only ever ADDS new media -- it can never\n// replace an existing image in place. Correlate each desired image slot\n// against the product's existing media using ONLY the slot number encoded at\n// the end of the alt text (e.g. \"... - Image 3\") -- never the full alt string,\n// and never a positional count.\n//\n// Matching on the FULL alt string (including the human-readable \"{keyword} in\n// {material}\" prefix) meant any later edit to the Keyword or Material column\n// changed every image's computed alt text, made this node think every\n// existing photo was an \"orphan\" with no match, and deleted them all --\n// even though nothing about the actual photos had changed. Matching by\n// positional count (Nth image seen this run) had the same failure mode\n// whenever a slot was added, removed, or deduped (e.g. the IMAGE URL11\n// CAD-drawing sync toggling on and off), which silently renumbered every\n// later slot's identity. Both caused real, live product photos to be deleted\n// from Shopify while the sheet was left pointing at the now-dead URL forever\n// (nothing writes new URLs back to the sheet after this runs).\n//\n// Slot number is tied to the underlying sheet column (IMAGE URL1 -> 1 ...\n// IMAGE URL11 -> 11, set in extractImages/buildAltText), so it survives both\n// kinds of unrelated edits: a legitimate Keyword/Material change now becomes\n// a safe in-place alt-text update via fileUpdate, never a delete+recreate.\n// Only media carrying this pipeline's own \"... - Image N\" alt suffix is ever\n// considered at all -- a manually-added product image with unrelated alt\n// text is never touched, matching the original safety property.\nconst SLOT_SUFFIX = / - Image (\\d+)$/;\nconst slotOf = (alt) => {\n  const m = SLOT_SUFFIX.exec(alt || '');\n  return m ? Number(m[1]) : null;\n};\n\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get product media): ' + JSON.stringify(res.errors));\n}\n\n// Same `v=`-cache-buster-insensitive comparison used everywhere else in this\n// pipeline to decide \"is this actually the same image\" -- exact URL only,\n// never a fuzzy filename/suffix match.\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\nconst existingNodes = res?.data?.product?.media?.nodes || [];\n// Keyed by slot -> ARRAY, never a single entry. A prior bug here used a plain\n// Map.set() per slot, which silently OVERWRITES on collision -- if Shopify\n// already has more than one media item sharing the same \"- Image N\" alt\n// suffix (however that happened: a retried create, a partial historical sync,\n// etc.), only the last one survived in the map and the other became\n// permanently invisible to both the \"already exists\" match AND the orphan\n// cleanup below -- it just sat there forever as an undetected duplicate.\n// Collecting the full array per slot lets every extra be identified and\n// deleted explicitly (see the reconciliation loop below), so a pre-existing\n// duplicate self-heals on the very next sync instead of persisting.\nconst existingBySlot = new Map();\n// A photo uploaded directly in Shopify Admin (never touched by this pipeline)\n// keeps whatever alt Shopify gave it -- almost never our \"... - Image N\"\n// convention -- so it will never appear in existingBySlot. Without a second\n// lookup by URL, every such photo looks like \"no existing media for this\n// slot\" on every relevant run, and this node would keep trying to CREATE a\n// duplicate using the photo's own already-Shopify-hosted URL as the source\n// (the same unsupported originalSource-reuse pattern flagged elsewhere in\n// this pipeline) instead of recognizing it's the same file already there.\nconst existingByUrl = new Map();\nfor (const n of existingNodes) {\n  const slot = slotOf(n.alt);\n  const url = normalizeImageUrl(n.image?.url || '');\n  if (slot !== null) {\n    const bucket = existingBySlot.get(slot) || [];\n    bucket.push({ id: n.id, alt: n.alt, url: n.image?.url || '' });\n    existingBySlot.set(slot, bucket);\n  } else if (url) {\n    existingByUrl.set(url, { id: n.id, alt: n.alt, url: n.image?.url || '' });\n  }\n}\n\nconst desiredImages = $('📝 Format Update Request').item.json.product.images || [];\nconst productId = $('📝 Format Update Request').item.json.product.id;\n\nconst desiredBySlot = new Map();\nfor (const img of desiredImages) {\n  const slot = slotOf(img.alt);\n  if (slot !== null) desiredBySlot.set(slot, img);\n}\n\nconst filesToUpdate = [];\nconst mediaToCreate = [];\nconst mediaToDelete = [];\n\nfor (const [slot, img] of desiredBySlot) {\n  const candidates = existingBySlot.get(slot);\n  if (candidates && candidates.length > 0) {\n    // Multiple media can legitimately collide on one slot (see the comment\n    // above existingBySlot) -- prefer whichever candidate's URL already\n    // matches the desired image exactly, so a genuinely-synced photo isn't\n    // needlessly re-uploaded just because a stale duplicate happens to sort\n    // first; otherwise fall back to the first one seen. Every OTHER candidate\n    // for this same slot is a confirmed duplicate and gets deleted outright.\n    const desiredNorm = normalizeImageUrl(img.src);\n    const exactIdx = candidates.findIndex(c => normalizeImageUrl(c.url) === desiredNorm);\n    const keepIdx = exactIdx !== -1 ? exactIdx : 0;\n    const existing = candidates[keepIdx];\n\n    candidates.forEach((c, idx) => {\n      if (idx !== keepIdx) mediaToDelete.push(c.id);\n    });\n\n    // Same slot -- only issue a fileUpdate when something about it actually\n    // changed (alt text or the underlying image). Re-sending an identical\n    // fileUpdate for every untouched photo on every run that happens to\n    // touch ANY image slot is unnecessary Shopify API load at catalog scale,\n    // and every such call is one more chance for a transient failure.\n    const unchanged = existing.alt === (img.alt || '') && normalizeImageUrl(existing.url) === normalizeImageUrl(img.src);\n    if (!unchanged) {\n      filesToUpdate.push({ id: existing.id, originalSource: img.src, alt: img.alt || '' });\n    }\n    continue;\n  }\n\n  // No match by our own alt convention -- before assuming this is a brand\n  // new photo, check whether a manually-uploaded (or otherwise foreign-alt)\n  // media already exists at this EXACT URL. If so, it's the same file a\n  // human already put on Shopify -- just relabel its alt to bring it under\n  // our convention (in-place, no content re-fetch) so future runs recognize\n  // it via existingBySlot instead of repeating this fallback every time.\n  const byUrl = existingByUrl.get(normalizeImageUrl(img.src));\n  if (byUrl) {\n    filesToUpdate.push({ id: byUrl.id, originalSource: img.src, alt: img.alt || '' });\n    continue;\n  }\n\n  mediaToCreate.push({ originalSource: img.src, alt: img.alt || '', mediaContentType: 'IMAGE' });\n}\n\n// Only delete a slot's media when the sheet itself no longer has that slot\n// populated at all -- a genuine, deliberate removal reflected in the data,\n// never a byproduct of a text or ordering mismatch. Every item in the slot's\n// bucket is orphaned here, not just one -- see the existingBySlot comment.\nfor (const [slot, candidates] of existingBySlot) {\n  if (!desiredBySlot.has(slot)) {\n    candidates.forEach(c => mediaToDelete.push(c.id));\n  }\n}\n\n// Media uploaded before alt-tagging existed in this pipeline has NO alt text\n// at all (confirmed live via diagnostic on LSYP123: 10 media items, every one\n// with alt === '') -- slotOf('') is null, so it can never match through\n// existingBySlot. It also can never match through existingByUrl: Shopify\n// renames every file it fetches from originalSource with its own hash (the\n// sheet's \"LSYP123-_1.jpg\" is stored by Shopify as\n// \"LSYP123-_1_c39dd55a-....jpg\"), so the stored url never equals the sheet's\n// source url even for the exact same photo. Both matching paths fail\n// simultaneously and permanently -- every run before this fix re-created the\n// entire gallery as a new duplicate set without ever seeing the old one.\n// Exact-URL matching is structurally impossible here, so this is the one\n// deliberate exception to \"never fuzzy-match filenames\" in this pipeline:\n// alt-less media whose filename starts with THIS row's own Product No. is a\n// stale upload from this exact pipeline (a human's manual upload would not\n// coincidentally share that exact prefix) and is deleted as an orphan. Never\n// touches media that already has a real \"- Image N\" tag, and never touches\n// alt-less media with an unrelated filename.\nconst productNumber = String($('🔀 Route: Create or Update').item.json.product.product_number || '').trim();\nif (productNumber) {\n  for (const n of existingNodes) {\n    if (slotOf(n.alt) !== null) continue;\n    const filename = (n.image?.url || '').split('/').pop() || '';\n    if (filename.startsWith(`${productNumber}-`) || filename.startsWith(`${productNumber}_`)) {\n      mediaToDelete.push(n.id);\n    }\n  }\n}\n\nconst operations = [];\n\nif (filesToUpdate.length > 0) {\n  const FILE_UPDATE_MUTATION = `mutation FileUpdate($files: [FileUpdateInput!]!) {\n  fileUpdate(files: $files) {\n    files { id }\n    userErrors { field message code }\n  }\n}`;\n  operations.push({\n    type: 'update',\n    body: { query: FILE_UPDATE_MUTATION, variables: { files: filesToUpdate } }\n  });\n}\n\nif (mediaToCreate.length > 0) {\n  const PRODUCT_CREATE_MEDIA_MUTATION = `mutation ProductCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {\n  productCreateMedia(productId: $productId, media: $media) {\n    media { id }\n    mediaUserErrors { field message }\n  }\n}`;\n  operations.push({\n    type: 'create',\n    body: {\n      query: PRODUCT_CREATE_MEDIA_MUTATION,\n      variables: { productId: `gid://shopify/Product/${productId}`, media: mediaToCreate }\n    }\n  });\n}\n\nif (mediaToDelete.length > 0) {\n  const FILE_DELETE_MUTATION = `mutation FileDelete($fileIds: [ID!]!) {\n  fileDelete(fileIds: $fileIds) {\n    deletedFileIds\n    userErrors { field message }\n  }\n}`;\n  operations.push({\n    type: 'delete',\n    body: { query: FILE_DELETE_MUTATION, variables: { fileIds: mediaToDelete } }\n  });\n}\n\nif (operations.length === 0) {\n  return [{ json: { message: 'No image changes to sync' } }];\n}\n\nreturn operations.map(op => ({ json: op }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2352,
-        704
+        -1152,
+        1296
       ],
-      "id": "8d725ade-1988-472c-b31f-22d3f627bbec",
+      "id": "725c84cd-c6cc-4111-a9e4-89d0322ab2bf",
       "name": "🔀 Build GraphQL: Sync Product Images"
     },
     {
@@ -1060,13 +1094,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "4d0ba13f-6b06-424d-8f5f-73d084b5bdba",
+      "id": "35d3f051-2346-4f35-abbf-8846cb17c3e9",
       "name": "➕ Shopify: Create Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1040,
-        1760
+        160,
+        2352
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1097,13 +1131,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "bc0bfd50-e857-4e78-a362-8be2c7c832f1",
+      "id": "fd094b90-624e-46d8-8890-475edea0621f",
       "name": "🔄 Shopify: Update Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -672,
-        -336
+        528,
+        256
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1134,13 +1168,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "0477036f-60b3-4a31-a9e2-ca369428d874",
+      "id": "af6fad9a-c4ff-4653-8df1-32362ce4cf8b",
       "name": "➕ Shopify: Add to Collection (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        432,
-        512
+        1632,
+        1104
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1156,65 +1190,65 @@
       "parameters": {
         "jsCode": "// Reads the SAME payload object built (unchanged) by \"📝 Format Update Request\".\n// Only translates it into GraphQL productUpdate / productVariantsBulkUpdate calls.\nconst p = $json.product;\nconst numericId = p.id;\n\nconst productInput = { id: `gid://shopify/Product/${numericId}` };\nif (p.body_html !== undefined) productInput.descriptionHtml = p.body_html;\nif (p.title !== undefined) productInput.title = p.title;\nif (p.tags !== undefined) {\n  productInput.tags = String(p.tags).split(',').map(t => t.trim()).filter(Boolean);\n}\nif (Array.isArray(p.metafields) && p.metafields.length > 0) {\n  productInput.metafields = p.metafields;\n}\n\n// Image sync is handled separately (see \"✅ Check if Image Update Needed\" and\n// its branch) via fileUpdate/productCreateMedia -- productUpdate's own `media`\n// argument only ever ADDS new media, it can never replace an existing image in\n// place, so resubmitting the full image list here on every image-triggered\n// update was silently duplicating every unchanged image alongside the one that\n// actually changed.\nconst PRODUCT_UPDATE_QUERY = `mutation ProductUpdate($product: ProductUpdateInput!) {\n  productUpdate(product: $product) {\n    product { id }\n    userErrors { field message }\n  }\n}`;\n\nconst variables = { product: productInput };\n\n// productUpdate does not support variant fields (Shopify docs) -- price/weight\n// need a separate productVariantsBulkUpdate call, same as REST effectively\n// needed a variant sub-object but in one call; here it's two calls.\nconst variant = (Array.isArray(p.variants) && p.variants[0]) || null;\nconst needsVariantUpdate = !!(variant && variant.id && (variant.price !== undefined || variant.weight !== undefined));\n\nlet variantBody = null;\nif (needsVariantUpdate) {\n  const variantInput = { id: `gid://shopify/ProductVariant/${variant.id}` };\n  if (variant.price !== undefined) variantInput.price = variant.price;\n  if (variant.weight !== undefined) {\n    // Marblebee's weight unit is always 'kg' (CONFIG.WEIGHT_UNIT in the sibling\n    // create-path node) -- there is no per-item weight_unit on the update payload.\n    variantInput.inventoryItem = {\n      measurement: { weight: { value: variant.weight, unit: 'KILOGRAMS' } }\n    };\n  }\n\n  const PRODUCT_VARIANTS_BULK_UPDATE_QUERY = `mutation ProductVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {\n  productVariantsBulkUpdate(productId: $productId, variants: $variants) {\n    productVariants { id }\n    userErrors { field message }\n  }\n}`;\n\n  variantBody = {\n    query: PRODUCT_VARIANTS_BULK_UPDATE_QUERY,\n    variables: { productId: `gid://shopify/Product/${numericId}`, variants: [variantInput] }\n  };\n}\n\nreturn [{\n  json: {\n    body: { query: PRODUCT_UPDATE_QUERY, variables },\n    needsVariantUpdate,\n    variantBody\n  }\n}];"
       },
-      "id": "c3a648be-667b-42f0-bfa6-a39b5105386c",
+      "id": "fd74e97b-20af-4f35-9fc0-8bdd8e95fb0e",
       "name": "🔀 Build GraphQL: Update Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -432,
-        944
+        768,
+        1536
       ]
     },
     {
       "parameters": {
         "jsCode": "// metafieldsDelete addresses metafields by ownerId + namespace + key (the\n// singular metafieldDelete-by-id mutation no longer exists on current API\n// versions) -- owner_id/namespace/key were added onto this \"delete\" operation\n// object in \"🧠 Sync Metafields\" (additive fields only).\nconst QUERY = `mutation MetafieldsDelete($metafields: [MetafieldIdentifierInput!]!) {\n  metafieldsDelete(metafields: $metafields) {\n    deletedMetafields { key }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- multiple metafield deletes can be in flight at\n// once (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const op = item.json;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${op.owner_id}`,\n            namespace: op.namespace,\n            key: op.key\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "d27d3c78-3eec-4551-b577-93071d1337d8",
+      "id": "94f5b5a8-8622-4039-9349-163b0e71e480",
       "name": "🔀 Build GraphQL: Delete Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -752,
-        -128
+        448,
+        464
       ]
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `query GetOnlineStorePublication {\n  publications(first: 10) {\n    nodes { id name }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY } } }];"
       },
-      "id": "7972b0cf-c408-4e74-9d09-c39dce449d39",
+      "id": "3625a62b-a887-4b4d-a5b3-28f6eeec3b1e",
       "name": "🔀 Build GraphQL: Get Online Store Publication",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -192,
-        2128
+        1008,
+        2720
       ]
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {\n  metafieldsSet(metafields: $metafields) {\n    metafields { id }\n    userErrors { field message code }\n  }\n}`;\n\n// Runs once per input item -- \"🧠 Sync Metafields\" can emit multiple create\n// operations at once (e.g. Material Catalog URL + Care Guide URL both new in\n// the same run), and this node must build one request per item, not just the\n// first (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const m = item.json.payload.metafield;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${m.owner_id}`,\n            namespace: m.namespace,\n            key: m.key,\n            type: m.type,\n            value: m.value\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "12ba0091-e8db-423f-bc74-da721542862a",
+      "id": "e5abf026-6230-4d96-bb8e-4877e1689104",
       "name": "🔀 Build GraphQL: Create Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1200,
-        -592
+        0,
+        0
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes into the REST-shaped { metafields: [{id, namespace, key, value, type}] }\n// array that \"🧠 Sync Metafields (CREATE / UPDATE / DELETE)\" already expects unchanged.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get metafields): ' + JSON.stringify(res.errors));\n}\nconst edges = res?.data?.product?.metafields?.edges || [];\nconst metafields = edges.map(e => ({\n  id: e.node.id,\n  namespace: e.node.namespace,\n  key: e.node.key,\n  value: e.node.value,\n  type: e.node.type\n}));\nreturn [{ json: { metafields } }];"
       },
-      "id": "8f9ccd87-06f9-4063-a45b-2a1960368192",
+      "id": "39fb9684-50d3-4708-ac3d-de519646c3fe",
       "name": "🔀 Adapt Response: Existing Metafields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1616,
-        -336
+        -416,
+        256
       ]
     },
     {
@@ -1275,10 +1309,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1616,
-        704
+        -416,
+        1296
       ],
-      "id": "a8277502-5b2b-439c-b38a-29da706ad72c",
+      "id": "cb02b57c-6d4c-48a9-872d-7dee71b94449",
       "name": "❓Check if colletion update request needed",
       "alwaysOutputData": false
     },
@@ -1307,13 +1341,13 @@
         },
         "options": {}
       },
-      "id": "0b966397-cc21-4995-ba4d-0d2a113a0237",
+      "id": "f25ebf66-50e4-418f-ab40-ed466afc5840",
       "name": "❓ Needs Variant Update? (GraphQL)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        320,
-        944
+        1520,
+        1536
       ]
     },
     {
@@ -1323,10 +1357,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1776,
-        1664
+        -576,
+        2256
       ],
-      "id": "bc7ac78d-58ac-4302-a923-2023dfdcccb5",
+      "id": "8577517e-7a8f-4ae0-b93b-464c9a601fb8",
       "name": "🩺 Pass Through Product"
     },
     {
@@ -1336,23 +1370,23 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        928,
-        -16
+        2128,
+        576
       ],
-      "id": "00c7d0f2-3623-4973-b8d0-d51bf00ff872",
+      "id": "fa0559c6-ac31-4cfd-aade-6719f8598dac",
       "name": "Merge"
     },
     {
       "parameters": {
         "jsCode": "const productId = $json.product.id;\nconst QUERY = `query GetProductMetafields($id: ID!) {\n  product(id: $id) {\n    metafields(first: 250) {\n      edges { node { id legacyResourceId namespace key value type } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
       },
-      "id": "85cd5971-f6b0-41b2-88ee-f89c8102f78d",
+      "id": "87ee1389-851b-4ca5-a743-afc1b364ab8f",
       "name": "🔀 Build GraphQL: Get Metafields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2080,
-        -336
+        -880,
+        256
       ]
     },
     {
@@ -1375,13 +1409,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "9fd7406e-a949-44da-800c-587c4ac2837e",
+      "id": "df5dfe89-cf12-43e1-9e67-f87b77829866",
       "name": "➕ Shopify: Publish Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        560,
-        2128
+        1760,
+        2720
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1397,13 +1431,13 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield creates can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsSet/create): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsSet?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsSet (create) userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "6dca2552-7392-4878-bc37-37d4ec49baca",
+      "id": "fb29e8d8-d689-40c5-889f-600bc6b54975",
       "name": "✅ Check Create Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -736,
-        -592
+        464,
+        0
       ]
     },
     {
@@ -1426,13 +1460,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "6eac525b-6663-4820-bd6d-76a0ca38a097",
+      "id": "563e3032-d217-4eab-b0fa-bc2a30a7ced9",
       "name": "🗑️ Remove Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -528,
-        -128
+        672,
+        464
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1447,39 +1481,39 @@
       "parameters": {
         "jsCode": "const res = $json;\nconst errors = res?.errors;\nconst userErrors = res?.data?.publishablePublish?.userErrors;\n\n// Reordering this node ahead of \"🔗 Build Collection Mappings\" and\n// \"📦 Parse Create Response\" means it is now their direct input -- both expect\n// a `.product` field (the shape \"🔀 Adapt Response: Create Product\" produces),\n// so it must be carried forward here or those nodes silently break (one throws\n// on undefined.id, the other silently falls back to {} and writes blank data\n// to the sheet).\nconst product = $('🔀 Adapt Response: Create Product').item.json.product;\n\n// A failed publish must not throw and halt the run -- the sheet write-back\n// (which records the product's Shopify URL) needs to happen regardless, or the\n// row looks \"not yet created\" next run and retries productSet with the same\n// handle, guaranteed to fail with HANDLE_NOT_UNIQUE since the product already\n// exists. A product left unpublished here is caught by the periodic\n// \"unpublished product\" reconciliation check instead.\nif (errors?.length || userErrors?.length) {\n  return [{ json: { product, published: false, publish_error: JSON.stringify(errors?.length ? errors : userErrors) } }];\n}\nreturn [{ json: { product, published: true } }];"
       },
-      "id": "c8aa71b7-e23e-4c8a-b276-affbd729c2a4",
+      "id": "20ac599d-2465-42bc-82e9-88efe1f4811d",
       "name": "✅ Check Publish Product Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        1760
+        1680,
+        2352
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reads the SAME cleanedProduct object built (unchanged) by \"📝 Format Create Request\".\nconst p = $json.product;\n\nconst tagsArr = String(p.tags || '').split(',').map(t => t.trim()).filter(Boolean);\nconst WEIGHT_UNIT_MAP = { kg: 'KILOGRAMS', g: 'GRAMS', lb: 'POUNDS', oz: 'OUNCES' };\nconst variant = (Array.isArray(p.variants) && p.variants[0]) || {};\n\n// Shopify requires an explicit productOptions entry whenever `variants` is\n// present on productSet, even for a plain single-SKU product with no real\n// customer-facing options -- omitting it (or passing optionValues: []) fails\n// with PRODUCT_OPTIONS_INPUT_MISSING. \"Title\" / \"Default Title\" is Shopify's\n// own magic-string convention for its internal single-default-variant option\n// (exact casing required, confirmed against a live productSet call) -- it's\n// the same hidden pseudo-option a plain REST product without options gets,\n// so it never shows a variant selector on the storefront.\nconst DEFAULT_OPTION_NAME = 'Title';\nconst DEFAULT_OPTION_VALUE = 'Default Title';\n\nconst variantInput = {\n  optionValues: [\n    { optionName: DEFAULT_OPTION_NAME, name: DEFAULT_OPTION_VALUE }\n  ],\n  price: variant.price,\n  inventoryItem: {\n    requiresShipping: !!variant.requires_shipping,\n    measurement: {\n      weight: {\n        value: variant.weight,\n        unit: WEIGHT_UNIT_MAP[variant.weight_unit] || 'KILOGRAMS'\n      }\n    }\n  }\n};\n\nconst input = {\n  title: p.title,\n  vendor: p.vendor,\n  productType: p.product_type,\n  tags: tagsArr,\n  handle: p.handle,\n  descriptionHtml: p.body_html || '',\n  // GraphQL's ACTIVE status only means \"publishable\", unlike REST where a\n  // created product is also auto-published to the Online Store channel --\n  // see the separate publish step appended after this create call.\n  status: 'ACTIVE',\n  productOptions: [\n    { name: DEFAULT_OPTION_NAME, values: [{ name: DEFAULT_OPTION_VALUE }] }\n  ],\n  variants: [variantInput]\n};\n\nif (Array.isArray(p.metafields) && p.metafields.length > 0) {\n  input.metafields = p.metafields;\n}\n\nif (Array.isArray(p.images) && p.images.length > 0) {\n  input.files = p.images.map(img => ({\n    originalSource: img.src,\n    alt: img.alt || '',\n    contentType: 'IMAGE'\n  }));\n}\n\nconst PRODUCT_SET_QUERY = `mutation ProductSet($input: ProductSetInput!, $synchronous: Boolean!) {\n  productSet(input: $input, synchronous: $synchronous) {\n    product {\n      id\n      legacyResourceId\n      title\n      handle\n      variants(first: 1) {\n        edges { node { id legacyResourceId } }\n      }\n    }\n    userErrors { field message code }\n  }\n}`;\n\nreturn [{\n  json: {\n    body: { query: PRODUCT_SET_QUERY, variables: { input, synchronous: true } }\n  }\n}];"
       },
-      "id": "5b227847-30cb-4bda-a223-cc68cdc00d87",
+      "id": "bd96d99c-b2d8-43b9-ac58-9c725114f657",
       "name": "🔀 Build GraphQL: Create Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1264,
-        1760
+        -64,
+        2352
       ]
     },
     {
       "parameters": {
         "jsCode": "const GID = (type, id) => `gid://shopify/${type}/${id}`;\nconst QUERY = `mutation CollectionRemoveProducts($id: ID!, $productIds: [ID!]!) {\n  collectionRemoveProducts(id: $id, productIds: $productIds) {\n    job { id done }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- \"🔧 Extract Collects to update or delete\" can\n// emit multiple collections to remove at once (the default \"run once for all\n// items\" Code node mode only sees $json as the first item, silently dropping\n// the rest).\nreturn $input.all().map(item => {\n  // \"🔧 Extract Collects to update or delete\" only carries collect_id forward\n  // on its delete branch (REST never needed product_id for a DELETE-by-collect-id\n  // call) -- GraphQL's collectionRemoveProducts needs both, so product_id is\n  // pulled back in here from the same source node the rest of this branch\n  // already reads from, without touching that existing decision-logic node.\n  const collectionId = item.json.collect_id;\n  const productId = $('📝 Format Update Request').item.json.product.id;\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: { id: GID('Collection', collectionId), productIds: [GID('Product', productId)] }\n      }\n    }\n  };\n});"
       },
-      "id": "0c4af22e-8e3f-4ecb-a8a4-4dc70a443e3e",
+      "id": "3b71eaca-403f-481b-9992-1c451835a7bc",
       "name": "🔀 Build GraphQL: Remove from Collection",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -288,
-        288
+        912,
+        880
       ]
     },
     {
@@ -1489,23 +1523,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1408,
-        -336
+        -208,
+        256
       ],
-      "id": "e5ce5d23-c746-4fd7-bd3c-cb5080bdf772",
+      "id": "fc91ec19-20b5-4e6e-b010-a4677fbbe8cc",
       "name": "🧠 Sync Metafields (CREATE / UPDATE / DELETE)"
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `query FindProductByHandle($handle: String!) {\n  productByHandle(handle: $handle) {\n    id\n    legacyResourceId\n    title\n    handle\n    variants(first: 1) {\n      edges { node { id legacyResourceId } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { handle: $json.attempted_handle } } } }];"
       },
-      "id": "08d901d5-0504-4932-a2ad-ea98400a340c",
+      "id": "36e3586b-29a1-41b4-b9a8-164392f704cb",
       "name": "🔍 Build GraphQL: Find Product By Handle",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -320,
-        1744
+        880,
+        2336
       ]
     },
     {
@@ -1591,23 +1625,23 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -1152,
-        -352
+        48,
+        240
       ],
-      "id": "49bf2738-ad7d-4d25-bae5-9170b854af5b",
+      "id": "f239c9fc-121d-49e0-93ad-91ed6c0e61a3",
       "name": "Switch1"
     },
     {
       "parameters": {
         "jsCode": "const res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productUpdate): ' + JSON.stringify(res.errors));\n}\nconst userErrors = res?.data?.productUpdate?.userErrors;\nif (userErrors?.length) {\n  throw new Error('Shopify productUpdate userErrors: ' + JSON.stringify(userErrors));\n}\n\nconst build = $('🔀 Build GraphQL: Update Product').item.json;\nreturn [{ json: { needsVariantUpdate: build.needsVariantUpdate, variantBody: build.variantBody } }];"
       },
-      "id": "d49fdb1f-7b94-442b-b4d0-7645e18a1b05",
+      "id": "94973d5f-1505-42b1-8d25-86f7fb7d4408",
       "name": "✅ Check Update Product Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        32,
-        944
+        1232,
+        1536
       ]
     },
     {
@@ -1646,10 +1680,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        1312,
-        1760
+        2512,
+        2352
       ],
-      "id": "f0067a19-1d56-40ba-8ab5-b9a5d1a048b3",
+      "id": "3c247bc8-8588-4986-bb21-7113a168b19f",
       "name": "💾 Update Google Sheet",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1683,10 +1717,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -2544,
-        704
+        -1344,
+        1296
       ],
-      "id": "d42bf41b-1a04-4e19-84f1-9bafd72dbcac",
+      "id": "4ae28624-c271-4588-bef5-5885178ee507",
       "name": "📥 Get Product Media (GraphQL) (Update)",
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1725,10 +1759,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -448,
-        688
+        752,
+        1280
       ],
-      "id": "6dcd00d5-cdfe-4203-b579-628b3861dce3",
+      "id": "acd54195-39e4-496d-9ce1-bfd0cc46557b",
       "name": "❓ Has Existing Collections?"
     },
     {
@@ -1756,13 +1790,65 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "ce166a62-09ff-494f-876d-ede52467e7c9",
+      "id": "f8a028a2-f8d3-410e-b790-22008cb03bd2",
       "name": "🔀 Handle Collision?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -592,
-        1760
+        608,
+        2352
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.sheet_name }}",
+          "mode": "name"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRange",
+              "headerRow": 2,
+              "firstDataRow": 3
+            }
+          }
+        }
+      },
+      "id": "ed878230-d120-4024-9a1e-9d5b2789026f",
+      "name": "📖 Re-Read Row (Fresh Fields_to_update)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2688,
+        608
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fixes a race between this update's Fields_to_update clear and any OTHER\n// branch (e.g. the CAD-Image11 sync) writing a NEW token to the same row's\n// Fields_to_update while this update was in flight. Re-reads the sheet fresh\n// (right now, not the stale snapshot from when this row's processing started)\n// and only removes the specific fields THIS update actually processed --\n// anything else present now (added concurrently) is preserved untouched.\nconst input = $('📦 Parse Update Response').item.json;\nconst rows = $input.all().map(i => i.json);\nconst row = rows.find(r => String(r.row_number) === String(input.row_number));\nconst currentFresh = row ? String(row['Fields_to_update'] || '') : '';\n\nconst processed = new Set(String(input.processedFields || '').split(',').map(t => t.trim()).filter(Boolean));\nconst remaining = currentFresh.split(',').map(t => t.trim()).filter(Boolean).filter(t => !processed.has(t));\n\nreturn [{\n  json: {\n    sheet_name: input.sheet_name,\n    row_number: input.row_number,\n    Ready_to_post: input.Ready_to_post,\n    last_update_time: input.last_update_time,\n    Fields_to_update: remaining.join(','),\n  }\n}];"
+      },
+      "id": "190c872f-822d-4959-a227-9c976210c34b",
+      "name": "🔀 Compute Field Diff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        864
       ]
     }
   ],
@@ -1816,7 +1902,7 @@
       "main": [
         [
           {
-            "node": "💾 Update Google Sheet",
+            "node": "📖 Re-Read Row (Fresh Fields_to_update)",
             "type": "main",
             "index": 0
           }
@@ -2376,6 +2462,17 @@
       "main": [
         [
           {
+            "node": "❓ Has Image Operations to Sync?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Has Image Operations to Sync?": {
+      "main": [
+        [
+          {
             "node": "➕ Shopify: Sync Product Images (GraphQL)",
             "type": "main",
             "index": 0
@@ -2544,6 +2641,28 @@
           }
         ]
       ]
+    },
+    "📖 Re-Read Row (Fresh Fields_to_update)": {
+      "main": [
+        [
+          {
+            "node": "🔀 Compute Field Diff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Compute Field Diff": {
+      "main": [
+        [
+          {
+            "node": "💾 Update Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -2555,7 +2674,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "b7e9b9da-40bc-4c9c-8b89-4f1159e8aa0d",
+  "versionId": "85785dba-d54c-4922-b9cd-46a48688b7c7",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
