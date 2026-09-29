@@ -7,13 +7,13 @@
         "height": 900,
         "width": 420
       },
-      "id": "b395d97b-f73c-4fc2-b83c-ea10d3e51aa6",
+      "id": "f7d5aecc-ff36-46c7-ad8d-167a4e7b5d61",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        52672,
-        11504
+        42480,
+        12896
       ]
     },
     {
@@ -27,13 +27,13 @@
           ]
         }
       },
-      "id": "c81c3c36-2056-4646-a82f-84d6f65f19ff",
+      "id": "a391d8e0-bfb6-47f9-84ae-286c51736c37",
       "name": "Daily Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        53216,
-        11824
+        43024,
+        13216
       ]
     },
     {
@@ -81,18 +81,24 @@
               "name": "postingHours",
               "type": "string",
               "value": "7,8,9,10,11,12,13,14,15,16,17,18,19,20,21"
+            },
+            {
+              "id": "a8",
+              "name": "scheduleMinute",
+              "type": "number",
+              "value": 0
             }
           ]
         },
         "options": {}
       },
-      "id": "ab303322-fabd-4940-b67f-370f21226344",
+      "id": "f357f934-59a7-4341-9081-a9dbdfad6696",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        53424,
-        11824
+        43232,
+        13216
       ]
     },
     {
@@ -109,13 +115,13 @@
         },
         "options": {}
       },
-      "id": "b45e0e1a-fad4-424e-be86-8431d4c4d488",
+      "id": "26d1f02b-9e39-44f6-86ff-d7e2a12fa19c",
       "name": "Get Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        53920,
-        11824
+        43808,
+        13216
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -161,26 +167,26 @@
         },
         "options": {}
       },
-      "id": "38ddf4cc-8bb8-46aa-85dd-aef8ba02bb4b",
+      "id": "3126acf6-dd09-434d-99f3-56347c0bc86c",
       "name": "Filter Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        54128,
-        11824
+        44000,
+        13216
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "650b748a-7686-462d-80d3-1009c0925da1",
+      "id": "9931dc45-c9bb-4c9c-876f-332a3eea57c1",
       "name": "Loop Over Blogs",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        54880,
-        11840
+        44688,
+        13232
       ]
     },
     {
@@ -195,26 +201,26 @@
           }
         }
       },
-      "id": "3cb84269-651f-42c0-bf23-029ab5ab74d3",
+      "id": "b21a9c76-9afd-472b-8199-1189d2fa1ced",
       "name": "Fetch Blog Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        55552,
-        11872
+        45360,
+        13264
       ]
     },
     {
       "parameters": {
-        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst rowNo = blog['row_number'];\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\nconst CONTENT_MARKERS = ['js-article-content', 'article__content', 'mb-blog-content'];\nconst JUNK_DOMAIN_RE = /review-images\\.judgeme\\.com|cdn\\.judge\\.me|judgeme/i;\n\nfunction findBalancedDivEnd(h, start) {\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = null;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return end;\n}\n\nfunction findContentRegion(h) {\n  const articleMatch = /<article\\b/i.exec(h);\n  if (!articleMatch) return { ok: false, reason: 'no <article> tag found on page' };\n  const articleStart = articleMatch.index;\n  const searchSpace = h.slice(articleStart);\n  let markerIdx = -1, usedMarker = null;\n  for (const cand of CONTENT_MARKERS) {\n    const idx = searchSpace.indexOf(cand);\n    if (idx >= 0) { markerIdx = idx; usedMarker = cand; break; }\n  }\n  if (markerIdx < 0) return { ok: false, reason: 'none of the known content markers matched (theme may have changed): ' + CONTENT_MARKERS.join(', ') };\n  const absMarker = articleStart + markerIdx;\n  const start = h.lastIndexOf('<div', absMarker);\n  if (start < 0) return { ok: false, reason: 'content marker \"' + usedMarker + '\" found but no enclosing <div>' };\n  const end = findBalancedDivEnd(h, start);\n  if (end === null) return { ok: false, reason: 'div nesting never balanced starting from marker \"' + usedMarker + '\" (malformed HTML)' };\n  return { ok: true, region: h.slice(start, end), marker: usedMarker };\n}\n\nlet images = [];\nlet extractionStatus = 'failed';\nlet statusReason = '';\nlet region = '';\n\ntry {\n  const extraction = findContentRegion(html);\n  if (!extraction.ok) {\n    statusReason = extraction.reason;\n  } else {\n    region = extraction.region;\n    const urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\n    const seen = new Set();\n    for (let raw of urls) {\n      let u = raw.replace(/&amp;/g,'&');\n      u = u.replace(/[.,;:!?]+$/, '');\n      if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n        const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n        if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n        else continue;\n      }\n      if (JUNK_DOMAIN_RE.test(u)) continue;\n      const qi = u.indexOf('?');\n      if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n      const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n      const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n      const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n      if (!(isShopify || isDrive || isExt)) continue;\n      let key;\n      if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n      else key = u.replace(/^https?:\\/\\//i, '').split('?')[0];\n      if (!seen.has(key)) { seen.add(key); images.push(u); }\n    }\n    extractionStatus = images.length > 0 ? 'ok' : 'no_images';\n    if (extractionStatus === 'no_images') statusReason = 'content region found but contained no matching images';\n  }\n} catch (e) {\n  extractionStatus = 'failed';\n  statusReason = 'exception during extraction: ' + (e && e.message ? e.message : String(e));\n}\n\nconst pinterestStatusLabel = extractionStatus === 'ok' ? 'Queued' : (extractionStatus === 'no_images' ? 'No Images Found' : 'Extraction Failed');\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\n// Global, run-spanning schedule cursor (persists across every blog this run,\n// and resumes from whatever's already scheduled in the sheet on the next\n// run) -- NOT one independent \"tomorrow\" base per blog. Two bugs that fixes:\n// 1) every blog restarting from the same \"tomorrow\" meant pins from DIFFERENT\n//    blogs collided on the same day/hour slots instead of stacking up.\n// 2) a single blog with more images than postingHours-per-day just wrapped\n//    the hour index (i % hours.length) WITHOUT advancing the day, so image\n//    16 (with a 15-hour list) got the exact same timestamp as image 1.\nconst sd = $getWorkflowStaticData('global');\nif (!sd.pinSlotDay) {\n  const existingDates = safe(() => $('Get Existing Pin Rows').all(), [])\n    .map(i => String(i.json['Scheduled Date'] || '').trim()).filter(Boolean)\n    .map(s => DateTime.fromFormat(s, 'yyyy-LL-dd HH:mm')).filter(dt => dt.isValid);\n  function safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\n  const latest = existingDates.length ? DateTime.max(...existingDates) : $now;\n  sd.pinSlotDay = latest.plus({ days: 1 }).toFormat('yyyy-LL-dd');\n  sd.pinSlotIndex = 0;\n}\nconst pins = images.map((img) => {\n  if (sd.pinSlotIndex > 0 && sd.pinSlotIndex % hours.length === 0) {\n    sd.pinSlotDay = DateTime.fromFormat(sd.pinSlotDay, 'yyyy-LL-dd').plus({ days: 1 }).toFormat('yyyy-LL-dd');\n  }\n  const hour = hours[sd.pinSlotIndex % hours.length] || 9;\n  sd.pinSlotIndex++;\n  const scheduledDate = DateTime.fromFormat(sd.pinSlotDay, 'yyyy-LL-dd').set({ hour, minute: 0, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, text, imageCount: images.length, pins, row_number: rowNo, extractionStatus, statusReason, pinterestStatusLabel } }];\n"
+        "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst rowNo = blog['row_number'];\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) { const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i); if (tm) blogTitle = tm[1].trim(); }\n\nconst CONTENT_MARKERS = ['js-article-content', 'article__content', 'mb-blog-content'];\nconst JUNK_DOMAIN_RE = /review-images\\.judgeme\\.com|cdn\\.judge\\.me|judgeme/i;\n\nfunction findBalancedDivEnd(h, start) {\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = null;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return end;\n}\n\nfunction findContentRegion(h) {\n  const articleMatch = /<article\\b/i.exec(h);\n  if (!articleMatch) return { ok: false, reason: 'no <article> tag found on page' };\n  const articleStart = articleMatch.index;\n  const searchSpace = h.slice(articleStart);\n  let markerIdx = -1, usedMarker = null;\n  for (const cand of CONTENT_MARKERS) {\n    const idx = searchSpace.indexOf(cand);\n    if (idx >= 0) { markerIdx = idx; usedMarker = cand; break; }\n  }\n  if (markerIdx < 0) return { ok: false, reason: 'none of the known content markers matched (theme may have changed): ' + CONTENT_MARKERS.join(', ') };\n  const absMarker = articleStart + markerIdx;\n  const start = h.lastIndexOf('<div', absMarker);\n  if (start < 0) return { ok: false, reason: 'content marker \"' + usedMarker + '\" found but no enclosing <div>' };\n  const end = findBalancedDivEnd(h, start);\n  if (end === null) return { ok: false, reason: 'div nesting never balanced starting from marker \"' + usedMarker + '\" (malformed HTML)' };\n  return { ok: true, region: h.slice(start, end), marker: usedMarker };\n}\n\nlet images = [];\nlet extractionStatus = 'failed';\nlet statusReason = '';\nlet region = '';\n\ntry {\n  const extraction = findContentRegion(html);\n  if (!extraction.ok) {\n    statusReason = extraction.reason;\n  } else {\n    region = extraction.region;\n    const urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\n    const seen = new Set();\n    for (let raw of urls) {\n      let u = raw.replace(/&amp;/g,'&');\n      u = u.replace(/[.,;:!?]+$/, '');\n      if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n        const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n        if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n        else continue;\n      }\n      if (JUNK_DOMAIN_RE.test(u)) continue;\n      const qi = u.indexOf('?');\n      if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n      const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n      const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n      const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n      if (!(isShopify || isDrive || isExt)) continue;\n      let key;\n      if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n      else key = u.replace(/^https?:\\/\\//i, '').split('?')[0];\n      if (!seen.has(key)) { seen.add(key); images.push(u); }\n    }\n    extractionStatus = images.length > 0 ? 'ok' : 'no_images';\n    if (extractionStatus === 'no_images') statusReason = 'content region found but contained no matching images';\n  }\n} catch (e) {\n  extractionStatus = 'failed';\n  statusReason = 'exception during extraction: ' + (e && e.message ? e.message : String(e));\n}\n\nconst pinterestStatusLabel = extractionStatus === 'ok' ? 'Queued' : (extractionStatus === 'no_images' ? 'No Images Found' : 'Extraction Failed');\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\n// Global, run-spanning schedule cursor (persists across every blog this run,\n// and resumes from whatever's already scheduled in the sheet on the next\n// run) -- NOT one independent \"tomorrow\" base per blog. Two bugs that fixes:\n// 1) every blog restarting from the same \"tomorrow\" meant pins from DIFFERENT\n//    blogs collided on the same day/hour slots instead of stacking up.\n// 2) a single blog with more images than postingHours-per-day just wrapped\n//    the hour index (i % hours.length) WITHOUT advancing the day, so image\n//    16 (with a 15-hour list) got the exact same timestamp as image 1.\n// Re-seeded from the sheet's actual current max Scheduled Date at the START\n// OF EVERY EXECUTION (keyed by $execution.id, same pattern as Dedupe\n// Duplicate Batches) -- NOT seeded once and trusted forever. A one-time\n// `if (!sd.pinSlotDay)` seed guard let this drift silently: n8n persists\n// workflow static data across separate executions, so every run just kept\n// incrementing an internal counter regardless of the sheet's real state,\n// eventually landing new pins ~2 months past the last real scheduled slot\n// (found 2026-09-29 via a live sheet gap: row 1155 = 2026-09-30, row 1156 =\n// 2026-11-28, no rows in between).\n// This workflow and pinterest_product_photo_prepare_workflow.json (WF0,\n// product-photo pins) post to two different tabs on the SAME Metricool\n// calendar, with neither one reading the other's schedule. Rather than add\n// that cross-tab coupling, they're kept on permanently disjoint minutes\n// instead: blog pins always land on :00, WF0's product-photo pins always\n// land on :30 (see its scheduling node comment) -- so the two schedules are\n// structurally incapable of landing on the same timestamp. Never change this\n// value without also updating WF0's to match.\nconst scheduleMinute = cfg.scheduleMinute != null ? Number(cfg.scheduleMinute) : 0;\nconst sd = $getWorkflowStaticData('global');\nif (sd.pinSlotExecId !== $execution.id) {\n  function safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\n  // A 'Needs Board' row's Scheduled Date is a leftover placeholder, never a\n  // real calendar commitment -- WF2 will never publish it at that timestamp\n  // until a human resolves its board (a separate, deliberately-deferred\n  // problem). Counting it here would drag every NEW pin's seed out to\n  // whatever stale date that stuck row happens to be sitting on (confirmed\n  // live 2026-09-29: fresh content kept seeding from Nov 28 because of\n  // exactly this).\n  // Also tolerant of every format actually found in this column, matching\n  // pinterest_publish_workflow.json's own toSendAt() exactly: this pipeline's\n  // own writes zero-pad (\"07:00\"), Google Sheets renders a genuine date/time\n  // cell without a leading zero (\"7:00\"), and WF2's OWN Build Result node\n  // rewrites a published row's Scheduled Date in M/d/yyyy HH:mm:ss format --\n  // a strict single-format parse silently dropped every WF2-touched row from\n  // this seed calculation, undercounting the real backlog (confirmed live\n  // 2026-09-29: seed landed on Oct 2 instead of the real Oct 10+ max once WF2\n  // had already reformatted some of that backlog).\n  function parseSheetDate(s) {\n    const str = String(s || '').trim();\n    if (!str) return null;\n    const formats = ['yyyy-LL-dd HH:mm', 'yyyy-LL-dd H:mm', 'M/d/yyyy HH:mm:ss', 'M/d/yyyy H:mm:ss', 'M/d/yyyy H:mm'];\n    for (const f of formats) {\n      const dt = DateTime.fromFormat(str, f);\n      if (dt.isValid) return dt;\n    }\n    const d = new Date(str);\n    if (!isNaN(d.getTime())) return DateTime.fromJSDate(d);\n    return null;\n  }\n  const existingDates = safe(() => $('Get Existing Pin Rows').all(), [])\n    .filter(i => String(i.json['Status'] || '').trim().toLowerCase() !== 'needs board')\n    .map(i => parseSheetDate(i.json['Scheduled Date']))\n    .filter(Boolean);\n  const latest = existingDates.length ? DateTime.max(...existingDates) : $now;\n  const tomorrow = $now.plus({ days: 1 });\n  let seedDay = latest.plus({ days: 1 });\n  if (seedDay < tomorrow) seedDay = tomorrow;\n  sd.pinSlotDay = seedDay.toFormat('yyyy-LL-dd');\n  sd.pinSlotIndex = 0;\n  sd.pinSlotExecId = $execution.id;\n}\nconst pins = images.map((img) => {\n  if (sd.pinSlotIndex > 0 && sd.pinSlotIndex % hours.length === 0) {\n    sd.pinSlotDay = DateTime.fromFormat(sd.pinSlotDay, 'yyyy-LL-dd').plus({ days: 1 }).toFormat('yyyy-LL-dd');\n  }\n  const hour = hours[sd.pinSlotIndex % hours.length] || 9;\n  sd.pinSlotIndex++;\n  const scheduledDate = DateTime.fromFormat(sd.pinSlotDay, 'yyyy-LL-dd').set({ hour, minute: scheduleMinute, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  return { type: 'single', images: [img], scheduledDate };\n});\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, text, imageCount: images.length, pins, row_number: rowNo, extractionStatus, statusReason, pinterestStatusLabel } }];\n"
       },
-      "id": "1653c468-e423-48e5-b8df-021526ea4afb",
+      "id": "e405cea7-a146-428f-a069-911f64f27643",
       "name": "Extract & Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        55712,
-        11872
+        45520,
+        13264
       ]
     },
     {
@@ -366,13 +372,13 @@
         },
         "options": {}
       },
-      "id": "4139378a-7cd8-4ae8-816c-e631d85eb45a",
+      "id": "f4f4c776-cc24-48a8-a16f-d72feca84f99",
       "name": "Mark Blog Queued",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        55248,
-        12416
+        45056,
+        13808
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -387,13 +393,13 @@
       "parameters": {
         "jsCode": "const ctx = $('Extract & Plan').item.json;\n\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\n// If this exact blog URL was already pinned before (allowed now for Manual\n// Blogs -- see Check Duplicate Blog), exclude boards already used for this URL\n// so repeats spread across different boards. If every matching board has\n// already been used for this URL, leave the pool empty rather than silently\n// reusing one -- Build Row then leaves Board/Board ID blank and the row goes\n// to Needs Board for a human to assign manually. The pin/row itself is never\n// skipped -- only its board assignment is held for review.\nfunction normUrl(u) { return String(u || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\\/+$/, ''); }\nfunction safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\nconst existingPinRows = safe(() => $('Get Existing Pin Rows').all().map(i => i.json), []);\nconst usedBoardIdsForThisUrl = new Set(\n  existingPinRows.filter(r => normUrl(r['Blog Link']) === normUrl(ctx.blogUrl)).map(r => String(r['Board ID'] || '').trim()).filter(Boolean)\n);\nconst finalCandidates = candidateBoards.filter(b => !usedBoardIdsForThisUrl.has(b.id));\n\nconst out = [];\n(ctx.pins || []).forEach((p, idx) => {\n  const candidateBoards = finalCandidates; // shadow -- this pin's actual pool after rotation\n  const needsBoardChoice = candidateBoards.length > 1;\n  const boardInstruction = needsBoardChoice\n    ? ('\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): ' + candidateBoards.map(b => b.name).join(' | '))\n    : '';\n  const jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\n  const prompt = 'You are a Pinterest SEO copywriter. Look at the image(s) and the article context, then return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Blog title: ' + ctx.blogTitle + '\\nCategory: ' + ctx.category + '\\nArticle context: ' + (ctx.text || '')\n    + '\\nThis is ' + (p.type === 'carousel' ? 'a carousel made of these images.' : 'a single image.')\n    + '\\nThe pin links to: ' + ctx.blogUrl\n    + boardInstruction;\n  out.push({ json: {\n    blogNo: ctx.blogNo, blogTitle: ctx.blogTitle, blogUrl: ctx.blogUrl,\n    category: ctx.category, candidateBoards,\n    type: p.type, images: p.images, scheduledDate: p.scheduledDate,\n    pinIndex: idx + 1, promptText: prompt\n  } });\n});\nreturn out;\n"
       },
-      "id": "ba4e1fbe-8383-4c36-810a-b78995289733",
+      "id": "ff06d436-eefa-4aa2-95a2-315dd41590c2",
       "name": "Split Pins",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        55520,
-        12256
+        45328,
+        13648
       ]
     },
     {
@@ -410,13 +416,13 @@
         "imageUrls": "={{ ($json.images || []).join(',') }}",
         "options": {}
       },
-      "id": "e9251790-67c8-4596-9419-993ed3ed37c8",
+      "id": "dff5e9ec-21c4-49f5-bcc1-201dca3a5296",
       "name": "AI Vision Copy",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        55744,
-        12256
+        45552,
+        13648
       ],
       "credentials": {
         "openAiApi": {
@@ -429,13 +435,13 @@
       "parameters": {
         "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n\n  const candidateBoards = pin.candidateBoards || [];\n  let board = '', boardId = '';\n  if (candidateBoards.length === 1) {\n    board = candidateBoards[0].name;\n    boardId = candidateBoards[0].id;\n  } else if (candidateBoards.length > 1) {\n    const aiChoice = String(ai.board || '').trim().toLowerCase();\n    const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n    const chosen = matched || candidateBoards[0];\n    board = chosen.name;\n    boardId = chosen.id;\n  }\n\n  const noBoardMatch = !boardId;\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': pin.scheduledDate,\n    // No candidate Pinterest board for this category -- hold for a human to\n    // assign a board manually instead of auto-approving something WF2 can\n    // never publish. 'Needs Board' is never picked up by WF2 (it only reads\n    // Approval=Approved + Status=Review/Error), so it won't loop or 429-retry.\n    'Approval': noBoardMatch ? 'Needs Board' : 'Approved',\n    'Status': noBoardMatch ? 'Needs Board' : 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
       },
-      "id": "7a94245d-8eb5-4b77-8509-c52cffe6bfbf",
+      "id": "dcccc852-8dad-4686-bf3d-c26dc8f17b73",
       "name": "Build Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        55936,
-        12256
+        45744,
+        13648
       ]
     },
     {
@@ -704,13 +710,13 @@
           "cellFormat": "USER_ENTERED"
         }
       },
-      "id": "3b5509c4-d07a-4065-af01-f9c00e2a61b8",
+      "id": "f55f7574-55b0-48d4-b3fa-00c3865f580d",
       "name": "Append Pin Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        56144,
-        12256
+        45952,
+        13648
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -725,13 +731,13 @@
       "parameters": {
         "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: { ...i.json, _source: 'blogs' } }));"
       },
-      "id": "23e44c5b-778f-4646-8af8-6738af1884fe",
+      "id": "777bcabc-4265-4342-a2d6-deeb4a94f101",
       "name": "Map Regular Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        54368,
-        11824
+        44176,
+        13216
       ]
     },
     {
@@ -748,13 +754,13 @@
         },
         "options": {}
       },
-      "id": "36f7cc6f-7366-4b11-9f01-12b69291b586",
+      "id": "07631205-0916-40a3-a33e-3d56ea5c30c3",
       "name": "Get Manual Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        53936,
-        12112
+        43680,
+        13504
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -801,37 +807,37 @@
         },
         "options": {}
       },
-      "id": "0d5996db-cd29-46b5-8ecf-6f46fe11c607",
+      "id": "170f4b55-d8e3-475b-b253-ae3ae8b6ebf2",
       "name": "Filter Manual Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        54144,
-        12112
+        43952,
+        13504
       ]
     },
     {
       "parameters": {
         "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: {\n  row_number: i.json['row_number'],\n  'BLog-URL': i.json['Manual Blog URL'] || '',\n  'Manual Blog URL': i.json['Manual Blog URL'] || '',\n  'Category': i.json['Category'] || '',\n  '_source': 'manual'\n} }));"
       },
-      "id": "6b34e7a0-0439-4919-850e-24765b1aeba8",
+      "id": "573adc1a-4d9d-4e3f-920f-a26aab9c63e0",
       "name": "Map Manual Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        54336,
-        12112
+        44144,
+        13504
       ]
     },
     {
       "parameters": {},
-      "id": "bd4d8bc2-49cf-4d2d-9fd4-a8b97a237cce",
+      "id": "001aaf6d-95a2-40c8-aed3-77e0248d95c4",
       "name": "Merge",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        54656,
-        11840
+        44464,
+        13232
       ]
     },
     {
@@ -858,13 +864,13 @@
         },
         "options": {}
       },
-      "id": "85d3c8d0-8b5e-4b61-9144-4feb5dfb737b",
+      "id": "7fc2c77e-a0e9-4d1b-8212-33c1e6929c95",
       "name": "IF Manual Blog",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        55008,
-        12256
+        44816,
+        13648
       ]
     },
     {
@@ -935,13 +941,13 @@
         },
         "options": {}
       },
-      "id": "5e857a49-e587-476d-8d40-45e0ae1fe3ed",
+      "id": "62a23576-2fc9-4229-9840-0482b4b41b5e",
       "name": "Update Manual Blog Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        55232,
-        12112
+        45040,
+        13504
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -966,13 +972,13 @@
         },
         "options": {}
       },
-      "id": "b08c1b90-e079-4781-a651-7a61d797806c",
+      "id": "de2d607c-0f9f-47b8-bd4b-5c38cc847467",
       "name": "🗂️ Get Pinterest Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        53616,
-        11824
+        43424,
+        13216
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -989,13 +995,13 @@
       "parameters": {
         "jsCode": "// A blog (regular or manual) counts as already processed if ANY OTHER row for\n// the same normalized URL already has a non-empty Pinterest Status -- this is\n// what actually happened in production: the same Manual Blog URL was entered\n// as two separate sheet rows, and the per-row empty-status check alone can't\n// catch that since each row starts out empty independently.\nconst item = $json;\nfunction normUrl(u) {\n  return String(u || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\\/+$/, '');\n}\nconst myUrl = normUrl(item['BLog-URL']);\nconst myRowNumber = item['row_number'];\nconst mySource = item['_source'];\n\nfunction isProcessed(row) {\n  return String(row['Pinterest Status'] || '').trim() !== '';\n}\n\n// Client decision: Manual Blog URLs may legitimately repeat (the same evergreen\n// content re-pinned to a different board later) -- only regular (\"blogs\"-tab,\n// auto-discovered) rows are protected against accidental double-processing.\nlet dup = null;\nif (myUrl && mySource !== 'manual') {\n  const blogRows = $('Get Blog Rows').all().map(i => i.json);\n  for (const row of blogRows) {\n    if (mySource === 'blogs' && row['row_number'] === myRowNumber) continue;\n    if (isProcessed(row) && normUrl(row['BLog-URL']) === myUrl) { dup = row; break; }\n  }\n  if (!dup) {\n    const manualRows = $('Get Manual Blog Rows').all().map(i => i.json);\n    for (const row of manualRows) {\n      if (mySource === 'manual' && row['row_number'] === myRowNumber) continue;\n      if (isProcessed(row) && normUrl(row['Manual Blog URL']) === myUrl) { dup = row; break; }\n    }\n  }\n}\n\nreturn [{ json: { ...item, isDuplicate: !!dup, duplicateOfRow: dup ? dup['row_number'] : null } }];\n"
       },
-      "id": "050a48d0-73d1-4a30-bc4c-a262d080f795",
+      "id": "1b73e812-1ae7-48a0-aae3-11980b4df6a0",
       "name": "Check Duplicate Blog",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        55104,
-        11856
+        44912,
+        13248
       ]
     },
     {
@@ -1023,13 +1029,13 @@
         },
         "options": {}
       },
-      "id": "67c465b0-61f4-447c-a14e-39ebbdc18dbb",
+      "id": "30056c5a-e072-4069-9993-98cedec69017",
       "name": "Is Duplicate?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        55312,
-        11856
+        45120,
+        13248
       ]
     },
     {
@@ -1056,13 +1062,13 @@
         },
         "options": {}
       },
-      "id": "e82b6dc2-394e-4bb5-98df-9dd3d76dd56d",
+      "id": "98fe0bea-d9e8-4d4e-829f-9ece74635ca5",
       "name": "IF Manual Blog (Dup)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        55296,
-        11616
+        45104,
+        13008
       ]
     },
     {
@@ -1214,13 +1220,13 @@
         },
         "options": {}
       },
-      "id": "d2cbe7d5-b714-44c2-b25a-252db519626f",
+      "id": "f6ef2acd-b38c-4f14-bdcb-dc8a918e2d32",
       "name": "Mark Blog Duplicate",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        55584,
-        11632
+        45392,
+        13024
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1299,13 +1305,13 @@
         },
         "options": {}
       },
-      "id": "c1b172e1-a122-4409-8e23-ee3014c76965",
+      "id": "bfc49702-286e-4d74-9757-7032b559ce20",
       "name": "Mark Manual Blog Duplicate",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        55568,
-        11392
+        45376,
+        12784
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1330,13 +1336,13 @@
         },
         "options": {}
       },
-      "id": "2d13de51-c663-4614-8a90-e68dded34657",
+      "id": "ca142857-b64d-4aa6-b5f4-aebd471c3eeb",
       "name": "Get Existing Pin Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        53836,
-        11824
+        43616,
+        13216
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -1674,7 +1680,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "aa843022-2271-4510-b72c-f7810f79a3cd",
+  "versionId": "2d3adf4d-5c0a-40bc-89d7-6857701e3c30",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
