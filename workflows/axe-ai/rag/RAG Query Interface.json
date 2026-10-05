@@ -1,5 +1,5 @@
 {
-  "name": "Quering&formating Embedded MSG",
+  "name": "RAG Query Interface",
   "nodes": [
     {
       "parameters": {
@@ -26,7 +26,7 @@
         2320
       ],
       "id": "33c6e0e8-8ac7-4ca6-b335-938bd7ba6147",
-      "name": "Message a model1",
+      "name": "Classify Query Intent",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -121,12 +121,11 @@
                 "conditions": [
                   {
                     "id": "fa06a856-f445-4372-af0c-4cd7c539c6e3",
-                    "leftValue": "AllData",
+                    "leftValue": "={{ $json.output[0].content[0].text }}",
                     "rightValue": "AllData",
                     "operator": {
                       "type": "string",
-                      "operation": "equals",
-                      "name": "filter.operator.equals"
+                      "operation": "equals"
                     }
                   }
                 ],
@@ -146,7 +145,7 @@
         2288
       ],
       "id": "83ef2a45-0579-4c3c-ab41-653fe6d7cf91",
-      "name": "Switch"
+      "name": "Route by Intent"
     },
     {
       "parameters": {
@@ -162,7 +161,7 @@
         2320
       ],
       "id": "28af8b22-8e1f-405a-b193-89dd8eb3da63",
-      "name": "Webhook",
+      "name": "Receive Client Query",
       "webhookId": "4ad175ee-ea0f-48de-8615-b5721cbe39a7"
     },
     {
@@ -176,7 +175,7 @@
         "responses": {
           "values": [
             {
-              "content": "=Task: Determine if a user statement is requesting a count of records or general database totals.\n\nIf the statement asks for total records, total count, number of entries, statistics, or database-wide information, output:\ncounter\n\nIf the statement asks for specific product information, details, or any query that is not about totals, output:\nnon-counter\n\nRules:\n\nOnly consider it counter if the request is explicitly about counts, totals, or statistics.\n\nReturn exactly one word, either counter or non-counter.\n\nDo not add explanations, extra text, or formatting.\n\nUser Statement:\n{{ $('Webhook').item.json.body.query }}"
+              "content": "=Task: Determine if a user statement is requesting a count of records or general database totals.\n\nIf the statement asks for total records, total count, number of entries, statistics, or database-wide information, output:\ncounter\n\nIf the statement asks for specific product information, details, or any query that is not about totals, output:\nnon-counter\n\nRules:\n\nOnly consider it counter if the request is explicitly about counts, totals, or statistics.\n\nReturn exactly one word, either counter or non-counter.\n\nDo not add explanations, extra text, or formatting.\n\nUser Statement:\n{{ $('Receive Client Query').item.json.body.query }}"
             }
           ]
         },
@@ -190,7 +189,7 @@
         2368
       ],
       "id": "c0d90fa9-1d79-4cf9-876b-fd63d5151632",
-      "name": "Message a model",
+      "name": "Classify AllData Counter vs Non-Counter",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -221,7 +220,7 @@
         2272
       ],
       "id": "d1751f72-dce0-44a4-911c-ea7bf61d1b13",
-      "name": "HTTP Request",
+      "name": "Get Total Message Count (Supabase)",
       "credentials": {
         "supabaseApi": {
           "id": "2SJbBfPYLuRHG4tm",
@@ -316,16 +315,16 @@
         2352
       ],
       "id": "7057d5fe-2956-4fe3-ab05-b956bfa1d394",
-      "name": "Switch1"
+      "name": "Route AllData Type"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=query or question:\n{{ $('Webhook').item.json.body.query }}\n\nanswer:\n{{ $json }}\n\nmake it a proper answer as responed by ai (short & simple)",
+        "text": "=query or question:\n{{ $('Receive Client Query').item.json.body.query }}\n\nanswer:\n{{ $json }}\n\nmake it a proper answer as responed by ai (short & simple)",
         "options": {}
       },
       "id": "7d051bd5-e4e2-4597-80bf-aba93189534d",
-      "name": "Question & Answer4",
+      "name": "Format Final Response Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "position": [
         -224,
@@ -336,7 +335,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Webhook').item.json.body.session_id }}",
+        "sessionKey": "={{ $('Receive Client Query').item.json.body.session_id }}",
         "contextWindowLength": 500
       },
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
@@ -346,7 +345,7 @@
         2496
       ],
       "id": "79198066-0022-4301-8c9c-5c04ba8e83d2",
-      "name": "Memory1"
+      "name": "Response Formatter Memory"
     },
     {
       "parameters": {
@@ -365,7 +364,7 @@
         2496
       ],
       "id": "206e5e4a-eaad-4f2b-981c-252efd8f6941",
-      "name": "chat model",
+      "name": "Response Formatter Chat Model",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -380,11 +379,11 @@
           "fieldValues": [
             {
               "fieldId": "session_id",
-              "fieldValue": "={{ $('Webhook').item.json.body.session_id }}"
+              "fieldValue": "={{ $('Receive Client Query').item.json.body.session_id }}"
             },
             {
               "fieldId": "user_message",
-              "fieldValue": "={{ $('Webhook').item.json.body.query }}"
+              "fieldValue": "={{ $('Receive Client Query').item.json.body.query }}"
             },
             {
               "fieldId": "response_message",
@@ -400,7 +399,7 @@
         2672
       ],
       "id": "169999a1-91f2-4f51-a24d-99ab26549241",
-      "name": "Create a row5",
+      "name": "Log Conversation (Supabase)",
       "credentials": {
         "supabaseApi": {
           "id": "2SJbBfPYLuRHG4tm",
@@ -419,7 +418,7 @@
         2672
       ],
       "id": "340018c1-155d-4606-84c2-a6034d57a6d0",
-      "name": "Code in JavaScript1"
+      "name": "Build Webhook Response"
     },
     {
       "parameters": {
@@ -434,7 +433,7 @@
         3248
       ],
       "id": "111ab933-52ed-4498-b981-6f66d71cb319",
-      "name": "Embeddings OpenAI3",
+      "name": "Query Embeddings (OpenAI)",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -445,7 +444,7 @@
     {
       "parameters": {
         "mode": "retrieve-as-tool",
-        "toolDescription": "={{ $('Webhook').item.json.body.query }}",
+        "toolDescription": "={{ $('Receive Client Query').item.json.body.query }}",
         "tableName": {
           "__rl": true,
           "value": "messages",
@@ -464,7 +463,7 @@
         3008
       ],
       "id": "fea5133c-87cb-457f-9da7-3ddfe7ca4fd5",
-      "name": "Supabase Vector Store1",
+      "name": "Product Knowledge Vector Store",
       "notesInFlow": false,
       "credentials": {
         "supabaseApi": {
@@ -484,7 +483,7 @@
         3248
       ],
       "id": "4991f806-a6e4-43cd-a665-782ca81a75d1",
-      "name": "Reranker Cohere",
+      "name": "Relevance Reranker (Cohere)",
       "credentials": {
         "cohereApi": {
           "id": "mhExRzwjXc727hMA",
@@ -495,11 +494,11 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $('Webhook').item.json.body.query }}",
+        "text": "={{ $('Receive Client Query').item.json.body.query }}",
         "options": {}
       },
       "id": "b2740193-15cd-4d8d-9648-1e11f2c75ed7",
-      "name": "Question & Answer1",
+      "name": "RAG Product Answer Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "position": [
         -800,
@@ -524,7 +523,7 @@
         2928
       ],
       "id": "1382532b-2658-4a8c-8613-1feb23cf4cb7",
-      "name": "Chat Model",
+      "name": "RAG Agent Chat Model",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -535,7 +534,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Webhook').item.json.body.session_id }}",
+        "sessionKey": "={{ $('Receive Client Query').item.json.body.session_id }}",
         "contextWindowLength": 10
       },
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
@@ -545,7 +544,7 @@
         2928
       ],
       "id": "8190564a-9a4b-42d1-921b-23b9bda48bcc",
-      "name": "Memory"
+      "name": "RAG Agent Memory"
     },
     {
       "parameters": {
@@ -558,7 +557,7 @@
         "responses": {
           "values": [
             {
-              "content": "=\nInstructions:\n\nRead the user input text, analyze it that the user just asked the query or asked the counter-query\ncounter-query means asked about the product with their count e.g (give the count of queries related to bathtub)\nFallback Rule:\n\nOutput Rules\n\nExactly one word, the word must be from:\ncounter_query OR simple_query\nUser Input:\n{{ $('Webhook').item.json.body.query }}"
+              "content": "=\nInstructions:\n\nRead the user input text, analyze it that the user just asked the query or asked the counter-query\ncounter-query means asked about the product with their count e.g (give the count of queries related to bathtub)\nFallback Rule:\n\nOutput Rules\n\nExactly one word, the word must be from:\ncounter_query OR simple_query\nUser Input:\n{{ $('Receive Client Query').item.json.body.query }}"
             }
           ]
         },
@@ -572,7 +571,7 @@
         2048
       ],
       "id": "5090805b-5172-4b46-b206-07be1498eb67",
-      "name": "Message a model7",
+      "name": "Classify Query vs Counter-Query",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -591,7 +590,7 @@
         "responses": {
           "values": [
             {
-              "content": "=Task: Extract a single keyword(product) from the user query for database searching.\n\nInstructions:\n\nRead the user input text.\n\nIdentify the most important keyword.\n\nWrap it with % at the beginning and end.\n\nFallback Rule:\nIf no useful keyword is found return:\n\n%a%\n\nOutput Rules\n\nExactly one word\n\nWrapped in %\n\nUser Input:\n{{ $('Webhook').item.json.body.query }}"
+              "content": "=Task: Extract a single keyword(product) from the user query for database searching.\n\nInstructions:\n\nRead the user input text.\n\nIdentify the most important keyword.\n\nWrap it with % at the beginning and end.\n\nFallback Rule:\nIf no useful keyword is found return:\n\n%a%\n\nOutput Rules\n\nExactly one word\n\nWrapped in %\n\nUser Input:\n{{ $('Receive Client Query').item.json.body.query }}"
             }
           ]
         },
@@ -605,7 +604,7 @@
         2032
       ],
       "id": "a6fd1c06-96b3-414b-85b2-7474d71e505a",
-      "name": "Message a model8",
+      "name": "Extract Product Keyword",
       "credentials": {
         "openAiApi": {
           "id": "2A9snppPp3TR9vjL",
@@ -640,7 +639,7 @@
         2032
       ],
       "id": "f582b7d9-44a5-4f5f-9958-dd5d3ef759f5",
-      "name": "HTTP Request1",
+      "name": "Get Product Count (Supabase)",
       "credentials": {
         "supabaseApi": {
           "id": "2SJbBfPYLuRHG4tm",
@@ -711,267 +710,267 @@
         2048
       ],
       "id": "4fb77bc1-143b-4ca3-aef7-9260c61d2823",
-      "name": "Switch2"
+      "name": "Route Counter vs Simple Query"
     }
   ],
   "pinData": {},
   "connections": {
-    "Message a model1": {
+    "Classify Query Intent": {
       "main": [
         [
           {
-            "node": "Switch",
+            "node": "Route by Intent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch": {
+    "Route by Intent": {
       "main": [
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Message a model7",
+            "node": "Classify Query vs Counter-Query",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Message a model",
+            "node": "Classify AllData Counter vs Non-Counter",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook": {
+    "Receive Client Query": {
       "main": [
         [
           {
-            "node": "Message a model1",
+            "node": "Classify Query Intent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Message a model": {
+    "Classify AllData Counter vs Non-Counter": {
       "main": [
         [
           {
-            "node": "Switch1",
+            "node": "Route AllData Type",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request": {
+    "Get Total Message Count (Supabase)": {
       "main": [
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch1": {
+    "Route AllData Type": {
       "main": [
         [
           {
-            "node": "HTTP Request",
+            "node": "Get Total Message Count (Supabase)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Question & Answer4": {
+    "Format Final Response Agent": {
       "main": [
         [
           {
-            "node": "Create a row5",
+            "node": "Log Conversation (Supabase)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Memory1": {
+    "Response Formatter Memory": {
       "ai_memory": [
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "ai_memory",
             "index": 0
           }
         ]
       ]
     },
-    "chat model": {
+    "Response Formatter Chat Model": {
       "ai_languageModel": [
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "Create a row5": {
+    "Log Conversation (Supabase)": {
       "main": [
         [
           {
-            "node": "Code in JavaScript1",
+            "node": "Build Webhook Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Embeddings OpenAI3": {
+    "Query Embeddings (OpenAI)": {
       "ai_embedding": [
         [
           {
-            "node": "Supabase Vector Store1",
+            "node": "Product Knowledge Vector Store",
             "type": "ai_embedding",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase Vector Store1": {
+    "Product Knowledge Vector Store": {
       "ai_tool": [
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "ai_tool",
             "index": 0
           }
         ]
       ]
     },
-    "Reranker Cohere": {
+    "Relevance Reranker (Cohere)": {
       "ai_reranker": [
         [
           {
-            "node": "Supabase Vector Store1",
+            "node": "Product Knowledge Vector Store",
             "type": "ai_reranker",
             "index": 0
           }
         ]
       ]
     },
-    "Question & Answer1": {
+    "RAG Product Answer Agent": {
       "main": [
         [
           {
-            "node": "Create a row5",
+            "node": "Log Conversation (Supabase)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Chat Model": {
+    "RAG Agent Chat Model": {
       "ai_languageModel": [
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "Memory": {
+    "RAG Agent Memory": {
       "ai_memory": [
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "ai_memory",
             "index": 0
           }
         ]
       ]
     },
-    "Message a model7": {
+    "Classify Query vs Counter-Query": {
       "main": [
         [
           {
-            "node": "Switch2",
+            "node": "Route Counter vs Simple Query",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Message a model8": {
+    "Extract Product Keyword": {
       "main": [
         [
           {
-            "node": "HTTP Request1",
+            "node": "Get Product Count (Supabase)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch2": {
+    "Route Counter vs Simple Query": {
       "main": [
         [
           {
-            "node": "Message a model8",
+            "node": "Extract Product Keyword",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Question & Answer1",
+            "node": "RAG Product Answer Agent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request1": {
+    "Get Product Count (Supabase)": {
       "main": [
         [
           {
-            "node": "Question & Answer4",
+            "node": "Format Final Response Agent",
             "type": "main",
             "index": 0
           }
