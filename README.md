@@ -116,13 +116,15 @@ Reads product rows from Google Sheets and uses AI to generate complete Shopify-r
 - `workflows/product-management/Shopify Merge product sync Pipeline (GraphQL).json` — main pipeline
 - `workflows/product-management/Shopify Merge product sync Pipeline (GraphQL) - Process Product (sub-workflow).json` — per-product sub-workflow
 
-Syncs product data from Google Sheets into Shopify via the **GraphQL Admin API** across all 30 category sheets. Handles product create/update, variants, slot-based image sync, collection assignments, metafields, SEO fields and Online Store publishing.
+Syncs product data from Google Sheets into Shopify via the **GraphQL Admin API** across all 30 category sheets. Handles product create/update, variants, image sync, collection assignments, metafields, SEO fields and Online Store publishing.
 
 **Sub-workflow architecture:** the main pipeline loops over sheets and reads/filters rows, then calls the Process Product sub-workflow once per product via an *Execute Sub-workflow* node (*Run once for each item*). This sidesteps an n8n Split-In-Batches bug where a node triggered more than once per execution silently stops processing items. A dedupe step guards against the sheet loop's *Done* branch firing more than once.
 
 **Also handled by the main pipeline:**
-- **CAD → IMAGE URL11 sync:** copies `CAD Drawing URL` into `IMAGE URL11` (skipped if that exact URL already sits in another image slot)
+- **CAD → IMAGE URL11 sync:** copies `CAD Drawing URL` into `IMAGE URL11` and, for already-published rows, flags `IMAGE URL11,CAD Drawing URL` in `Fields_to_update` with `Ready_to_post = yes`. If the same URL also sits in another image slot, it is deduplicated by exact URL when the gallery is built
 - **Publish reconciliation:** recently created products missing from the Online Store channel are re-published
+
+**Image sync (one file per image):** the product's gallery is kept in step with `IMAGE URL1-11` for products whose `Fields_to_update` contains an `IMAGE URL` token (nothing else is touched). The sub-workflow looks up the existing Shopify File behind each sheet URL and **attaches that same file to the product by ID** (`fileUpdate` + `referencesToAdd`) instead of creating a copy, so the sheet URL and the product URL are identical. A CAD drawing shared by several products is one shared file and its alt text is never changed. A replaced image is deleted only if the product owns it (file name starts with the product number, or it is an old Shopify `_<uuid>` copy); any other file is only detached. The gallery is re-ordered to sheet order afterwards. If a sheet URL has no matching Shopify File the run stops with an error naming the image slot and changes nothing (no copy fallback); a file still processing is skipped until the next run.
 
 **Import note:** import both files, then open the main pipeline's `Process Product (per item)` node and select the sub-workflow from its dropdown.
 
