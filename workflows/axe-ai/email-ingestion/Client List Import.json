@@ -1,0 +1,1435 @@
+{
+  "name": "AXE AI | Client List Import → Mailbox Check (7 mailboxes) → Emails Beta",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Client List Import -- compare a client list with Emails Beta, verify new clients in the mailboxes, add them\n\n**One switch: `addToEmailsBeta` (Set Config, currently `true`; set `false` to only preview).** Every run does the same two things:\n\n1. **Checks the next `batchSize` new contacts** (address not in Emails Beta, no \"Mailbox check\" yet): searches all 7 mailboxes (Outlook: Jack, Mia, Eve, Yolanda. Gmail: Emily, Terry, Office) and writes into the list sheet **Mailbox check** (Found / Not found), **Mailboxes** (where) and **Linked contacts** (other addresses seen on those messages: From/To/Cc). A contact is only marked when every mailbox answered; a failed call leaves it unchecked for the next run.\n2. **Plans the groups that are complete.** Checked contacts are grouped **by evidence** (contact B seen on messages found for contact A, directly or through a chain). A group is only complete when every member has been checked. With `addToEmailsBeta = false` the plan is only shown in the summary (`preview`); with `true` every group whose members are ALL checked is appended to Emails Beta in that run (groups with an unchecked member wait for it). If a contact checked later turns out to share messages with a group that was already added, it is flagged \"linked to existing client X\" in Status and listed in `linkedToExisting` in the summary; it is not merged.\n\nJust run it repeatedly. After saving the check results the workflow re-reads the list and plans again, so groups completed during a run are added in the same run. Run with `false` first and read `preview`, `nameClashes`, `noConversation`, `largeGroups` and `groupsPending` before switching to `true`.\n\n**Rules:** existing clients (address already in an Emails Beta Email cell) are never changed. The list's account Name is NOT used for grouping; it only names the group (first contact's account Name; renamed `Name (address prefix)` if an Emails Beta Name already exists, because the intake workflow finds a client's folder by Name only). A contact linked to an existing client is flagged in Status, not merged. No conversation found in any mailbox: the client is still appended, flagged in Batch (`<label> - no conversation found`) with a blank Platform so the intake workflow skips it. Platform is written as one entry per email (JSON array, e.g. `[\"outlook\",[\"gmail\",\"outlook\"]]`) because the intake workflow assigns platforms to emails by position. Rows with no email are never processed (intake skips them). Matching is by exact address only.\n\n**Mass emails:** messages with more than `maxParticipants` external people still count as a conversation but are not used to link contacts. Our own addresses are ignored as participants (any company mailbox, connected or not, since we can't read the others' conversations): anything on `ownDomains`, listed in `ownAddresses`, or containing a `ownContains` text (default `marblebee`, which covers the company Gmail accounts). An address that shows up on 4+ different contacts is also ignored as a hub (`hubThreshold`) and listed in the summary.\n\n**Safe to re-run:** addresses already in Emails Beta come back as Existing (or `New (<Batch>)`), checked contacts are skipped. The disabled schedule trigger can run it automatically every 15 minutes; turn it off when Status shows no \"not checked yet\".\n\n**Before the first real run:** the intake workflow picks up rows with Processed = FALSE; keep it off until the Emails Beta import is finished. After import, intake pulls full history for rows with a blank last_synced_at.\n\n**Setup:** list sheet columns `Name`, `Contact email`, `Contact name` are required (found by header name); `Status`, `Matched client`, `Mailbox check`, `Mailboxes` and `Linked contacts` are added to the right automatically if they are missing; Emails Beta `Name`, `Email`, `Processed`, `Platform`, `last_synced_at`, `Batch`. The Google credential's account needs edit access to the list sheet. Select the Outlook credentials on the four `Outlook (...)` nodes after import (Mia, Eve, Yolanda). Two HTTP calls exist on purpose: the header row (column letters) and the bulk Status / check write (one call instead of ~700).",
+        "height": 820,
+        "width": 720
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -13472,
+        2736
+      ],
+      "id": "a7cbbca2-837a-432e-8173-0dfb8e6ba29d",
+      "name": "README"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -12560,
+        3248
+      ],
+      "id": "ee3f3a65-4a93-45df-bc0f-da4e72742d04",
+      "name": "▶️ Run Import"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -12544,
+        3008
+      ],
+      "id": "1128315e-63b3-4c45-abee-07d37359b342",
+      "name": "⏰ Auto-run every 15 min (disabled)",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e63ff7e4-34c6-4281-82d6-554eb4a80517",
+              "name": "addToEmailsBeta",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "e35d36b1-437a-4b41-9d4d-8e0cde55db52",
+              "name": "sourceSheetId",
+              "type": "string",
+              "value": "1EK1-SOvfPd_vEnEROVG4zfCK2_u2XHanOmTcTcUCRwU"
+            },
+            {
+              "id": "6d6b01a8-ef73-4ded-b27a-dedbd4879be2",
+              "name": "sourceTab",
+              "type": "string",
+              "value": "Master data export"
+            },
+            {
+              "id": "5c2bd3fc-ff20-4f48-ae03-8bdf603d656d",
+              "name": "betaSheetId",
+              "type": "string",
+              "value": "1SM-fEJ71XiL7cS464X4jUCFhY_A1b96bHvaZeNgvYr8"
+            },
+            {
+              "id": "197717a2-f852-4ea0-bebf-79c796544123",
+              "name": "betaTab",
+              "type": "string",
+              "value": "Sheet1"
+            },
+            {
+              "id": "4d6e7fe8-02c9-47ab-a055-48a1b9b0aa40",
+              "name": "batchLabel",
+              "type": "string",
+              "value": "New 2026-10"
+            },
+            {
+              "id": "3dc5e58b-4a58-4527-a2ec-60ac88d343c0",
+              "name": "noConversationFlag",
+              "type": "string",
+              "value": "no conversation found"
+            },
+            {
+              "id": "ce7e66ac-8b32-4d4a-88ea-43900ca2bdc0",
+              "name": "batchSize",
+              "type": "number",
+              "value": 25
+            },
+            {
+              "id": "dbb2b0e4-fe09-4845-b288-7f7b463b7602",
+              "name": "maxParticipants",
+              "type": "number",
+              "value": 8
+            },
+            {
+              "id": "871aefd3-7cb0-4f2e-a57b-d8d447cbb118",
+              "name": "ownDomains",
+              "type": "string",
+              "value": "marblebee.com"
+            },
+            {
+              "id": "dfac093b-983f-498b-9dde-f6ce5504c0de",
+              "name": "ownAddresses",
+              "type": "string",
+              "value": "marblebee2020@gmail.com,marblebee2021@gmail.com,marblebeeltd@gmail.com"
+            },
+            {
+              "id": "c3f8fb45-06ed-4324-97f5-efd817212b23",
+              "name": "ownContains",
+              "type": "string",
+              "value": "marblebee"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -12320,
+        3248
+      ],
+      "id": "0abeb02a-506d-4065-8ac5-cd33f1f677df",
+      "name": "Set Config"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent($('Set Config').first().json.sourceSheetId) + '/values/' + encodeURIComponent(\"'\" + $('Set Config').first().json.sourceTab + \"'!1:1\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -12112,
+        3248
+      ],
+      "id": "286bccfb-6bd9-4522-b730-e5a2a5471e4c",
+      "name": "📥 Read List Header",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.sourceSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.sourceTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -11888,
+        3248
+      ],
+      "id": "cdef9460-a95f-4307-bf8f-2535bb8f2048",
+      "name": "📥 Read Source List",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.betaSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.betaTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -11664,
+        3248
+      ],
+      "id": "91a1262e-3e8a-4910-bbfd-63b00765998d",
+      "name": "📥 Read Emails Beta",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Client list import, v3: compares a client list sheet with Emails Beta by EMAIL,\n// picks the next batch of new contacts for the mailbox check, and (in append\n// mode) groups checked contacts by evidence and plans the Emails Beta rows.\n//\n// Every run does both:\n//   * picks the next `batchSize` new contacts that have no \"Mailbox check\" yet (the\n//     nodes after this one search all 7 mailboxes for them and save the result), and\n//   * groups the contacts that are already checked by evidence and plans the Emails\n//     Beta rows for every group whose members are all checked.\n// The single switch `addToEmailsBeta` decides whether those rows are appended\n// (true) or only shown as a preview (false).\n//\n// Rules:\n//  * An address already in an Emails Beta Email cell => existing client. Never\n//    changed (name, emails, folder).\n//  * Any other address => new contact. (One Emails Beta row per group; no extra name-only rows.) Contacts are only put in one group when\n//    the mailbox check SAW them together: contact B appears (From/To/Cc) on\n//    messages found for contact A, directly or through a chain. The list's\n//    account Name is NOT used for grouping; it only names the group (first\n//    contact's account Name). A contact linked to an existing client is flagged,\n//    never merged into it.\n//  * A group is only appended when every member has been checked. No\n//    conversation found in any mailbox => still appended, flagged in Batch, with\n//    a blank Platform so the intake workflow skips it.\n//  * Platform is written as one entry per email (JSON array), because the intake\n//    workflow assigns platforms to emails by position.\n//  * The intake workflow finds a client's Drive folder by Name only, so a new\n//    group whose name equals an existing Emails Beta Name is renamed\n//    \"Name (address prefix)\".\n//  * Matching is by exact address only, never by name.\nconst cfg = $('Set Config').first().json;\nconst batchSize = Math.max(1, Number(cfg.batchSize) || 10);\nconst batch = String(cfg.batchLabel || '');\nconst noConvFlag = String(cfg.noConversationFlag || 'no conversation found');\nconst listOf = (v) => String(v || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nconst ownDomains = listOf(cfg.ownDomains), ownAddrs = new Set(listOf(cfg.ownAddresses)), ownContains = listOf(cfg.ownContains);\nconst isOwn = (a) => ownAddrs.has(a) || ownDomains.some(d => a.endsWith('@' + d)) || ownContains.some(s => a.includes(s));\n\nconst SRC = { name: 'Name', email: 'Contact email', contact: 'Contact name', status: 'Status', matched: 'Matched client', check: 'Mailbox check', boxes: 'Mailboxes', linked: 'Linked contacts' };\nconst BETA = { name: 'Name', email: 'Email', processed: 'Processed', platform: 'Platform', synced: 'last_synced_at', batch: 'Batch' };\n\n// On the second pass (after this run's check results were saved) the list is read again, so\n// groups completed during this run are planned in the same run.\nconst reread = (() => { try { return $('📥 Re-read Source List').isExecuted === true; } catch (e) { return false; } })();\nconst srcItems = $(reread ? '📥 Re-read Source List' : '📥 Read Source List').all().map(i => i.json);\nconst betaItems = $('📥 Read Emails Beta').all().map(i => i.json);\nconst srcHeader = (($('📥 Read List Header').first().json.values || [])[0]) || [];\nif (srcItems.length === 0) throw new Error('List sheet has no data rows');\n\nconst keyOf = (obj, wanted, label) => {\n  const k = Object.keys(obj).find(x => x.trim().toLowerCase() === wanted.toLowerCase());\n  if (!k) throw new Error(`${label}: column \"${wanted}\" not found (columns: ${Object.keys(obj).join(' | ')})`);\n  return k;\n};\nconst colLetter = (i) => { let s = ''; i += 1; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };\n// Output columns (Status, Matched client, Mailbox check, Mailboxes, Linked contacts): found by\n// header name; any that is missing is added to the right of the last header automatically.\nconst headerIdx = (wanted) => srcHeader.findIndex(h => String(h || '').trim().toLowerCase() === wanted.toLowerCase());\nlet nextFree = srcHeader.length;\nconst headersToAdd = [];\nconst outCol = (wanted) => {\n  let i = headerIdx(wanted);\n  if (i < 0) { i = nextFree++; headersToAdd.push({ index: i, name: wanted }); }\n  return i;\n};\nconst str = (v) => String(v ?? '').trim();\nconst addrsOf = (v) => String(v || '').split(/[,;\\s]+/).map(e => e.trim().toLowerCase()).filter(Boolean);\n\n// ---- Emails Beta ----\nconst bk = {};\nfor (const [f, h] of Object.entries(BETA)) bk[f] = keyOf(betaItems[0] || {}, h, 'Emails Beta');\nconst betaByEmail = new Map();\nconst takenNames = new Set();\nfor (const row of betaItems) {\n  const nm = str(row[bk.name]);\n  if (nm) takenNames.add(nm.toLowerCase());\n  for (const a of addrsOf(str(row[bk.email]))) if (!betaByEmail.has(a)) betaByEmail.set(a, { name: nm, batch: str(row[bk.batch]) });\n}\n\n// ---- list sheet ----\nconst sk = {};\nfor (const f of ['name', 'email', 'contact']) sk[f] = keyOf(srcItems[0], SRC[f], 'List sheet');\n// check columns may not exist yet (added below): read them only when present\nfor (const f of ['check', 'boxes', 'linked']) sk[f] = Object.keys(srcItems[0]).find(x => x.trim().toLowerCase() === SRC[f].toLowerCase()) || null;\nconst col = { status: colLetter(outCol(SRC.status)), matched: colLetter(outCol(SRC.matched)), check: colLetter(outCol(SRC.check)), boxes: colLetter(outCol(SRC.boxes)), linked: colLetter(outCol(SRC.linked)) };\nconst lastRow = Math.max(...srcItems.map(r => Number(r.row_number) || 0));\nif (!(lastRow >= 2)) throw new Error('List sheet rows have no row_number');\nconst n = lastRow - 1;\nconst out = Array.from({ length: n }, () => ({ status: '', matched: '' }));\nconst stats = { existing: 0, existingWithNewAddress: 0, newContacts: 0, noEmail: 0, duplicateInList: 0 };\nconst existingWithNewAddress = [];\nconst seen = new Map(); const dups = [];\nconst contacts = [];\n\nfor (const row of srcItems) {\n  const r = Number(row.row_number) - 2;\n  const addrs = addrsOf(str(row[sk.email]));\n  if (addrs.length === 0) { out[r].status = 'No email'; stats.noEmail++; continue; }\n  if (addrs.every(a => seen.has(a))) { out[r].status = 'Duplicate in list'; dups.push({ r, of: seen.get(addrs[0]) }); stats.duplicateInList++; continue; }\n  addrs.forEach(a => { if (!seen.has(a)) seen.set(a, r); });\n  const hit = addrs.map(a => betaByEmail.get(a)).filter(Boolean);\n  if (hit.length) {\n    const first = hit[0];\n    const missing = addrs.filter(a => !betaByEmail.has(a));\n    out[r].matched = first.name;\n    out[r].status = first.batch ? `New (${first.batch})` : 'Existing';\n    if (missing.length) { out[r].status += ` (+${missing.length} address not in Emails Beta)`; stats.existingWithNewAddress++; existingWithNewAddress.push({ row: r + 2, client: first.name, addresses: missing }); }\n    stats.existing++;\n    continue;\n  }\n  const check = sk.check ? str(row[sk.check]) : '';\n  const boxes = sk.boxes ? str(row[sk.boxes]) : '';\n  contacts.push({\n    r, row: r + 2, account: str(row[sk.name]), addrs, contactName: str(row[sk.contact]),\n    check, checked: /^(found|not found)$/i.test(check), found: /^found$/i.test(check),\n    types: [...new Set((boxes.match(/outlook|gmail/gi) || []).map(t => t.toLowerCase()))],\n    boxes, linked: sk.linked ? addrsOf(str(row[sk.linked])).filter(a => !isOwn(a)) : []   // own addresses saved by an earlier run are ignored\n  });\n  stats.newContacts++;\n}\n\nconst addrToContact = new Map();\ncontacts.forEach((c, i) => c.addrs.forEach(a => addrToContact.set(a, i)));\n\n// ---- evidence grouping (union-find over contacts the check saw together) ----\nconst parent = contacts.map((_, i) => i);\nconst find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };\nconst union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb); };\nconst existingLink = new Map();   // contact index -> Set of existing client names\n// An address that shows up in the linked lists of many different contacts is almost certainly\n// one of our own mailboxes or a mass sender, not a person who belongs to a client. Using it\n// would chain unrelated clients into one group, so it is ignored for grouping and reported.\nconst hubThreshold = Math.max(3, Number(cfg.hubThreshold) || 4);\nconst linkCount = new Map();\ncontacts.forEach(c => new Set(c.linked).forEach(a => linkCount.set(a, (linkCount.get(a) || 0) + 1)));\nconst hubs = new Set([...linkCount].filter(([, k]) => k >= hubThreshold).map(([a]) => a));\ncontacts.forEach((c, i) => {\n  for (const a of c.linked) {\n    if (hubs.has(a)) continue;\n    if (addrToContact.has(a)) union(i, addrToContact.get(a));\n    else if (betaByEmail.has(a)) { if (!existingLink.has(i)) existingLink.set(i, new Set()); existingLink.get(i).add(betaByEmail.get(a).name); }\n  }\n});\nconst groupsMap = new Map();\ncontacts.forEach((c, i) => { const root = find(i); if (!groupsMap.has(root)) groupsMap.set(root, []); groupsMap.get(root).push(i); });\nconst groups = [...groupsMap.values()].map(ix => ix.sort((a, b) => a - b));\n\nconst uniqueName = (base, firstAddr) => {\n  let name = base || firstAddr.split('@')[0];\n  if (!takenNames.has(name.toLowerCase())) { takenNames.add(name.toLowerCase()); return name; }\n  const local = firstAddr.split('@')[0];\n  let cand = `${name} (${local})`, k = 2;\n  while (takenNames.has(cand.toLowerCase())) cand = `${name} (${local}) ${k++}`;\n  takenNames.add(cand.toLowerCase());\n  return cand;\n};\nconst platformValue = (allAddrs, group) => {\n  const union = [...new Set(group.flatMap(i => contacts[i].types))];\n  if (union.length === 0) return '';\n  const per = allAddrs.map(a => { const t = contacts[addrToContact.get(a)].types; const use = t.length ? t : union; return use.length === 1 ? use[0] : use; });\n  return per.length === 1 && typeof per[0] === 'string' ? per[0] : JSON.stringify(per);\n};\n\nconst appendRows = [];\nconst pendingGroups = [];\nconst nameClashes = [];\nconst sameAccountNote = [];\nconst bigGroups = [];\nconst noConversation = [];\nconst toCheck = [];\nconst newStatus = (c, i) => {\n  let s = !c.checked ? 'New (not checked yet)' : (c.found ? 'New (conversation found)' : `New (${noConvFlag})`);\n  if (existingLink.has(i)) s += `; linked to existing client ${[...existingLink.get(i)].join(' / ')}`;\n  return s;\n};\ncontacts.forEach((c, i) => { out[c.r].status = newStatus(c, i); });\n\nfor (const c of contacts) { if (!c.checked && toCheck.length < batchSize) toCheck.push({ row: c.row, addrs: c.addrs }); }\nfor (const g of groups) {\n  if (!g.every(i => contacts[i].checked)) { pendingGroups.push(g.map(i => contacts[i].row)); continue; }\n  if (g.length > 6) bigGroups.push({ rows: g.map(i => contacts[i].row), size: g.length });\n  const first = contacts[g[0]];\n  const base = first.account || first.contactName || '';\n  const name = uniqueName(base, first.addrs[0]);\n  if (name.toLowerCase() !== (base || first.addrs[0].split('@')[0]).toLowerCase()) nameClashes.push({ row: first.row, original: base, assigned: name });\n  const allAddrs = [...new Set(g.flatMap(i => contacts[i].addrs))];\n  const found = g.some(i => contacts[i].found);\n  const mk = (nm, email, platform, label) => ({ [bk.name]: nm, [bk.email]: email, [bk.processed]: 'FALSE', [bk.platform]: platform, [bk.synced]: '', [bk.batch]: label });\n  const label = found ? batch : `${batch} - ${noConvFlag}`;\n  appendRows.push(mk(name, allAddrs.join(', '), found ? platformValue(allAddrs, g) : '', label));\n  if (!found) noConversation.push({ name, rows: g.map(i => contacts[i].row) });\n  g.forEach(i => {\n    const c = contacts[i];\n    out[c.r].matched = name;\n    // (no name-only rows for the other contacts: who belongs to a group is in the list sheet's Matched client column)\n  });\n  g.forEach(i => { if (existingLink.has(i)) sameAccountNote.push({ row: contacts[i].row, newClient: name, linkedToExisting: [...existingLink.get(i)] }); });\n}\n// With the switch on, every group whose members are all checked is added in this run.\nconst addOn = cfg.addToEmailsBeta === true || String(cfg.addToEmailsBeta).toLowerCase() === 'true';\nconst rowsToAdd = addOn ? appendRows : [];\nfor (const d of dups) out[d.r].matched = out[d.of].matched;\n\nconst q = (t) => `'${String(t).replace(/'/g, \"''\")}'`;\nconst srcTab = String(cfg.sourceTab);\nconst sid = encodeURIComponent(cfg.sourceSheetId);\nconst sourceUpdate = {\n  url: `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values:batchUpdate`,\n  body: { valueInputOption: 'RAW', data: [\n    ...headersToAdd.map(h => ({ range: `${q(srcTab)}!${colLetter(h.index)}1`, values: [[h.name]] })),\n    { range: `${q(srcTab)}!${col.status}2:${col.status}${n + 1}`, values: out.map(o => [o.status]) },\n    { range: `${q(srcTab)}!${col.matched}2:${col.matched}${n + 1}`, values: out.map(o => [o.matched]) }\n  ] }\n};\n\nreturn [{ json: {\n  addToEmailsBeta: addOn, rowsToAdd,\n  summary: {\n    listRows: srcItems.length, ...stats,\n    checked: contacts.filter(c => c.checked).length,\n    conversationFound: contacts.filter(c => c.found).length,\n    notChecked: contacts.filter(c => !c.checked).length,\n    nextBatch: toCheck.length,\n    groupsReady: groups.length - pendingGroups.length,\n    groupsPending: pendingGroups.length,\n    rowsToAppendToEmailsBeta: appendRows.length,\n    noConversationClients: noConversation.length,\n    nameClashesRenamed: nameClashes.length,\n    largeGroups: bigGroups.length,\n    hubAddressesIgnored: hubs.size\n  },\n  headersAdded: headersToAdd.map(h => h.name),\n  toCheck, columns: col, srcTab, sourceSheetId: cfg.sourceSheetId,\n  hubAddressesIgnored: [...hubs],\n  nameClashes, linkedToExisting: sameAccountNote, bigGroups, noConversation, existingWithNewAddress,\n  preview: appendRows.slice(0, 30).map(r => ({ Name: r[bk.name], Email: r[bk.email], Platform: r[bk.platform], Batch: r[bk.batch] })),\n  sourceUpdate, appendRows\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11440,
+        3248
+      ],
+      "id": "68602247-5727-41d7-9089-adabad69af01",
+      "name": "🧮 Compare & Plan"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.sourceUpdate.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.sourceUpdate.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11232,
+        3248
+      ],
+      "id": "57c2bf45-8372-4e48-836a-b39279db73c7",
+      "name": "📝 Write Status to List Sheet",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "has-batch",
+              "leftValue": "={{ $('🧮 Compare & Plan').first().json.toCheck.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -12144,
+        3040
+      ],
+      "id": "b3ea96ee-b8fe-4921-bb8d-47f66ed66454",
+      "name": "❓ Anything to check?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per contact of the current batch, with the ready-made search URLs the\n// mailbox nodes use (so the nodes only need one simple expression).\nconst c = $('🧮 Compare & Plan').first().json;\nconst enc = encodeURIComponent;\nreturn c.toCheck.map((t, ci) => {\n  const gq = t.addrs.map(a => `from:${a} OR to:${a} OR cc:${a}`).join(' OR ');\n  return { json: {\n    ci, row: t.row, addrs: t.addrs,\n    outlookUrl: 'https://graph.microsoft.com/v1.0/me/messages?$top=10&$select=from,toRecipients,ccRecipients,sentDateTime&$search=' + enc('\"' + t.addrs.join(' OR ') + '\"'),\n    gmailListUrl: 'https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=5&q=' + enc(gq)\n  } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12192,
+        2816
+      ],
+      "id": "60f4fa0f-cfc4-4c04-8b7b-20906530744e",
+      "name": "🔎 Contacts to Check"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.outlookUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11984,
+        2816
+      ],
+      "id": "f792067d-3165-4498-92dd-f49a01045751",
+      "name": "📥 Outlook (Jack)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.outlookUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11776,
+        2816
+      ],
+      "id": "01c40607-0e45-42df-b4b1-39ca63191ad7",
+      "name": "📥 Outlook (Mia)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "ckA8HrYIftAN0Pkc",
+          "name": "Mia_Outlook"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.outlookUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11584,
+        2816
+      ],
+      "id": "c08d6e09-7ea2-400d-aab9-3de4f4994b5f",
+      "name": "📥 Outlook (Eve)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Yh5QCnOCkAeQKJK9",
+          "name": "Eve_Outlook"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.outlookUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11392,
+        2816
+      ],
+      "id": "e4da0412-cc72-4ad1-b091-68aba6919cd7",
+      "name": "📥 Outlook (Yolanda)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "qdzdw93tZPipg6By",
+          "name": "Yolanda_Outlook"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.gmailListUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11184,
+        2816
+      ],
+      "id": "5017257b-f1b9-4adb-b6bf-34acd46496e4",
+      "name": "📬 List Threads (Emily)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns each contact's thread list (one response per contact, same order) into\n// one item per thread to fetch (headers only). A placeholder item keeps the\n// chain alive when there are no threads at all.\nconst lists = $input.all();\nconst out = [];\nlists.forEach((it, ci) => {\n  const threads = (it.json && it.json.threads) || [];\n  for (const t of threads.slice(0, 5)) {\n    out.push({ json: { ci, url: `https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` } });\n  }\n});\nif (out.length === 0) out.push({ json: { ci: -1, url: 'https://gmail.googleapis.com/gmail/v1/users/me/profile' } });\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10992,
+        2816
+      ],
+      "id": "f200066f-7f7a-486c-a1ed-5db3eeff2154",
+      "name": "📬 Expand Threads (Emily)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -10784,
+        2816
+      ],
+      "id": "37fba84a-982c-4e53-9ab9-bc26a14a5dd1",
+      "name": "📬 Get Threads (Emily)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YDwIfKGPpGOoGWLo",
+          "name": "Sales-Assistant-Emily"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Back to one item per contact: the headers of every message in the fetched\n// threads, plus an error flag if the list call or any thread call failed.\nconst EXPAND = '📬 Expand Threads (Emily)';\nconst LIST = '📬 List Threads (Emily)';\nconst contacts = $('🔎 Contacts to Check').all();\nconst lists = $(LIST).all();\nconst exp = $(EXPAND).all();\nconst threads = $input.all();\nconst errText = (e) => { try { return String(typeof e === 'string' ? e : (e.message || JSON.stringify(e))).slice(0, 240); } catch (x) { return 'error'; } };\nconst res = contacts.map((_, ci) => {\n  const e = lists[ci] && lists[ci].json && lists[ci].json.error;\n  return { error: !!e, errorMessage: e ? 'list: ' + errText(e) : '', messages: [] };\n});\nexp.forEach((e, k) => {\n  const ci = e.json.ci;\n  if (ci < 0 || !res[ci]) return;\n  const t = threads[k] && threads[k].json;\n  if (!t || t.error) { res[ci].error = true; res[ci].errorMessage = res[ci].errorMessage || ('thread: ' + (t ? errText(t.error) : 'no response')); return; }\n  for (const m of (t.messages || [])) {\n    const h = {};\n    for (const x of (m.payload && m.payload.headers) || []) h[String(x.name).toLowerCase()] = x.value;\n    res[ci].messages.push({ from: h.from || '', to: h.to || '', cc: h.cc || '' });\n  }\n});\nreturn res.map((r, ci) => ({ json: { ci, ...r } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10576,
+        2816
+      ],
+      "id": "8e4b9745-d03f-40e6-912b-173463eac855",
+      "name": "📬 Collect Gmail (Emily)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.gmailListUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -12224,
+        2576
+      ],
+      "id": "76144f54-5a8b-4f24-9f2e-2bf41afa019b",
+      "name": "📬 List Threads (Terry)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns each contact's thread list (one response per contact, same order) into\n// one item per thread to fetch (headers only). A placeholder item keeps the\n// chain alive when there are no threads at all.\nconst lists = $input.all();\nconst out = [];\nlists.forEach((it, ci) => {\n  const threads = (it.json && it.json.threads) || [];\n  for (const t of threads.slice(0, 5)) {\n    out.push({ json: { ci, url: `https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` } });\n  }\n});\nif (out.length === 0) out.push({ json: { ci: -1, url: 'https://gmail.googleapis.com/gmail/v1/users/me/profile' } });\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12016,
+        2576
+      ],
+      "id": "d7660529-4467-4e4d-969a-f94c9d4a1070",
+      "name": "📬 Expand Threads (Terry)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11824,
+        2576
+      ],
+      "id": "8c498532-790a-4e47-9e3c-f2ddee39c493",
+      "name": "📬 Get Threads (Terry)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Back to one item per contact: the headers of every message in the fetched\n// threads, plus an error flag if the list call or any thread call failed.\nconst EXPAND = '📬 Expand Threads (Terry)';\nconst LIST = '📬 List Threads (Terry)';\nconst contacts = $('🔎 Contacts to Check').all();\nconst lists = $(LIST).all();\nconst exp = $(EXPAND).all();\nconst threads = $input.all();\nconst errText = (e) => { try { return String(typeof e === 'string' ? e : (e.message || JSON.stringify(e))).slice(0, 240); } catch (x) { return 'error'; } };\nconst res = contacts.map((_, ci) => {\n  const e = lists[ci] && lists[ci].json && lists[ci].json.error;\n  return { error: !!e, errorMessage: e ? 'list: ' + errText(e) : '', messages: [] };\n});\nexp.forEach((e, k) => {\n  const ci = e.json.ci;\n  if (ci < 0 || !res[ci]) return;\n  const t = threads[k] && threads[k].json;\n  if (!t || t.error) { res[ci].error = true; res[ci].errorMessage = res[ci].errorMessage || ('thread: ' + (t ? errText(t.error) : 'no response')); return; }\n  for (const m of (t.messages || [])) {\n    const h = {};\n    for (const x of (m.payload && m.payload.headers) || []) h[String(x.name).toLowerCase()] = x.value;\n    res[ci].messages.push({ from: h.from || '', to: h.to || '', cc: h.cc || '' });\n  }\n});\nreturn res.map((r, ci) => ({ json: { ci, ...r } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11616,
+        2576
+      ],
+      "id": "eb272d84-f050-44f7-9490-461b3b810ba0",
+      "name": "📬 Collect Gmail (Terry)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('🔎 Contacts to Check').all()[$itemIndex].json.gmailListUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11424,
+        2576
+      ],
+      "id": "cd3023c7-a271-4e55-9364-bc09a9a87cc8",
+      "name": "📬 List Threads (Office)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns each contact's thread list (one response per contact, same order) into\n// one item per thread to fetch (headers only). A placeholder item keeps the\n// chain alive when there are no threads at all.\nconst lists = $input.all();\nconst out = [];\nlists.forEach((it, ci) => {\n  const threads = (it.json && it.json.threads) || [];\n  for (const t of threads.slice(0, 5)) {\n    out.push({ json: { ci, url: `https://gmail.googleapis.com/gmail/v1/users/me/threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` } });\n  }\n});\nif (out.length === 0) out.push({ json: { ci: -1, url: 'https://gmail.googleapis.com/gmail/v1/users/me/profile' } });\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11216,
+        2576
+      ],
+      "id": "af59a42e-3d97-4a7a-a01a-9b5a7db325af",
+      "name": "📬 Expand Threads (Office)"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -11008,
+        2576
+      ],
+      "id": "3d118c9b-6247-45fc-b1bf-b89288879ca1",
+      "name": "📬 Get Threads (Office)",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u7Xymn1Ii2SjvPeL",
+          "name": "Sales-Assistant-Office"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Back to one item per contact: the headers of every message in the fetched\n// threads, plus an error flag if the list call or any thread call failed.\nconst EXPAND = '📬 Expand Threads (Office)';\nconst LIST = '📬 List Threads (Office)';\nconst contacts = $('🔎 Contacts to Check').all();\nconst lists = $(LIST).all();\nconst exp = $(EXPAND).all();\nconst threads = $input.all();\nconst errText = (e) => { try { return String(typeof e === 'string' ? e : (e.message || JSON.stringify(e))).slice(0, 240); } catch (x) { return 'error'; } };\nconst res = contacts.map((_, ci) => {\n  const e = lists[ci] && lists[ci].json && lists[ci].json.error;\n  return { error: !!e, errorMessage: e ? 'list: ' + errText(e) : '', messages: [] };\n});\nexp.forEach((e, k) => {\n  const ci = e.json.ci;\n  if (ci < 0 || !res[ci]) return;\n  const t = threads[k] && threads[k].json;\n  if (!t || t.error) { res[ci].error = true; res[ci].errorMessage = res[ci].errorMessage || ('thread: ' + (t ? errText(t.error) : 'no response')); return; }\n  for (const m of (t.messages || [])) {\n    const h = {};\n    for (const x of (m.payload && m.payload.headers) || []) h[String(x.name).toLowerCase()] = x.value;\n    res[ci].messages.push({ from: h.from || '', to: h.to || '', cc: h.cc || '' });\n  }\n});\nreturn res.map((r, ci) => ({ json: { ci, ...r } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10800,
+        2576
+      ],
+      "id": "eeab31a5-9642-4e67-a8ed-79d140095fd6",
+      "name": "📬 Collect Gmail (Office)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combines the 7 mailbox searches per contact: is there a conversation, in which\n// mailboxes, and who else appears on those messages. Contacts where any mailbox\n// call failed are left unchecked (retried next run) -- \"not found\" is only\n// written when every mailbox answered.\nconst cfg = $('Set Config').first().json;\nconst contacts = $('🔎 Contacts to Check').all().map(i => i.json);\nconst maxP = Math.max(1, Number(cfg.maxParticipants) || 8);\nconst ownDomains = String(cfg.ownDomains || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nconst ownAddrs = new Set(String(cfg.ownAddresses || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean));\nconst ownContains = String(cfg.ownContains || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nconst isOwn = (a) => ownAddrs.has(a) || ownDomains.some(d => a.endsWith('@' + d)) || ownContains.some(s => a.includes(s));\nconst ADDR = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g;\nconst pick = (s) => (String(s || '').match(ADDR) || []).map(x => x.toLowerCase());\n\nconst OUTLOOK = [['Outlook-Jack', '📥 Outlook (Jack)'], ['Outlook-Mia', '📥 Outlook (Mia)'], ['Outlook-Eve', '📥 Outlook (Eve)'], ['Outlook-Yolanda', '📥 Outlook (Yolanda)']];\nconst GMAIL = [['Gmail-Emily', '📬 Collect Gmail (Emily)'], ['Gmail-Terry', '📬 Collect Gmail (Terry)'], ['Gmail-Office', '📬 Collect Gmail (Office)']];\n\nconst perContact = contacts.map(() => ({ error: false, errors: [], boxes: [], participants: new Set(), msgs: [] }));\nconst errText = (e) => { try { return String(typeof e === 'string' ? e : (e.message || JSON.stringify(e))).slice(0, 240); } catch (x) { return 'error'; } };\nconst addMessages = (ci, label, msgs) => {\n  const own = contacts[ci].addrs;\n  let hit = false;\n  for (const m of msgs) {\n    const people = [...new Set(m)];\n    if (!people.some(a => own.includes(a))) continue;      // search hit that does not involve the contact\n    hit = true;\n    const others = people.filter(a => !isOwn(a));\n    if (others.length <= maxP) others.forEach(a => { if (!own.includes(a)) perContact[ci].participants.add(a); });\n  }\n  if (hit) perContact[ci].boxes.push(label);\n};\n// Which mailbox did each Outlook node really search? Graph names the user in @odata.context.\nconst mailboxIds = {};\nfor (const [label, node] of OUTLOOK) {\n  const items = $(node).all();\n  for (const it of items) {\n    const m = /users\\('([^']+)'\\)/.exec(String((it.json && it.json['@odata.context']) || ''));\n    if (m) { mailboxIds[label] = m[1]; break; }\n  }\n}\nconst sameBox = {};\nfor (const [label, id] of Object.entries(mailboxIds)) (sameBox[id] = sameBox[id] || []).push(label);\nconst warnings = Object.values(sameBox).filter(l => l.length > 1).map(l => `${l.join(' and ')} searched the SAME mailbox -- check the credential on those nodes. Nothing was saved.`);\n\nfor (const [label, node] of OUTLOOK) {\n  const items = $(node).all();\n  contacts.forEach((_, ci) => {\n    const j = items[ci] && items[ci].json;\n    if (!j || j.error || !Array.isArray(j.value)) { perContact[ci].error = true; perContact[ci].errors.push(`${label}: ${j && j.error ? errText(j.error) : 'no usable response'}`); return; }\n    addMessages(ci, label, j.value.map(m => [\n      ...pick(m.from && m.from.emailAddress && m.from.emailAddress.address),\n      ...(m.toRecipients || []).flatMap(r => pick(r.emailAddress && r.emailAddress.address)),\n      ...(m.ccRecipients || []).flatMap(r => pick(r.emailAddress && r.emailAddress.address))\n    ]));\n  });\n}\nfor (const [label, node] of GMAIL) {\n  const items = $(node).all();\n  contacts.forEach((_, ci) => {\n    const j = items[ci] && items[ci].json;\n    if (!j || j.error) { perContact[ci].error = true; perContact[ci].errors.push(`${label}: ${(j && j.errorMessage) || 'no response'}`); return; }\n    addMessages(ci, label, (j.messages || []).map(m => [...pick(m.from), ...pick(m.to), ...pick(m.cc)]));\n  });\n}\n\nconst tab = String(cfg.sourceTab);\nconst col = $('🧮 Compare & Plan').first().json.columns;\nconst q = (t) => `'${String(t).replace(/'/g, \"''\")}'`;\nconst data = [];\nconst done = [];\nconst retry = [];\nconst retryDetails = [];\ncontacts.forEach((c, ci) => {\n  const r = perContact[ci];\n  if (warnings.length || r.error) { retry.push(c.row); if (r.errors.length) retryDetails.push({ row: c.row, errors: r.errors }); return; }\n  const found = r.boxes.length > 0;\n  const vals = { check: found ? 'Found' : 'Not found', boxes: r.boxes.join('; '), linked: [...r.participants].join(', ') };\n  for (const f of ['check', 'boxes', 'linked']) data.push({ range: `${q(tab)}!${col[f]}${c.row}`, values: [[vals[f]]] });\n  // Status now, so it does not wait for the next run to catch up with the check columns.\n  data.push({ range: `${q(tab)}!${col.status}${c.row}`, values: [[found ? 'New (conversation found)' : `New (${String(cfg.noConversationFlag || 'no conversation found')})`]] });\n  done.push({ row: c.row, result: found ? 'Found' : 'Not found', mailboxes: r.boxes, linked: [...r.participants] });\n});\nreturn [{ json: {\n  hasWrites: data.length > 0,\n  checkedThisRun: done, retryNextRun: retry, retryDetails, mailboxIds, warnings,\n  update: { url: `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(cfg.sourceSheetId)}/values:batchUpdate`, body: { valueInputOption: 'RAW', data } }\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10528,
+        2576
+      ],
+      "id": "03b1f00b-cc61-4ab3-872c-0d8a307d7585",
+      "name": "🧩 Aggregate Check Results"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "has-writes",
+              "leftValue": "={{ $json.hasWrites }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -10240,
+        2576
+      ],
+      "id": "927ff41b-752a-46b6-bb1a-00c36797f7ed",
+      "name": "❓ Any results to save?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.update.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.update.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -9888,
+        2560
+      ],
+      "id": "64a77bbd-e851-4059-9d5a-edf110bbdfc1",
+      "name": "💾 Write Check Results",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "add-on",
+              "leftValue": "={{ ($('🧮 Plan Again').isExecuted ? $('🧮 Plan Again') : $('🧮 Compare & Plan')).first().json.addToEmailsBeta }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "has-new-rows",
+              "leftValue": "={{ ($('🧮 Plan Again').isExecuted ? $('🧮 Plan Again') : $('🧮 Compare & Plan')).first().json.rowsToAdd.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -12144,
+        3552
+      ],
+      "id": "8ed0b83c-c4d2-4666-98c3-b0cb67bc5633",
+      "name": "❓ Append to Emails Beta?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const plan = ($('🧮 Plan Again').isExecuted ? $('🧮 Plan Again') : $('🧮 Compare & Plan')).first().json;\nreturn plan.rowsToAdd.map(r => ({ json: r }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11232,
+        3536
+      ],
+      "id": "a98d031b-87d6-47e9-af7a-f3fd82ea9153",
+      "name": "🧾 Rows to Append"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.betaSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.betaTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -11024,
+        3536
+      ],
+      "id": "9a8154a5-3b57-4a73-a599-c1e7efce536c",
+      "name": "➕ Append New Clients to Emails Beta",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -11152,
+        3776
+      ],
+      "id": "ca5989e3-f25b-4136-a0f3-f7724f41ad30",
+      "name": "⏸️ Emails Beta Unchanged (dry run or nothing to add)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const c0 = $('🧮 Compare & Plan').first().json;      // plan at the START of the run\nconst ran = (n) => { try { return $(n).isExecuted; } catch (e) { return false; } };\nconst c = ran('🧮 Plan Again') ? $('🧮 Plan Again').first().json : c0;   // plan after this run's check results\nconst agg = ran('🧩 Aggregate Check Results') ? $('🧩 Aggregate Check Results').first().json : null;\nconst appended = ran('➕ Append New Clients to Emails Beta');\nconst parts = [];\nparts.push(agg ? `checked ${agg.checkedThisRun.length} contact(s) in the mailboxes` : (c0.toCheck.length ? 'no results saved (see warnings / retry details)' : 'nothing left to check'));\nparts.push(appended ? `ADDED ${c.rowsToAdd.length} row(s) to Emails Beta` : (c.addToEmailsBeta ? 'nothing new to add yet (groups are added as soon as all their members are checked)' : `PREVIEW only (addToEmailsBeta = false): ${c.appendRows.length} row(s) would be added`));\nreturn [{ json: {\n  result: parts.join(' | '),\n  afterThisRun: {\n    contactsChecked: c.summary.checked,\n    contactsNotChecked: c.summary.notChecked,\n    savedThisRun: agg ? agg.checkedThisRun.length : 0,\n    failedAndRetriedNextRun: agg ? agg.retryNextRun.length : 0,\n    groupsReady: c.summary.groupsReady,\n    groupsPending: c.summary.groupsPending,\n    rowsPlanned: c.appendRows.length\n  },\n  startOfRun: c0.summary,\n  checkedThisRun: agg ? agg.checkedThisRun : undefined,\n  retryNextRun: agg ? agg.retryNextRun : undefined,\n  retryDetails: agg ? agg.retryDetails : undefined,\n  warnings: agg ? agg.warnings : undefined,\n  mailboxIds: agg ? agg.mailboxIds : undefined,\n  noConversation: c.noConversation, linkedToExisting: c.linkedToExisting, largeGroups: c.bigGroups,\n  nameClashes: c.nameClashes, hubAddressesIgnored: c.hubAddressesIgnored, existingWithNewAddress: c.existingWithNewAddress, preview: c.preview\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10320,
+        3040
+      ],
+      "id": "f46bd44d-6362-4e31-b1ca-4c08b065bab0",
+      "name": "📊 Result Summary"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.sourceSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.sourceTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -9648,
+        2560
+      ],
+      "id": "a8229e2c-0a17-466a-ba83-19e00e0baddb",
+      "name": "📥 Re-read Source List",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Client list import, v3: compares a client list sheet with Emails Beta by EMAIL,\n// picks the next batch of new contacts for the mailbox check, and (in append\n// mode) groups checked contacts by evidence and plans the Emails Beta rows.\n//\n// Every run does both:\n//   * picks the next `batchSize` new contacts that have no \"Mailbox check\" yet (the\n//     nodes after this one search all 7 mailboxes for them and save the result), and\n//   * groups the contacts that are already checked by evidence and plans the Emails\n//     Beta rows for every group whose members are all checked.\n// The single switch `addToEmailsBeta` decides whether those rows are appended\n// (true) or only shown as a preview (false).\n//\n// Rules:\n//  * An address already in an Emails Beta Email cell => existing client. Never\n//    changed (name, emails, folder).\n//  * Any other address => new contact. (One Emails Beta row per group; no extra name-only rows.) Contacts are only put in one group when\n//    the mailbox check SAW them together: contact B appears (From/To/Cc) on\n//    messages found for contact A, directly or through a chain. The list's\n//    account Name is NOT used for grouping; it only names the group (first\n//    contact's account Name). A contact linked to an existing client is flagged,\n//    never merged into it.\n//  * A group is only appended when every member has been checked. No\n//    conversation found in any mailbox => still appended, flagged in Batch, with\n//    a blank Platform so the intake workflow skips it.\n//  * Platform is written as one entry per email (JSON array), because the intake\n//    workflow assigns platforms to emails by position.\n//  * The intake workflow finds a client's Drive folder by Name only, so a new\n//    group whose name equals an existing Emails Beta Name is renamed\n//    \"Name (address prefix)\".\n//  * Matching is by exact address only, never by name.\nconst cfg = $('Set Config').first().json;\nconst batchSize = Math.max(1, Number(cfg.batchSize) || 10);\nconst batch = String(cfg.batchLabel || '');\nconst noConvFlag = String(cfg.noConversationFlag || 'no conversation found');\nconst listOf = (v) => String(v || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nconst ownDomains = listOf(cfg.ownDomains), ownAddrs = new Set(listOf(cfg.ownAddresses)), ownContains = listOf(cfg.ownContains);\nconst isOwn = (a) => ownAddrs.has(a) || ownDomains.some(d => a.endsWith('@' + d)) || ownContains.some(s => a.includes(s));\n\nconst SRC = { name: 'Name', email: 'Contact email', contact: 'Contact name', status: 'Status', matched: 'Matched client', check: 'Mailbox check', boxes: 'Mailboxes', linked: 'Linked contacts' };\nconst BETA = { name: 'Name', email: 'Email', processed: 'Processed', platform: 'Platform', synced: 'last_synced_at', batch: 'Batch' };\n\n// On the second pass (after this run's check results were saved) the list is read again, so\n// groups completed during this run are planned in the same run.\nconst reread = (() => { try { return $('📥 Re-read Source List').isExecuted === true; } catch (e) { return false; } })();\nconst srcItems = $(reread ? '📥 Re-read Source List' : '📥 Read Source List').all().map(i => i.json);\nconst betaItems = $('📥 Read Emails Beta').all().map(i => i.json);\nconst srcHeader = (($('📥 Read List Header').first().json.values || [])[0]) || [];\nif (srcItems.length === 0) throw new Error('List sheet has no data rows');\n\nconst keyOf = (obj, wanted, label) => {\n  const k = Object.keys(obj).find(x => x.trim().toLowerCase() === wanted.toLowerCase());\n  if (!k) throw new Error(`${label}: column \"${wanted}\" not found (columns: ${Object.keys(obj).join(' | ')})`);\n  return k;\n};\nconst colLetter = (i) => { let s = ''; i += 1; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };\n// Output columns (Status, Matched client, Mailbox check, Mailboxes, Linked contacts): found by\n// header name; any that is missing is added to the right of the last header automatically.\nconst headerIdx = (wanted) => srcHeader.findIndex(h => String(h || '').trim().toLowerCase() === wanted.toLowerCase());\nlet nextFree = srcHeader.length;\nconst headersToAdd = [];\nconst outCol = (wanted) => {\n  let i = headerIdx(wanted);\n  if (i < 0) { i = nextFree++; headersToAdd.push({ index: i, name: wanted }); }\n  return i;\n};\nconst str = (v) => String(v ?? '').trim();\nconst addrsOf = (v) => String(v || '').split(/[,;\\s]+/).map(e => e.trim().toLowerCase()).filter(Boolean);\n\n// ---- Emails Beta ----\nconst bk = {};\nfor (const [f, h] of Object.entries(BETA)) bk[f] = keyOf(betaItems[0] || {}, h, 'Emails Beta');\nconst betaByEmail = new Map();\nconst takenNames = new Set();\nfor (const row of betaItems) {\n  const nm = str(row[bk.name]);\n  if (nm) takenNames.add(nm.toLowerCase());\n  for (const a of addrsOf(str(row[bk.email]))) if (!betaByEmail.has(a)) betaByEmail.set(a, { name: nm, batch: str(row[bk.batch]) });\n}\n\n// ---- list sheet ----\nconst sk = {};\nfor (const f of ['name', 'email', 'contact']) sk[f] = keyOf(srcItems[0], SRC[f], 'List sheet');\n// check columns may not exist yet (added below): read them only when present\nfor (const f of ['check', 'boxes', 'linked']) sk[f] = Object.keys(srcItems[0]).find(x => x.trim().toLowerCase() === SRC[f].toLowerCase()) || null;\nconst col = { status: colLetter(outCol(SRC.status)), matched: colLetter(outCol(SRC.matched)), check: colLetter(outCol(SRC.check)), boxes: colLetter(outCol(SRC.boxes)), linked: colLetter(outCol(SRC.linked)) };\nconst lastRow = Math.max(...srcItems.map(r => Number(r.row_number) || 0));\nif (!(lastRow >= 2)) throw new Error('List sheet rows have no row_number');\nconst n = lastRow - 1;\nconst out = Array.from({ length: n }, () => ({ status: '', matched: '' }));\nconst stats = { existing: 0, existingWithNewAddress: 0, newContacts: 0, noEmail: 0, duplicateInList: 0 };\nconst existingWithNewAddress = [];\nconst seen = new Map(); const dups = [];\nconst contacts = [];\n\nfor (const row of srcItems) {\n  const r = Number(row.row_number) - 2;\n  const addrs = addrsOf(str(row[sk.email]));\n  if (addrs.length === 0) { out[r].status = 'No email'; stats.noEmail++; continue; }\n  if (addrs.every(a => seen.has(a))) { out[r].status = 'Duplicate in list'; dups.push({ r, of: seen.get(addrs[0]) }); stats.duplicateInList++; continue; }\n  addrs.forEach(a => { if (!seen.has(a)) seen.set(a, r); });\n  const hit = addrs.map(a => betaByEmail.get(a)).filter(Boolean);\n  if (hit.length) {\n    const first = hit[0];\n    const missing = addrs.filter(a => !betaByEmail.has(a));\n    out[r].matched = first.name;\n    out[r].status = first.batch ? `New (${first.batch})` : 'Existing';\n    if (missing.length) { out[r].status += ` (+${missing.length} address not in Emails Beta)`; stats.existingWithNewAddress++; existingWithNewAddress.push({ row: r + 2, client: first.name, addresses: missing }); }\n    stats.existing++;\n    continue;\n  }\n  const check = sk.check ? str(row[sk.check]) : '';\n  const boxes = sk.boxes ? str(row[sk.boxes]) : '';\n  contacts.push({\n    r, row: r + 2, account: str(row[sk.name]), addrs, contactName: str(row[sk.contact]),\n    check, checked: /^(found|not found)$/i.test(check), found: /^found$/i.test(check),\n    types: [...new Set((boxes.match(/outlook|gmail/gi) || []).map(t => t.toLowerCase()))],\n    boxes, linked: sk.linked ? addrsOf(str(row[sk.linked])).filter(a => !isOwn(a)) : []   // own addresses saved by an earlier run are ignored\n  });\n  stats.newContacts++;\n}\n\nconst addrToContact = new Map();\ncontacts.forEach((c, i) => c.addrs.forEach(a => addrToContact.set(a, i)));\n\n// ---- evidence grouping (union-find over contacts the check saw together) ----\nconst parent = contacts.map((_, i) => i);\nconst find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };\nconst union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb); };\nconst existingLink = new Map();   // contact index -> Set of existing client names\n// An address that shows up in the linked lists of many different contacts is almost certainly\n// one of our own mailboxes or a mass sender, not a person who belongs to a client. Using it\n// would chain unrelated clients into one group, so it is ignored for grouping and reported.\nconst hubThreshold = Math.max(3, Number(cfg.hubThreshold) || 4);\nconst linkCount = new Map();\ncontacts.forEach(c => new Set(c.linked).forEach(a => linkCount.set(a, (linkCount.get(a) || 0) + 1)));\nconst hubs = new Set([...linkCount].filter(([, k]) => k >= hubThreshold).map(([a]) => a));\ncontacts.forEach((c, i) => {\n  for (const a of c.linked) {\n    if (hubs.has(a)) continue;\n    if (addrToContact.has(a)) union(i, addrToContact.get(a));\n    else if (betaByEmail.has(a)) { if (!existingLink.has(i)) existingLink.set(i, new Set()); existingLink.get(i).add(betaByEmail.get(a).name); }\n  }\n});\nconst groupsMap = new Map();\ncontacts.forEach((c, i) => { const root = find(i); if (!groupsMap.has(root)) groupsMap.set(root, []); groupsMap.get(root).push(i); });\nconst groups = [...groupsMap.values()].map(ix => ix.sort((a, b) => a - b));\n\nconst uniqueName = (base, firstAddr) => {\n  let name = base || firstAddr.split('@')[0];\n  if (!takenNames.has(name.toLowerCase())) { takenNames.add(name.toLowerCase()); return name; }\n  const local = firstAddr.split('@')[0];\n  let cand = `${name} (${local})`, k = 2;\n  while (takenNames.has(cand.toLowerCase())) cand = `${name} (${local}) ${k++}`;\n  takenNames.add(cand.toLowerCase());\n  return cand;\n};\nconst platformValue = (allAddrs, group) => {\n  const union = [...new Set(group.flatMap(i => contacts[i].types))];\n  if (union.length === 0) return '';\n  const per = allAddrs.map(a => { const t = contacts[addrToContact.get(a)].types; const use = t.length ? t : union; return use.length === 1 ? use[0] : use; });\n  return per.length === 1 && typeof per[0] === 'string' ? per[0] : JSON.stringify(per);\n};\n\nconst appendRows = [];\nconst pendingGroups = [];\nconst nameClashes = [];\nconst sameAccountNote = [];\nconst bigGroups = [];\nconst noConversation = [];\nconst toCheck = [];\nconst newStatus = (c, i) => {\n  let s = !c.checked ? 'New (not checked yet)' : (c.found ? 'New (conversation found)' : `New (${noConvFlag})`);\n  if (existingLink.has(i)) s += `; linked to existing client ${[...existingLink.get(i)].join(' / ')}`;\n  return s;\n};\ncontacts.forEach((c, i) => { out[c.r].status = newStatus(c, i); });\n\nfor (const c of contacts) { if (!c.checked && toCheck.length < batchSize) toCheck.push({ row: c.row, addrs: c.addrs }); }\nfor (const g of groups) {\n  if (!g.every(i => contacts[i].checked)) { pendingGroups.push(g.map(i => contacts[i].row)); continue; }\n  if (g.length > 6) bigGroups.push({ rows: g.map(i => contacts[i].row), size: g.length });\n  const first = contacts[g[0]];\n  const base = first.account || first.contactName || '';\n  const name = uniqueName(base, first.addrs[0]);\n  if (name.toLowerCase() !== (base || first.addrs[0].split('@')[0]).toLowerCase()) nameClashes.push({ row: first.row, original: base, assigned: name });\n  const allAddrs = [...new Set(g.flatMap(i => contacts[i].addrs))];\n  const found = g.some(i => contacts[i].found);\n  const mk = (nm, email, platform, label) => ({ [bk.name]: nm, [bk.email]: email, [bk.processed]: 'FALSE', [bk.platform]: platform, [bk.synced]: '', [bk.batch]: label });\n  const label = found ? batch : `${batch} - ${noConvFlag}`;\n  appendRows.push(mk(name, allAddrs.join(', '), found ? platformValue(allAddrs, g) : '', label));\n  if (!found) noConversation.push({ name, rows: g.map(i => contacts[i].row) });\n  g.forEach(i => {\n    const c = contacts[i];\n    out[c.r].matched = name;\n    // (no name-only rows for the other contacts: who belongs to a group is in the list sheet's Matched client column)\n  });\n  g.forEach(i => { if (existingLink.has(i)) sameAccountNote.push({ row: contacts[i].row, newClient: name, linkedToExisting: [...existingLink.get(i)] }); });\n}\n// With the switch on, every group whose members are all checked is added in this run.\nconst addOn = cfg.addToEmailsBeta === true || String(cfg.addToEmailsBeta).toLowerCase() === 'true';\nconst rowsToAdd = addOn ? appendRows : [];\nfor (const d of dups) out[d.r].matched = out[d.of].matched;\n\nconst q = (t) => `'${String(t).replace(/'/g, \"''\")}'`;\nconst srcTab = String(cfg.sourceTab);\nconst sid = encodeURIComponent(cfg.sourceSheetId);\nconst sourceUpdate = {\n  url: `https://sheets.googleapis.com/v4/spreadsheets/${sid}/values:batchUpdate`,\n  body: { valueInputOption: 'RAW', data: [\n    ...headersToAdd.map(h => ({ range: `${q(srcTab)}!${colLetter(h.index)}1`, values: [[h.name]] })),\n    { range: `${q(srcTab)}!${col.status}2:${col.status}${n + 1}`, values: out.map(o => [o.status]) },\n    { range: `${q(srcTab)}!${col.matched}2:${col.matched}${n + 1}`, values: out.map(o => [o.matched]) }\n  ] }\n};\n\nreturn [{ json: {\n  addToEmailsBeta: addOn, rowsToAdd,\n  summary: {\n    listRows: srcItems.length, ...stats,\n    checked: contacts.filter(c => c.checked).length,\n    conversationFound: contacts.filter(c => c.found).length,\n    notChecked: contacts.filter(c => !c.checked).length,\n    nextBatch: toCheck.length,\n    groupsReady: groups.length - pendingGroups.length,\n    groupsPending: pendingGroups.length,\n    rowsToAppendToEmailsBeta: appendRows.length,\n    noConversationClients: noConversation.length,\n    nameClashesRenamed: nameClashes.length,\n    largeGroups: bigGroups.length,\n    hubAddressesIgnored: hubs.size\n  },\n  headersAdded: headersToAdd.map(h => h.name),\n  toCheck, columns: col, srcTab, sourceSheetId: cfg.sourceSheetId,\n  hubAddressesIgnored: [...hubs],\n  nameClashes, linkedToExisting: sameAccountNote, bigGroups, noConversation, existingWithNewAddress,\n  preview: appendRows.slice(0, 30).map(r => ({ Name: r[bk.name], Email: r[bk.email], Platform: r[bk.platform], Batch: r[bk.batch] })),\n  sourceUpdate, appendRows\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9408,
+        2560
+      ],
+      "id": "6fb6c13a-4024-4c34-8892-5de68b4cea73",
+      "name": "🧮 Plan Again"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.sourceUpdate.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.sourceUpdate.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -9168,
+        2560
+      ],
+      "id": "7ef208b1-1523-47cf-828f-b183be48cced",
+      "name": "📝 Write Status (after check)",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ Run Import": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ Auto-run every 15 min (disabled)": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "📥 Read List Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read List Header": {
+      "main": [
+        [
+          {
+            "node": "📥 Read Source List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read Source List": {
+      "main": [
+        [
+          {
+            "node": "📥 Read Emails Beta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read Emails Beta": {
+      "main": [
+        [
+          {
+            "node": "🧮 Compare & Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧮 Compare & Plan": {
+      "main": [
+        [
+          {
+            "node": "📝 Write Status to List Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Write Status to List Sheet": {
+      "main": [
+        [
+          {
+            "node": "❓ Anything to check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧾 Rows to Append": {
+      "main": [
+        [
+          {
+            "node": "➕ Append New Clients to Emails Beta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "➕ Append New Clients to Emails Beta": {
+      "main": [
+        [
+          {
+            "node": "📊 Result Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏸️ Emails Beta Unchanged (dry run or nothing to add)": {
+      "main": [
+        [
+          {
+            "node": "📊 Result Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Write Check Results": {
+      "main": [
+        [
+          {
+            "node": "📥 Re-read Source List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Contacts to Check": {
+      "main": [
+        [
+          {
+            "node": "📥 Outlook (Jack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Outlook (Jack)": {
+      "main": [
+        [
+          {
+            "node": "📥 Outlook (Mia)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Outlook (Mia)": {
+      "main": [
+        [
+          {
+            "node": "📥 Outlook (Eve)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Outlook (Eve)": {
+      "main": [
+        [
+          {
+            "node": "📥 Outlook (Yolanda)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Outlook (Yolanda)": {
+      "main": [
+        [
+          {
+            "node": "📬 List Threads (Emily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 List Threads (Emily)": {
+      "main": [
+        [
+          {
+            "node": "📬 Expand Threads (Emily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Expand Threads (Emily)": {
+      "main": [
+        [
+          {
+            "node": "📬 Get Threads (Emily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Get Threads (Emily)": {
+      "main": [
+        [
+          {
+            "node": "📬 Collect Gmail (Emily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Collect Gmail (Emily)": {
+      "main": [
+        [
+          {
+            "node": "📬 List Threads (Terry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 List Threads (Terry)": {
+      "main": [
+        [
+          {
+            "node": "📬 Expand Threads (Terry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Expand Threads (Terry)": {
+      "main": [
+        [
+          {
+            "node": "📬 Get Threads (Terry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Get Threads (Terry)": {
+      "main": [
+        [
+          {
+            "node": "📬 Collect Gmail (Terry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Collect Gmail (Terry)": {
+      "main": [
+        [
+          {
+            "node": "📬 List Threads (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 List Threads (Office)": {
+      "main": [
+        [
+          {
+            "node": "📬 Expand Threads (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Expand Threads (Office)": {
+      "main": [
+        [
+          {
+            "node": "📬 Get Threads (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Get Threads (Office)": {
+      "main": [
+        [
+          {
+            "node": "📬 Collect Gmail (Office)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📬 Collect Gmail (Office)": {
+      "main": [
+        [
+          {
+            "node": "🧩 Aggregate Check Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Aggregate Check Results": {
+      "main": [
+        [
+          {
+            "node": "❓ Any results to save?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Anything to check?": {
+      "main": [
+        [
+          {
+            "node": "🔎 Contacts to Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "❓ Append to Emails Beta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Any results to save?": {
+      "main": [
+        [
+          {
+            "node": "💾 Write Check Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "❓ Append to Emails Beta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Append to Emails Beta?": {
+      "main": [
+        [
+          {
+            "node": "🧾 Rows to Append",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⏸️ Emails Beta Unchanged (dry run or nothing to add)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Re-read Source List": {
+      "main": [
+        [
+          {
+            "node": "🧮 Plan Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧮 Plan Again": {
+      "main": [
+        [
+          {
+            "node": "📝 Write Status (after check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Write Status (after check)": {
+      "main": [
+        [
+          {
+            "node": "❓ Append to Emails Beta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8d50b0e5-a776-4f33-b743-aa7a2d3107f7",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "FRwbVQtdk6aETGF0",
+  "tags": []
+}

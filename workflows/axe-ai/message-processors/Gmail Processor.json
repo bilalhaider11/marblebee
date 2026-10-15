@@ -3,15 +3,15 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "// Get previous node data\nconst previousData = $('If Has Attachments').item.json;\nconst sheet_id = $('Loop | Gmail Message IDs').item.json.sheet_id;\n\n// Collect all webViewLinks\nconst links = $input.all()\n  .map(item => item.json.webViewLink)\n  .filter(link => !!link);\n\n// Convert links array into numbered fields\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\n// Return merged object\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields,\n      sheet_id: sheet_id\n    }\n  }\n];\n"
+        "jsCode": "// One run per email: 'Merge | Attachment Branches' hands over the links of ALL its attachments\n// (uploaded now + already in Drive). Before, each branch ran this node separately, so an email with\n// both new and already-uploaded attachments was logged twice, each row with only part of the links.\n// Drop tabName, it is routing metadata (which tab to write to), not a column of the sheet.\nconst { tabName, ...previousData } = $('If Has Attachments').item.json;\nconst sheet_id = $('Loop | Gmail Message IDs').item.json.sheet_id;\n\n// Upload results carry id (+ webViewLink); already-uploaded ones carry webViewLink only\nconst links = $input.all()\n  .map(item => item.json.webViewLink\n    || (item.json.id ? `https://drive.google.com/file/d/${item.json.id}/view?usp=drivesdk` : null))\n  .filter(link => !!link);\n\n// Gmail rows keep their own link columns: attachment1 / attachment2 / ... (the Outlook processor\n// writes webViewLink1 / webViewLink2 / ...). A column that does not exist yet is created by the append.\nconst linkFields = {};\nlinks.forEach((link, index) => {\n  linkFields[`attachment${index + 1}`] = link;\n});\n\nreturn [\n  {\n    json: {\n      ...previousData,\n      ...linkFields,\n      hasAttachments: links.length > 0,\n      sheet_id: sheet_id\n    }\n  }\n];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1824,
-        1456
+        9888,
+        1904
       ],
-      "id": "ac65bd09-62eb-402c-a972-1b59bc925fbe",
+      "id": "d04adf0b-1d4b-4c46-b4a5-361139ea33ca",
       "name": "Merge | Add Drive Links"
     },
     {
@@ -35,10 +35,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1824,
-        1168
+        9696,
+        1632
       ],
-      "id": "64f4d0eb-243e-4ad4-9af3-d6207154bc93",
+      "id": "083b8055-8a9e-4ee5-9674-9d0495d27342",
       "name": "Drive | Upload Attachment",
       "alwaysOutputData": false,
       "retryOnFail": true,
@@ -52,15 +52,15 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach(item => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            }\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+        "jsCode": "// One item per attachment. file_size = the real byte size of the attachment: together with the file\n// name it identifies a file, so a generic name such as 'image.png' (different pictures in different\n// emails) is not mistaken for a file that is already in Drive, while the same file attached again\n// is recognised and reused instead of being uploaded once more.\nconst items = $input.all();\nconst newItems = [];\n\nfor (let itemIndex = 0; itemIndex < items.length; itemIndex++) {\n  const item = items[itemIndex];\n  const jsonData = item.json || {};\n  const binaries = item.binary || {};\n\n  let index = 0;\n  for (const key in binaries) {\n    // Get the original filename if available\n    const originalFileName = binaries[key].fileName || key;\n    const binaryKey = `attachment_${index}`;\n\n    let fileSize = null;\n    try {\n      fileSize = (await this.helpers.getBinaryDataBuffer(itemIndex, key)).length;\n    } catch (e) {\n      fileSize = null; // unknown size: the lookup then falls back to the file name alone\n    }\n\n    newItems.push({\n      json: {\n        ...jsonData,\n        file_name: originalFileName,\n        binary_field_name: binaryKey, // <-- added field name of binary\n        file_size: fileSize\n      },\n      binary: {\n        [binaryKey]: binaries[key]\n      },\n      // keeps the lineage back to the source email for every downstream $('Node').item lookup\n      pairedItem: itemIndex\n    });\n    index++;\n  }\n}\n\nreturn newItems;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1008,
-        1184
+        8880,
+        1648
       ],
-      "id": "688f7c0a-a37b-495a-bb4d-37b210345e20",
+      "id": "30d084a4-248c-46d8-b244-375eadcc08a9",
       "name": "Expand | Split Attachments"
     },
     {
@@ -76,10 +76,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        -352,
-        1152
+        7520,
+        1616
       ],
-      "id": "801c0599-e9af-4227-a5c8-00c9d46f0da0",
+      "id": "d67fec01-f4ef-45e5-b768-98d853cca559",
       "name": "Gmail | Fetch Message + Attachments (Emily)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -640,
-        1360
+        7232,
+        1824
       ],
-      "id": "68fac8eb-f0f1-4839-a7c8-7f741ca59ea8",
+      "id": "483bb3f2-f837-4939-a40c-aef4fe69e412",
       "name": "Loop | Gmail Message IDs"
     },
     {
@@ -131,10 +131,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1056,
-        1392
+        8928,
+        1856
       ],
-      "id": "e48b3d02-71bc-478b-a630-5897bc388f4d",
+      "id": "ead1277f-3bbe-49a6-a46c-7738e9cee4b0",
       "name": "If Has Attachments"
     },
     {
@@ -168,10 +168,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -912,
-        1360
+        6960,
+        1824
       ],
-      "id": "dde39f16-9b21-4af2-8242-8f2be1422c30",
+      "id": "badbee3d-00f9-4075-95a4-8c7672b76339",
       "name": "Load Queued Messages from Queue Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -193,10 +193,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        -128,
-        1376
+        7744,
+        1840
       ],
-      "id": "e82060c6-cc2d-4599-a866-886f9b48549f",
+      "id": "383425e6-61f2-47d3-a2ce-817487643363",
       "name": "Gmail | Fetch Message + Attachments (Terry)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
@@ -221,10 +221,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        -368,
-        1632
+        7504,
+        2096
       ],
-      "id": "205b7184-8692-4735-8c06-c183d907bd30",
+      "id": "89464b96-ceeb-4fca-8dfb-ae794690c370",
       "name": "Gmail | Fetch Message + Attachments (Office)",
       "webhookId": "4dc0cbb6-5ca5-4db2-803c-a408a1505774",
       "retryOnFail": true,
@@ -262,10 +262,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        384,
-        960
+        8256,
+        1424
       ],
-      "id": "02bb9a5e-3928-4255-b34c-a75016c4d598",
+      "id": "a394da01-1346-4d62-a8b4-85b498f5c885",
       "name": "Sheets | Log Message Row",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -411,10 +411,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        800,
-        960
+        8672,
+        1424
       ],
-      "id": "46d57700-da97-40fe-bb35-5250ddf33bfe",
+      "id": "ca6b4a42-2eca-4a03-937c-51ac237fa185",
       "name": "Sheets | Mark Queue Row Processed",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -504,23 +504,23 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        -368,
-        1360
+        7504,
+        1824
       ],
-      "id": "4c1d9bce-3481-480c-95d6-39511a923944",
+      "id": "5ede63bb-1240-4c94-a611-54a2ba80d552",
       "name": "Route by Mailbox"
     },
     {
       "parameters": {
-        "jsCode": "const output = [];\n\nconst data = $('Loop | Gmail Message IDs').item.json;\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. An always-present key (even when\n// empty) can never trigger that shift.\nconst row_number = $('Load Queued Messages from Queue Sheet').item.json.row_number ?? '';\n/**\n * Clean unwanted characters and normalize spacing\n */\nconst cleanText = (text = \"\") =>\n  text\n    ?.replace(/[<>&*]/g, \"\")   // remove special chars\n    .replace(/\\s+/g, \" \")     // normalize spaces\n    .trim();\n\n/**\n * Remove everything AFTER an email inside <>\n * Example stop point: <example@gmail.com>\n */\nconst cutAfterAngleEmail = (text = \"\") => {\n  if (!text) return null;\n\n  // Match <email@domain>\n  const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n  const match = text.match(angleEmailRegex);\n  if (!match) return text;\n\n  return text.slice(0, match.index);\n};\n\n/**\n * Extract ONLY reply content (remove quoted Gmail reply)\n */\nconst extractReplyText = (text = \"\") => {\n  if (!text) return null;\n\n  // First: remove quoted reply block\n  const splitPatterns = [\n    \"\\nOn \",   // Gmail reply marker\n    \"\\n>\"      // quoted lines\n  ];\n\n  let clean = text;\n  for (const p of splitPatterns) {\n    if (clean.includes(p)) {\n      clean = clean.split(p)[0];\n      break;\n    }\n  }\n\n  // Second: cut after <email@domain>\n  clean = cutAfterAngleEmail(clean);\n\n  return cleanText(clean);\n};\n\n/**\n * MAIN LOOP\n */\nfor (const input of items) {\n  const e = input.json;\n  const headers = e.headers || {};\n\n  const isSent = e.labelIds?.includes(\"SENT\");\n  const isReply =\n    !!e.inReplyTo ||\n    !!headers[\"in-reply-to\"] ||\n    !!headers.references;\n\n  const rawText = e.text || \"\";\n\n  const finalText = isReply\n    ? extractReplyText(rawText)\n    : cleanText(cutAfterAngleEmail(rawText));\n\n  output.push({\n    json: {\n      // Direction\n      id: e.id ?? '',\n      direction: isSent ? \"SENT\" : \"RECEIVED\",\n      sheet_id: data.sheet_id ?? '',\n      row_number,\n\n      // From\n      fromEmail: e.from?.value?.[0]?.address || null,\n      fromName: e.from?.value?.[0]?.name || null,\n\n      // To\n      toEmail: e.to?.value?.[0]?.address || null,\n      toName: e.to?.value?.[0]?.name || null,\n\n      // Subject\n      subject:\n        e.subject ||\n        headers.subject?.replace(\"Subject: \", \"\") ||\n        null,\n\n      // Timestamp\n      timestamp: e.date || null,\n\n      //  Cleaned message\n      message: finalText || null,\n    },\n\n    //  Preserve attachments exactly\n    binary: input.binary ?? undefined,\n  });\n}\n\nreturn output;"
+        "jsCode": "const output = [];\n\nconst data = $('Loop | Gmail Message IDs').item.json;\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. An always-present key (even when\n// empty) can never trigger that shift.\nconst row_number = $('Load Queued Messages from Queue Sheet').item.json.row_number ?? '';\n/**\n * Clean unwanted characters and normalize spacing\n */\nconst cleanText = (text = \"\") =>\n  text\n    ?.replace(/[<>&*]/g, \"\")   // remove special chars\n    .replace(/\\s+/g, \" \")     // normalize spaces\n    .trim();\n\n/**\n * Remove everything AFTER an email inside <>\n * Example stop point: <example@gmail.com>\n */\nconst cutAfterAngleEmail = (text = \"\") => {\n  if (!text) return null;\n\n  // Match <email@domain>\n  const angleEmailRegex = /<[^>\\s]+@[^>\\s]+>/i;\n\n  const match = text.match(angleEmailRegex);\n  if (!match) return text;\n\n  return text.slice(0, match.index);\n};\n\n/**\n * Extract ONLY reply content (remove quoted Gmail reply)\n */\nconst extractReplyText = (text = \"\") => {\n  if (!text) return null;\n\n  // First: remove quoted reply block\n  const splitPatterns = [\n    \"\\nOn \",   // Gmail reply marker\n    \"\\n>\"      // quoted lines\n  ];\n\n  let clean = text;\n  for (const p of splitPatterns) {\n    if (clean.includes(p)) {\n      clean = clean.split(p)[0];\n      break;\n    }\n  }\n\n  // Second: cut after <email@domain>\n  clean = cutAfterAngleEmail(clean);\n\n  return cleanText(clean);\n};\n\n/**\n * MAIN LOOP\n */\nfor (const input of items) {\n  const e = input.json;\n  const headers = e.headers || {};\n\n  const isSent = e.labelIds?.includes(\"SENT\");\n  const isReply =\n    !!e.inReplyTo ||\n    !!headers[\"in-reply-to\"] ||\n    !!headers.references;\n\n  const rawText = e.text || \"\";\n\n  const finalText = isReply\n    ? extractReplyText(rawText)\n    : cleanText(cutAfterAngleEmail(rawText));\n\n  output.push({\n    json: {\n      // Direction\n      id: e.id ?? '',\n      direction: (isSent || /marblebee/i.test(e.from?.value?.[0]?.address || \"\")) ? \"SENT\" : \"RECEIVED\",   // SENT = our mailbox label OR written by any Marblebee address\n      sheet_id: data.sheet_id ?? '',\n      row_number,\n\n      // From\n      fromEmail: e.from?.value?.[0]?.address || null,\n      fromName: e.from?.value?.[0]?.name || null,\n\n      // To\n      toEmail: e.to?.value?.[0]?.address || null,\n      toName: e.to?.value?.[0]?.name || null,\n\n      // Subject\n      subject:\n        e.subject ||\n        headers.subject?.replace(\"Subject: \", \"\") ||\n        null,\n\n      // Timestamp\n      timestamp: e.date || null,\n\n      //  Cleaned message\n      message: finalText || null,\n\n      hasAttachments: Object.keys(input.binary || {}).length > 0,\n    },\n\n    //  Preserve attachments exactly\n    binary: input.binary ?? undefined,\n  });\n}\n\nreturn output;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        128,
-        1376
+        8000,
+        1840
       ],
-      "id": "d9896397-e52a-48a9-b1a1-9b3911cc05a8",
+      "id": "9d12c9d6-de8d-4eb4-aa7c-c091779e6520",
       "name": "Normalize | Extract Clean Reply Text2"
     },
     {
@@ -537,10 +537,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -1168,
-        1360
+        6704,
+        1824
       ],
-      "id": "1b14dc40-f122-48be-9a4b-850070ae4a06",
+      "id": "3f2bfec2-e641-4fec-82a5-555fb58c94b1",
       "name": "Schedule Trigger"
     },
     {
@@ -580,10 +580,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        416,
-        1376
+        8288,
+        1840
       ],
-      "id": "8e371438-c02d-4335-a611-de6c1a62e204",
+      "id": "4e1b9d46-98f6-4729-9ca6-0c11a80cfcc5",
       "name": "Sheets | Find Existing Message Row",
       "alwaysOutputData": true,
       "retryOnFail": true,
@@ -603,10 +603,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        608,
-        1376
+        8480,
+        1840
       ],
-      "id": "1322d5c1-8f3c-44e1-acbd-9eba6f51a916",
+      "id": "e29a8ddf-ff23-424d-a5c2-e0d0ec76da6f",
       "name": "Restore Message Data After Lookup"
     },
     {
@@ -637,35 +637,56 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        800,
-        1376
+        8672,
+        1840
       ],
-      "id": "bd7bf0f3-25e0-4a93-bf27-54d0b13ed6e2",
+      "id": "1efcc01c-a6db-4034-9035-c51fe72e1f9d",
       "name": "Message Already Logged?"
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "queryString": "={{ $json.file_name }}",
-        "limit": 5,
-        "filter": {
-          "folderId": {
-            "__rl": true,
-            "value": "={{ $('Loop | Gmail Message IDs').item.json.subf5_id }}",
-            "mode": "id"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"name = '\" + String($json.file_name).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"\\\\'\") + \"' and '\" + $('Loop | Gmail Message IDs').item.json.subf5_id + \"' in parents and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,size,webViewLink,createdTime)"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime"
+            },
+            {
+              "name": "pageSize",
+              "value": "20"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        1216,
-        1184
+        9088,
+        1648
       ],
-      "id": "40f829ff-9185-46bb-8909-e4b6a2aedaa8",
+      "id": "bc2de6c2-c9ad-4f9c-a7af-6b5f29862942",
       "name": "Drive | Find Existing Attachment",
-      "alwaysOutputData": true,
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "credentials": {
@@ -677,15 +698,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} (as this used to do) silently broke every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\nconst byOrigin = new Map();\nfor (const c of candidates) {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) continue;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, []);\n  byOrigin.get(idx).push(c);\n}\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx) || [];\n  const exact = group.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});"
+        "jsCode": "// One request per attachment goes into the exact-name lookup above, so 'results' has exactly one item\n// per attachment, in the same order, each {files: [...]} with the files of this attachments folder\n// whose name is EXACTLY the attachment's file name (oldest first). The old lookup was a fuzzy\n// Drive 'name contains' search capped at 5 results, which missed file names such as\n// Bathtub_26DDYP43_1.jpg -- so the same photo was uploaded again on every run.\n// A file counts as already uploaded when name AND byte size match (size unknown -> name only).\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...) and binary data untouched,\n// just annotated with the match result -- 'Drive | Upload Attachment' needs them to upload.\nconst originals = $('Expand | Split Attachments').all();\nconst results = $input.all();\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const size = orig.json.file_size;\n  const files = results[idx]?.json?.files || [];\n  const exact = files.find(f =>\n    (f.name || '').toString().trim().toLowerCase() === expected &&\n    (size === null || size === undefined || f.size === undefined || String(f.size) === String(size)));\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.id : '',\n      _existingFileWebViewLink: exact ? (exact.webViewLink || '') : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1408,
-        1184
+        9280,
+        1648
       ],
-      "id": "dc6dc22f-a2f6-400a-98f9-b54d92132c2a",
+      "id": "7d43eca9-c824-4627-8185-154af285d81b",
       "name": "Pick Exact Attachment Match"
     },
     {
@@ -717,23 +738,23 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1600,
-        1184
+        9472,
+        1648
       ],
-      "id": "bf7fb570-53a4-4607-bab4-f937028d9365",
+      "id": "3f57fed3-194d-479c-82b3-083f98ba92b8",
       "name": "Attachment Already Uploaded?"
     },
     {
       "parameters": {
-        "jsCode": "// Map to the shape 'Merge | Add Drive Links' expects (a bare webViewLink)\n// -- the item still carries the original file_name/binary fields from\n// 'Pick Exact Attachment Match', which aren't needed on this skip-upload\n// path and are intentionally dropped here.\nreturn $input.all().map(item => ({\n  json: { webViewLink: item.json._existingFileWebViewLink },\n  pairedItem: item.pairedItem\n}));"
+        "jsCode": "// Map to the shape 'Merge | Add Drive Links' expects (a bare webViewLink)\n// -- the item still carries the original file_name/binary fields from\n// 'Pick Exact Attachment Match', which aren't needed on this skip-upload\n// path and are intentionally dropped here. Falls back to the canonical Drive\n// URL built from the file id when the lookup returned no webViewLink.\nreturn $input.all().map(item => ({\n  json: {\n    webViewLink: item.json._existingFileWebViewLink\n      || (item.json._existingFileId ? `https://drive.google.com/file/d/${item.json._existingFileId}/view?usp=drivesdk` : null)\n  },\n  pairedItem: item.pairedItem\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
-        1456
+        9440,
+        1920
       ],
-      "id": "a9994c1a-7f26-4bb6-b251-4b2c51f0bc73",
+      "id": "8907ca7e-f453-4dbf-8c3f-a74b6bade368",
       "name": "Existing Attachment (Resolved)"
     },
     {
@@ -746,19 +767,19 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        176,
-        1712
+        8048,
+        2176
       ],
-      "id": "d92b96e7-a64c-483a-9aa7-a3c2ffaae2c4",
+      "id": "727af8e0-a0c3-4867-80b5-d880e0cdb2e0",
       "name": "Get Conversation Sheet Tab Name",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "rKfNzy77xzsMahH6",
           "name": "Template_control"
         }
-      },
-      "retryOnFail": true,
-      "waitBetweenTries": 5000
+      }
     },
     {
       "parameters": {
@@ -767,11 +788,22 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        1712
+        8288,
+        2176
       ],
-      "id": "bc8d3a71-fe10-48ee-86c0-147bbe906593",
+      "id": "fc375fef-a378-477b-b33f-09d8cccce35f",
       "name": "Extract Tab Name"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        9696,
+        1904
+      ],
+      "id": "3238cf4f-7c1c-4bc4-8317-2e0c35864816",
+      "name": "Merge | Attachment Branches"
     }
   ],
   "pinData": {},
@@ -791,7 +823,7 @@
       "main": [
         [
           {
-            "node": "Merge | Add Drive Links",
+            "node": "Merge | Attachment Branches",
             "type": "main",
             "index": 0
           }
@@ -1036,9 +1068,9 @@
       "main": [
         [
           {
-            "node": "Merge | Add Drive Links",
+            "node": "Merge | Attachment Branches",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -1064,6 +1096,17 @@
           }
         ]
       ]
+    },
+    "Merge | Attachment Branches": {
+      "main": [
+        [
+          {
+            "node": "Merge | Add Drive Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1071,7 +1114,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "08e6fb43-607f-416a-acca-9a4eaadf0f2c",
+  "versionId": "bf0b1fd1-4e7c-4375-967e-aeeb03fa0a08",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },

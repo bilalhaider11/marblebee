@@ -14,10 +14,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -3984,
-        496
+        -3408,
+        208
       ],
-      "id": "d6441ffc-1a3f-4802-bc19-5085e0a78708",
+      "id": "016395df-103e-4b37-a6ca-b906b269a70c",
       "name": "Schedule Trigger"
     },
     {
@@ -38,7 +38,7 @@
           "values": [
             {
               "lookupColumn": "Processed",
-              "lookupValue": "="
+              "lookupValue": "false"
             },
             {
               "lookupColumn": "source"
@@ -50,10 +50,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -3728,
-        496
+        -3152,
+        208
       ],
-      "id": "0216b839-2ac4-4c81-b68a-c47dcb0e0794",
+      "id": "bb446a30-5488-481a-a919-07b68de16228",
       "name": "Load Queued Messages from Queue Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -69,65 +69,23 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -3472,
-        496
+        -2896,
+        208
       ],
-      "id": "6459b840-9b3e-4fdd-95a7-353843fb4efb",
+      "id": "b7c214e7-15a2-4488-800c-c16422e60cb2",
       "name": "Loop | Outlook Message IDs"
     },
     {
       "parameters": {
-        "operation": "get",
-        "messageId": {
-          "__rl": true,
-          "value": "={{ $json.id }}",
-          "mode": "id"
-        },
-        "output": "fields",
-        "fields": [
-          "body",
-          "from",
-          "hasAttachments",
-          "isRead",
-          "receivedDateTime",
-          "replyTo",
-          "sender",
-          "sentDateTime",
-          "subject",
-          "toRecipients"
-        ],
-        "options": {
-          "attachmentsPrefix": "attachment_",
-          "downloadAttachments": true
-        }
-      },
-      "type": "n8n-nodes-base.microsoftOutlook",
-      "typeVersion": 2,
-      "position": [
-        -3184,
-        512
-      ],
-      "id": "2eb2ebab-81a2-41dd-8640-533e10d576c9",
-      "name": "Outlook | Fetch Message + Attachments",
-      "webhookId": "c1c331d7-f9bd-4045-b252-f530d984d7e9",
-      "credentials": {
-        "microsoftOutlookOAuth2Api": {
-          "id": "Pg1Yh9oUPVFueUUr",
-          "name": "Axe_AI-outlook"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst data = $('Load Queued Messages from Queue Sheet');\nconst sheet_id = data.item.json.sheet_id ?? '';\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. Same fix as the Gmail processor.\nconst row_number = data.item.json.row_number ?? '';\n// logged-in mailbox email\nconst MY_EMAIL = 'jack@marblebee.com'.toLowerCase();\n\n/**\n * Cut message at polite sign-offs like \"Kind regards,\"\n */\nfunction cutAtKindRegards(text = '') {\n  const match = text.match(\n    /\\b(Kind regards|Best regards|Regards|Warm regards),\\b/i\n  );\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Extract latest message from Outlook/Gmail HTML body\n */\nfunction extractLatestMessageFromHtml(html = '') {\n  if (!html) return '';\n\n  // Remove scripts & styles\n  html = html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '');\n\n  // Cut at known reply/forward separators (earliest match wins)\n  const cutPatterns = [\n    /<hr[\\s\\S]*?>/i,\n    /<div[^>]+id=[\"']divRplyFwdMsg[\"'][\\s\\S]*?>/i,\n    /<div[^>]+class=[\"'][^\"']*gmail_quote[^\"']*[\"'][\\s\\S]*?>/i,\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},/i\n  ];\n\n  for (const pattern of cutPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      html = html.slice(0, match.index);\n    }\n  }\n\n  // Strip remaining HTML -> plain text\n  return html\n    .replace(/<\\/?[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n\nfunction cutAtReplyDate(text = '') {\n  const replyRegex =\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s*(AM|PM)/i;\n\n  const match = text.match(replyRegex);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Strip HTML safely\n */\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Cut text at first occurrence of:\n *  - 5 or more underscores\n *  - \"Get Outlook for \"\n * whichever comes first\n */\nfunction cutAtSeparator(text = '') {\n  const match = text.match(/_{5,}|Get Outlook for /i);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const fromEmail =\n    msg.from?.emailAddress?.address || null;\n  const fromName =\n    msg.from?.emailAddress?.name || null;\n\n  // receivers -- joined into a plain comma-separated string, matching the\n  // Gmail processor's convention for this shared sheet (this used to be a\n  // raw array, which stringified into the cell as e.g. [\"a@b.com\"] instead\n  // of a clean address).\n  const toRecipientsArr = msg.toRecipients || [];\n  const toEmail =\n    toRecipientsArr.map(r => r.emailAddress?.address).filter(Boolean).join(', ') || null;\n  const toName =\n    toRecipientsArr.map(r => r.emailAddress?.name).filter(Boolean).join(', ') || null;\n\n  // sent or received -- uppercase to match the Gmail processor's convention;\n  // a client's conversation sheet interleaves both providers, so the two\n  // must agree on casing.\n  const direction =\n    fromEmail?.toLowerCase() === MY_EMAIL\n      ? 'SENT'\n      : 'RECEIVED';\n\n  // body (HTML -> text)\nlet message = '';\n\nif (msg.body?.contentType === 'html') {\n  message = extractLatestMessageFromHtml(msg.body.content);\n} else {\n  message = stripHtml(msg.body?.content || '');\n}\n\n// Remove signatures / Outlook footer\nmessage = cutAtSeparator(message);\n\n// Remove quoted reply thread\nmessage = cutAtReplyDate(message);\n\n// Remove content after \"Kind regards,\"\nmessage = cutAtKindRegards(message);\n\n\n  return {\n    json: {\n      id: msg.id ?? '',\n      sheet_id,\n      row_number,\n      message,\n      fromEmail,\n      fromName,\n      toEmail,\n      toName,\n      direction,\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false\n    },\n\n    binary: $input.all()[index]?.binary || {}\n  };\n});"
+        "jsCode": "const items = $input.all();\nconst data = $('Load Queued Messages from Queue Sheet');\nconst sheet_id = data.item.json.sheet_id ?? '';\n// Referenced directly from the queue read (not the splitInBatches loop node)\n// and coerced to '' instead of left undefined -- when this evaluated to\n// undefined, the resulting json object never had a row_number KEY at all\n// (JS/JSON serialization drops undefined-valued keys entirely), and since\n// the sheet's header already reserves a column for it, autoMapInputData\n// wrote fromEmail's value into the row_number cell instead and shifted\n// every field after it one column left. Same fix as the Gmail processor.\nconst row_number = data.item.json.row_number ?? '';\n// logged-in mailbox email\n// the mailbox this message was fetched from (queue column by_mail), so SENT / RECEIVED is\n// judged against that mailbox's own address; unknown / older rows ('outlook') = the original mailbox\nconst MAILBOX_ADDRESS = {\n  outlook: 'jack@marblebee.com',\n  outlook_jack: 'jack@marblebee.com',\n  outlook_mia: 'mia@marblebee.com',\n  outlook_eve: 'eve@marblebee.com',\n  outlook_yolanda: 'yolanda@marblebee.com'\n};\nconst byMail = String(data.item.json.by_mail || 'outlook').trim().toLowerCase();\nconst MY_EMAIL = (MAILBOX_ADDRESS[byMail] || MAILBOX_ADDRESS.outlook).toLowerCase();\n\n/**\n * Cut message at polite sign-offs like \"Kind regards,\"\n */\nfunction cutAtKindRegards(text = '') {\n  const match = text.match(\n    /\\b(Kind regards|Best regards|Regards|Warm regards),\\b/i\n  );\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Extract latest message from Outlook/Gmail HTML body\n */\nfunction extractLatestMessageFromHtml(html = '') {\n  if (!html) return '';\n\n  // Remove scripts & styles\n  html = html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '');\n\n  // Cut at known reply/forward separators (earliest match wins)\n  const cutPatterns = [\n    /<hr[\\s\\S]*?>/i,\n    /<div[^>]+id=[\"']divRplyFwdMsg[\"'][\\s\\S]*?>/i,\n    /<div[^>]+class=[\"'][^\"']*gmail_quote[^\"']*[\"'][\\s\\S]*?>/i,\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},/i\n  ];\n\n  for (const pattern of cutPatterns) {\n    const match = html.match(pattern);\n    if (match) {\n      html = html.slice(0, match.index);\n    }\n  }\n\n  // Strip remaining HTML -> plain text\n  return html\n    .replace(/<\\/?[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n\nfunction cutAtReplyDate(text = '') {\n  const replyRegex =\n    /\\nOn\\s+(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\\s+[A-Za-z]{3}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s*(AM|PM)/i;\n\n  const match = text.match(replyRegex);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\n/**\n * Strip HTML safely\n */\nfunction stripHtml(html = '') {\n  return html\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<\\/?[^>]+(>|$)/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Cut text at first occurrence of:\n *  - 5 or more underscores\n *  - \"Get Outlook for \"\n * whichever comes first\n */\nfunction cutAtSeparator(text = '') {\n  const match = text.match(/_{5,}|Get Outlook for /i);\n  return match ? text.slice(0, match.index).trim() : text.trim();\n}\n\nreturn items.map((item, index) => {\n  const msg = item.json;\n\n  // sender\n  const fromEmail =\n    msg.from?.emailAddress?.address || null;\n  const fromName =\n    msg.from?.emailAddress?.name || null;\n\n  // receivers -- joined into a plain comma-separated string, matching the\n  // Gmail processor's convention for this shared sheet (this used to be a\n  // raw array, which stringified into the cell as e.g. [\"a@b.com\"] instead\n  // of a clean address).\n  const toRecipientsArr = msg.toRecipients || [];\n  const toEmail =\n    toRecipientsArr.map(r => r.emailAddress?.address).filter(Boolean).join(', ') || null;\n  const toName =\n    toRecipientsArr.map(r => r.emailAddress?.name).filter(Boolean).join(', ') || null;\n\n  // sent or received -- uppercase to match the Gmail processor's convention;\n  // a client's conversation sheet interleaves both providers, so the two\n  // must agree on casing.\n  // SENT = written by our side: the mailbox owner, OR any other Marblebee address (a colleague\n  // writing to the client with this mailbox in copy, or a shared company Gmail account).\n  const ownSender = fromEmail?.toLowerCase() === MY_EMAIL || /marblebee/i.test(fromEmail || '');\n  const direction = ownSender ? 'SENT' : 'RECEIVED';\n\n  // body (HTML -> text)\nlet message = '';\n\nif (msg.body?.contentType === 'html') {\n  message = extractLatestMessageFromHtml(msg.body.content);\n} else {\n  message = stripHtml(msg.body?.content || '');\n}\n\n// Remove signatures / Outlook footer\nmessage = cutAtSeparator(message);\n\n// Remove quoted reply thread\nmessage = cutAtReplyDate(message);\n\n// Remove content after \"Kind regards,\"\nmessage = cutAtKindRegards(message);\n\n\n  return {\n    json: {\n      id: msg.id ?? '',\n      sheet_id,\n      row_number,\n      message,\n      fromEmail,\n      fromName,\n      toEmail,\n      toName,\n      direction,\n      timestamp:\n        msg.sentDateTime || msg.receivedDateTime,\n      subject: msg.subject || null,\n      hasAttachments: msg.hasAttachments || false\n    },\n\n    binary: $input.all()[index]?.binary || {}\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2848,
-        512
+        -2000,
+        240
       ],
-      "id": "de9e0787-b042-4228-8654-49c4a8df19e5",
+      "id": "ac04b92d-c0e8-4c2e-b385-c38ed65e498c",
       "name": "Normalize | Extract Message Metadata"
     },
     {
@@ -140,10 +98,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -2592,
-        512
+        -1744,
+        240
       ],
-      "id": "7a0925de-2743-4538-bf59-6d7ea24b647a",
+      "id": "043f089e-2496-4136-b7e7-211f242617da",
       "name": "Get Conversation Sheet Tab Name",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -161,10 +119,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2336,
-        512
+        -1488,
+        240
       ],
-      "id": "f0d3f9a3-831d-401a-bcf7-6fd5bb2038cb",
+      "id": "5b161ab2-ba7e-4e71-8b7c-3b99ac6cc496",
       "name": "Extract Tab Name"
     },
     {
@@ -204,10 +162,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -2080,
-        512
+        -1232,
+        240
       ],
-      "id": "03fdd51e-1b32-44ef-b774-4b30266229d4",
+      "id": "5a81f749-8fe3-443d-8334-5d73cbd031ca",
       "name": "Sheets | Find Existing Message Row",
       "alwaysOutputData": true,
       "retryOnFail": true,
@@ -227,10 +185,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1808,
-        512
+        -960,
+        240
       ],
-      "id": "52b9f7d6-8b92-41f1-92c6-c027bc77c10e",
+      "id": "4be1655e-e88a-416b-84a4-08627cdd1506",
       "name": "Restore Message Data After Lookup"
     },
     {
@@ -261,10 +219,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1552,
-        512
+        -704,
+        240
       ],
-      "id": "bc2e5028-3f5f-400a-9b2f-9409aac42439",
+      "id": "6760269b-11ac-465c-978d-7e70c2a91be8",
       "name": "Message Already Logged?"
     },
     {
@@ -295,48 +253,69 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2864,
-        800
+        -2016,
+        528
       ],
-      "id": "1349b3b9-ef71-46f0-a258-a3a37623a14b",
+      "id": "c5691830-6e86-4dd0-bbb6-09d5f178beb1",
       "name": "If Has Attachments"
     },
     {
       "parameters": {
-        "jsCode": "\nconst items = $input.all();\nconst newItems = [];\n\nitems.forEach((item, itemIndex) => {\n    const jsonData = item.json || {};\n    const binaries = item.binary || {};\n\n    let index = 0;\n    for (const key in binaries) {\n        // Get the original filename if available\n        const originalFileName = binaries[key].fileName || key;\n        const binaryKey = `attachment_${index}`;\n\n        newItems.push({\n            json: {\n                ...jsonData,\n                file_name: originalFileName,\n                binary_field_name: binaryKey // <-- added field name of binary\n            },\n            binary: {\n                [binaryKey]: binaries[key]\n            },\n            // This fans one email out into N attachment items -- without\n            // pairedItem, n8n loses the lineage back to that source item,\n            // and every downstream $('SomeNode').item lookup (the Message\n            // Already Logged? read in Merge | Add Drive Links, the Loop |\n            // Outlook Message IDs subf5_id read in the Drive nodes) throws\n            // \"Cannot read properties of undefined (reading 'pairedItem')\"\n            // for any email that actually has an attachment.\n            pairedItem: itemIndex\n        });\n        index++;\n    }\n});\n\nreturn newItems;\n"
+        "jsCode": "// One item per attachment. file_size = the real byte size of the attachment: together with the file\n// name it identifies a file, so a generic name such as 'image.png' (different pictures in different\n// emails) is not mistaken for a file that is already in Drive, while the same file attached again\n// is recognised and reused instead of being uploaded once more.\nconst items = $input.all();\nconst newItems = [];\n\nfor (let itemIndex = 0; itemIndex < items.length; itemIndex++) {\n  const item = items[itemIndex];\n  const jsonData = item.json || {};\n  const binaries = item.binary || {};\n\n  let index = 0;\n  for (const key in binaries) {\n    // Get the original filename if available\n    const originalFileName = binaries[key].fileName || key;\n    const binaryKey = `attachment_${index}`;\n\n    let fileSize = null;\n    try {\n      fileSize = (await this.helpers.getBinaryDataBuffer(itemIndex, key)).length;\n    } catch (e) {\n      fileSize = null; // unknown size: the lookup then falls back to the file name alone\n    }\n\n    newItems.push({\n      json: {\n        ...jsonData,\n        file_name: originalFileName,\n        binary_field_name: binaryKey, // <-- added field name of binary\n        file_size: fileSize\n      },\n      binary: {\n        [binaryKey]: binaries[key]\n      },\n      // keeps the lineage back to the source email for every downstream $('Node').item lookup\n      pairedItem: itemIndex\n    });\n    index++;\n  }\n}\n\nreturn newItems;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2576,
-        784
+        -1728,
+        512
       ],
-      "id": "595dc228-093f-486d-ac05-f82d78b615a3",
+      "id": "b4030d01-3de7-4084-b232-49c1187a7b47",
       "name": "Expand | Split Attachments"
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "queryString": "={{ $json.file_name }}",
-        "limit": 5,
-        "filter": {
-          "folderId": {
-            "__rl": true,
-            "value": "={{ $('Loop | Outlook Message IDs').item.json.subf5_id }}",
-            "mode": "id"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"name = '\" + String($json.file_name).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"\\\\'\") + \"' and '\" + $('Loop | Outlook Message IDs').item.json.subf5_id + \"' in parents and trashed = false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,size,webViewLink,createdTime)"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime"
+            },
+            {
+              "name": "pageSize",
+              "value": "20"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        -2320,
-        784
+        -1472,
+        512
       ],
-      "id": "bd1a7ea4-28df-4f00-baa0-7f88927f6d14",
+      "id": "29e48880-ea6c-400b-8d21-c471f0168eb3",
       "name": "Drive | Find Existing Attachment",
-      "alwaysOutputData": true,
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "credentials": {
@@ -348,15 +327,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per attachment goes into the search above, but Drive can\n// return 0, 1, or several loosely-matched candidates per attachment --\n// group results back by which original attachment they belong to\n// (pairedItem), then pick the exact filename match (if any) within\n// that attachment's own group. Guarantees exactly one output item per\n// original attachment, in the same order, never mixing one\n// attachment's candidates into another's decision.\n//\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...)\n// and binary data untouched, just annotated with the match result --\n// 'Drive | Upload Attachment' (the not-found path) needs that original\n// binary/file_name to actually upload; overwriting the item with just\n// {id, name} would silently break every real upload.\nconst originals = $('Expand | Split Attachments').all();\nconst candidates = $input.all();\n\n// Track each candidate's own ARRAY POSITION in `candidates` (this node's\n// real $input), not just which attachment it belongs to. pairedItem must\n// point at a real index into this node's own input for n8n to keep the\n// lineage chain unbroken -- using the attachment's index instead (0, 1, 2..)\n// breaks the moment any earlier attachment returns more than one candidate\n// (search node's 'Drive | Find Existing Attachment' has alwaysOutputData on\n// so every attachment adds at least one, but not always exactly one, entry\n// to this flat list), which shifts every later attachment's true position\n// out from under that naive index and corrupts the chain downstream --\n// every $('SomeNode').item lookup after this node (the message-metadata\n// read in 'Merge | Add Drive Links', the folder id read in 'Drive | Upload\n// Attachment') then throws \"Cannot read properties of undefined (reading\n// 'pairedItem')\" for any email whose attachment search fanned out.\nconst byOrigin = new Map();\ncandidates.forEach((c, candidateIndex) => {\n  const idx = typeof c.pairedItem === 'number' ? c.pairedItem : c.pairedItem?.item;\n  if (idx === undefined) return;\n  if (!byOrigin.has(idx)) byOrigin.set(idx, { items: [], firstCandidateIndex: candidateIndex });\n  byOrigin.get(idx).items.push(c);\n});\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const group = byOrigin.get(idx);\n  const items = group?.items || [];\n  const exact = items.find(c => (c.json.name || '').toString().trim().toLowerCase() === expected);\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.json.id : '',\n      _existingFileWebViewLink: exact ? exact.json.webViewLink : ''\n    },\n    binary: orig.binary,\n    pairedItem: group ? group.firstCandidateIndex : 0\n  };\n});\n"
+        "jsCode": "// One request per attachment goes into the exact-name lookup above, so 'results' has exactly one item\n// per attachment, in the same order, each {files: [...]} with the files of this attachments folder\n// whose name is EXACTLY the attachment's file name (oldest first). The old lookup was a fuzzy\n// Drive 'name contains' search capped at 5 results, which missed file names such as\n// Bathtub_26DDYP43_1.jpg -- so the same photo was uploaded again on every run.\n// A file counts as already uploaded when name AND byte size match (size unknown -> name only).\n// Preserve the ORIGINAL item's json (file_name, binary_field_name, ...) and binary data untouched,\n// just annotated with the match result -- 'Drive | Upload Attachment' needs them to upload.\nconst originals = $('Expand | Split Attachments').all();\nconst results = $input.all();\n\nreturn originals.map((orig, idx) => {\n  const expected = (orig.json.file_name || '').toString().trim().toLowerCase();\n  const size = orig.json.file_size;\n  const files = results[idx]?.json?.files || [];\n  const exact = files.find(f =>\n    (f.name || '').toString().trim().toLowerCase() === expected &&\n    (size === null || size === undefined || f.size === undefined || String(f.size) === String(size)));\n  return {\n    json: {\n      ...orig.json,\n      _existingFileId: exact ? exact.id : '',\n      _existingFileWebViewLink: exact ? (exact.webViewLink || '') : ''\n    },\n    binary: orig.binary,\n    pairedItem: idx\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2064,
-        784
+        -1216,
+        512
       ],
-      "id": "10c33acd-caff-470f-a3ac-d3e558dfc466",
+      "id": "05485ea4-ad4d-447f-8119-d03656b0b994",
       "name": "Pick Exact Attachment Match"
     },
     {
@@ -388,10 +367,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1808,
-        784
+        -960,
+        512
       ],
-      "id": "a20e6bcc-e974-4fc8-8fe4-9ebfcc762a3c",
+      "id": "beeb9b5d-4c4f-4617-8827-d4a1ab1f4d4b",
       "name": "Attachment Already Uploaded?"
     },
     {
@@ -415,10 +394,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -1552,
-        768
+        -704,
+        496
       ],
-      "id": "bba67c8a-24f0-43d7-a36b-cc28babde03a",
+      "id": "ff9d72df-1956-4143-a6e8-f6e5705d5df5",
       "name": "Drive | Upload Attachment",
       "alwaysOutputData": false,
       "retryOnFail": true,
@@ -437,10 +416,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2640,
-        1184
+        -1792,
+        912
       ],
-      "id": "664a565d-6553-46e3-b134-47973fadd856",
+      "id": "6b4a7faa-7143-445b-a6d3-f91704b334d8",
       "name": "Existing Attachment (Resolved)"
     },
     {
@@ -450,10 +429,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2240,
-        1184
+        -1392,
+        912
       ],
-      "id": "be4422cd-7342-406b-9605-67880cf9632b",
+      "id": "95d5fe88-1857-4100-8870-00ba781b88bb",
       "name": "Merge | Add Drive Links"
     },
     {
@@ -655,10 +634,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -1984,
-        1184
+        -1136,
+        912
       ],
-      "id": "d58176ba-8857-40d0-95ca-8e9c0e1f8b80",
+      "id": "d3a08499-4026-4f1f-bc90-e0121d75a656",
       "name": "Sheets | Log Message Row",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -804,10 +783,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -1600,
-        1184
+        -752,
+        912
       ],
-      "id": "8084dff1-cc28-465e-9735-7942c2a78ce3",
+      "id": "e0cc0cf7-0a42-4029-96ec-3aad239f84c6",
       "name": "Sheets | Mark Queue Row Processed",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -817,6 +796,299 @@
           "name": "Template_control"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -2288,
+        -64
+      ],
+      "id": "4956cc9b-1e55-46fa-9a46-13f2beab954a",
+      "name": "Outlook | Fetch Message + Attachments (Jack)",
+      "webhookId": "c5db3d28-ec38-44cf-b0ad-e8e417fa67d4",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        192
+      ],
+      "id": "d88624d1-fb5c-4fca-943d-e26c7d8ad18f",
+      "name": "Outlook | Fetch Message + Attachments (Mia)",
+      "webhookId": "93537950-ccf5-458d-a10e-83e7ec35630c",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "ckA8HrYIftAN0Pkc",
+          "name": "Mia_Outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        432
+      ],
+      "id": "bfeb3141-79ea-4290-90ab-226ac2121af1",
+      "name": "Outlook | Fetch Message + Attachments (Eve)",
+      "webhookId": "52404b82-81a4-459f-aedc-4685dc5560fd",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Yh5QCnOCkAeQKJK9",
+          "name": "Eve_Outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "output": "fields",
+        "fields": [
+          "body",
+          "from",
+          "hasAttachments",
+          "isRead",
+          "receivedDateTime",
+          "replyTo",
+          "sender",
+          "sentDateTime",
+          "subject",
+          "toRecipients"
+        ],
+        "options": {
+          "attachmentsPrefix": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        672
+      ],
+      "id": "810ff622-b650-49c3-8cd5-03f5c15659e7",
+      "name": "Outlook | Fetch Message + Attachments (Yolanda)",
+      "webhookId": "1033ca5f-48f9-44bc-a055-c246292621fa",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "qdzdw93tZPipg6By",
+          "name": "Yolanda_Outlook"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2479a6ce-dc84-4e11-b27b-657f028c629b",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "outlook_jack",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "23986561-0d57-472f-83ab-f28b0dd46ab7",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "outlook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Jack"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d2f35151-8765-4ac1-8b97-79ec986e0253",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "outlook_mia",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Mia"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "575ec2af-7597-467e-8e1a-29a93aa2f7e8",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "outlook_eve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Eve"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1d3e3b00-680c-4491-a094-cb3c7fbd10c1",
+                    "leftValue": "={{ $json.by_mail }}",
+                    "rightValue": "outlook_yolanda",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Yolanda"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown mailbox (skipped)"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2656,
+        176
+      ],
+      "id": "2cc963d7-9b3a-4e0f-84d2-b4c2f508c85e",
+      "name": "Route by Mailbox"
     }
   ],
   "pinData": {},
@@ -848,18 +1120,7 @@
         [],
         [
           {
-            "node": "Outlook | Fetch Message + Attachments",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Outlook | Fetch Message + Attachments": {
-      "main": [
-        [
-          {
-            "node": "Normalize | Extract Message Metadata",
+            "node": "Route by Mailbox",
             "type": "main",
             "index": 0
           }
@@ -1062,6 +1323,89 @@
           }
         ]
       ]
+    },
+    "Outlook | Fetch Message + Attachments (Jack)": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Fetch Message + Attachments (Mia)": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Fetch Message + Attachments (Eve)": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook | Fetch Message + Attachments (Yolanda)": {
+      "main": [
+        [
+          {
+            "node": "Normalize | Extract Message Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Mailbox": {
+      "main": [
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments (Jack)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments (Mia)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments (Eve)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook | Fetch Message + Attachments (Yolanda)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1069,7 +1413,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "4effbad1-1c4c-4016-a854-e58069915b62",
+  "versionId": "bb2fde87-a123-469b-b9fb-0c1a89148cb1",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
