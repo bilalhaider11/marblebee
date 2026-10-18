@@ -1,0 +1,1081 @@
+{
+  "name": "Project Showcase Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Project Showcase Publisher\n\nPublishes Luna's project case Docs (Google Drive: Case案例 → Upload) as posts in the Shopify blog **Project Showcase** (marblebee.com/blogs/project-showcase), translated to English, using the `showcase` theme templates.\n\n**One case per run.** Each run picks the lowest case number (CA###, read from the Doc name) that has no post yet, so a case is never posted twice. A case counts as done when a post in the blog has its tag (e.g. `CA009`), draft or published. Run it once per case, or activate it and the hourly trigger works through new Docs on its own.\n\n**Flow:** list Docs → skip done cases → read the Doc's structure from the Google Docs API (no size limit; Drive's export refuses Docs over 10 MB) → turn it into tagged text with [[IMG_n]] photo placeholders → GPT-4.1 (OpenAI node) translates to English and rebuilds clean HTML (same order, same photo positions) → photos are copied from the Doc into Shopify Files → placeholders become Shopify CDN images (each photo full width, same order and position as in the Doc; bold text kept) → post created with template `showcase`, tag = case number, featured image = first photo.\n\n**Set Config → publish**: `false` creates hidden drafts to review in Shopify admin; set `true` to publish directly.\n\n**If a run fails** nothing is posted (the post is created last), so fix the cause and run again. Photos are never uploaded twice: an update keeps every photo that is unchanged in the Doc (any age; the Doc-image-id → URL map is stored on the post as metafield showcase.image_map, so admin edits can't lose it), and a re-run after a failure reuses what that run already uploaded (last 3 days). When nothing needs uploading the 15 s wait is skipped.\n\n**Limits:** the existing-posts check reads the newest 250 posts of the blog; add pagination before the blog passes 250 cases.\n\n**Nodes:** Google Drive and OpenAI use n8n's own nodes. Shopify calls are HTTP Request nodes because n8n's Shopify node has no blog-post or Files operations. \"Get Doc\" is an HTTP Request to the Google Docs API so it can reuse the existing Google Drive login (the Google Docs node only accepts its own credential type).\n\n**Update a posted case:** set Set Config → `updateCase` to its number (e.g. `CA002`), run once, then clear it. The case is re-read from its Doc and the existing post is overwritten (same URL, visibility unchanged).\n\n**Log:** every created/updated case is written to the Google Sheet \"Project Showcase Log\" → tab `Cases` (one row per case, matched on Case No; First Published comes from Shopify, Last Updated is the run time).",
+        "height": 584,
+        "width": 620
+      },
+      "id": "0df5fe3c-0b79-4dd6-ace5-140ce63c9114",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        20528,
+        3520
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f1c5e2b5-c2c7-4e4b-a82e-f9d13a19af4e",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        21424,
+        3552
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "c6596166-489b-4900-95cf-178f82d74969",
+      "name": "Hourly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        21424,
+        3728
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "shop",
+              "type": "string",
+              "value": "marblebee.myshopify.com"
+            },
+            {
+              "id": "s2",
+              "name": "apiVersion",
+              "type": "string",
+              "value": "2025-01"
+            },
+            {
+              "id": "s3",
+              "name": "blogId",
+              "type": "string",
+              "value": "108060344473"
+            },
+            {
+              "id": "s4",
+              "name": "blogHandle",
+              "type": "string",
+              "value": "project-showcase"
+            },
+            {
+              "id": "s5",
+              "name": "publicDomain",
+              "type": "string",
+              "value": "marblebee.com"
+            },
+            {
+              "id": "s6",
+              "name": "templateSuffix",
+              "type": "string",
+              "value": "showcase"
+            },
+            {
+              "id": "s7",
+              "name": "uploadFolderId",
+              "type": "string",
+              "value": "1d4bkJY9TpPI70oWtK9F7m6bJn0YYsIlD"
+            },
+            {
+              "id": "s8",
+              "name": "openAiModel",
+              "type": "string",
+              "value": "gpt-4.1"
+            },
+            {
+              "id": "s9",
+              "name": "publish",
+              "type": "string",
+              "value": "true"
+            },
+            {
+              "id": "s10",
+              "name": "updateCase",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "s11",
+              "name": "logSheetId",
+              "type": "string",
+              "value": "1MKpPONMqo6qMDxqeUwv8m7dw9_KKqaR3AdLIvBFu9kQ"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "511dee6a-ea60-4a6a-841a-2d4cef6d8ac8",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        21664,
+        3632
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Set Config').first().json.uploadFolderId }}",
+            "mode": "id"
+          },
+          "whatToSearch": "files",
+          "fileTypes": [
+            "application/vnd.google-apps.document"
+          ]
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "d51b997f-b0c2-4261-a3e3-9aba58f49b50",
+      "name": "List Case Docs",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        21888,
+        3632
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/blogs/' + $('Set Config').first().json.blogId + '/articles.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "250"
+            },
+            {
+              "name": "published_status",
+              "value": "any"
+            },
+            {
+              "name": "fields",
+              "value": "id,title,tags"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b74db7b-7787-40f3-b9c9-b825f986e3cc",
+      "name": "Get Existing Cases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        22112,
+        3632
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Set Config').first().json;\n// The Drive node returns one item per Doc (or a single empty item when the\n// folder has none, because \"Always Output Data\" is on).\nconst files = $('List Case Docs').all().map(i => i.json).filter(f => f && f.id);\nif (!files.length) {\n  throw new Error('No Google Docs found in the Upload folder (' + cfg.uploadFolderId + '). Check the folder ID and that the Google Drive credential on \"List Case Docs\" can open that folder.');\n}\nconst articles = $('Get Existing Cases').first().json.articles || [];\n\n// A case counts as done once ANY post in the Project Showcase blog (draft or\n// published) carries its case-number tag, e.g. \"CA009\". Doc names vary\n// (\"CA009\", \"Copy of CA004-UP\", \"UP-CA014\"), so only the CA number matters.\nconst done = new Set();\nfor (const a of articles) {\n  for (const t of String(a.tags || '').split(',')) {\n    const m = t.trim().match(/^CA0*(\\d+)$/i);\n    if (m) done.add('CA' + m[1].padStart(3, '0'));\n  }\n}\n\n// Update mode: Set Config -> updateCase = \"CA002\" re-processes that one case and\n// overwrites its existing post (same URL, visibility unchanged). Leave empty\n// for normal runs.\nconst wanted = String(cfg.updateCase || '').trim().toUpperCase().replace(/^CA0*(\\d+)$/, (m, n) => 'CA' + n.padStart(3, '0'));\nif (wanted) {\n  const doc = files.find(f => { const m = String(f.name || '').match(/CA[\\s_-]*0*(\\d+)/i); return m && 'CA' + m[1].padStart(3, '0') === wanted; });\n  if (!doc) throw new Error('updateCase ' + wanted + ': no Doc with that case number in the Upload folder.');\n  const post = articles.find(a => String(a.tags || '').split(',').some(t => t.trim().toUpperCase() === wanted));\n  if (!post) throw new Error('updateCase ' + wanted + ': no existing post with tag ' + wanted + ' -- clear updateCase to create it normally.');\n  return [{ json: { docId: doc.id, docName: doc.name, caseNo: wanted, articleId: post.id, remainingAfterThis: 0, skipped: [] } }];\n}\n\nconst pending = [];\nconst skipped = [];\nfor (const f of files) {\n  const m = String(f.name || '').match(/CA[\\s_-]*0*(\\d+)/i);\n  if (!m) { skipped.push(f.name + ' (no CA number in the name)'); continue; }\n  const caseNo = 'CA' + m[1].padStart(3, '0');\n  if (done.has(caseNo)) continue;\n  if (pending.some(p => p.caseNo === caseNo)) { skipped.push(f.name + ' (same CA number as another Doc)'); continue; }\n  pending.push({ docId: f.id, docName: f.name, caseNo });\n}\npending.sort((a, b) => a.caseNo.localeCompare(b.caseNo));\n\nconsole.log(JSON.stringify({ alreadyDone: [...done], pending: pending.map(p => p.caseNo), skipped }));\n// One case per execution keeps every run small and avoids nested loops.\n// Nothing left to publish -> stop quietly.\nif (!pending.length) return [];\nreturn [{ json: { ...pending[0], remainingAfterThis: pending.length - 1, skipped } }];"
+      },
+      "id": "a44057e6-8cfe-49bc-93b0-64ca9ed242dd",
+      "name": "Pick Next Case",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22336,
+        3632
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://docs.googleapis.com/v1/documents/' + $json.docId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "id": "0980bed8-a8d5-493d-ae45-aa6a7bcee506",
+      "name": "Get Doc (Google Docs API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        22544,
+        3632
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Pick Next Case').first().json;\n// Full document structure from the Google Docs API (documents.get). Reading\n// the Doc this way has no size limit -- Drive's HTML/Word export refuses any\n// Doc over 10 MB (exportSizeLimitExceeded), which photo-heavy cases exceed.\nconst doc = $json;\nconst tab = doc.tabs && doc.tabs[0] && doc.tabs[0].documentTab;\nconst content = (doc.body && doc.body.content) || (tab && tab.body && tab.body.content);\nif (!Array.isArray(content)) {\n  throw new Error(meta.caseNo + ': the Google Docs API did not return the document structure.');\n}\nconst inlineObjects = doc.inlineObjects || (tab && tab.inlineObjects) || {};\nconst positionedObjects = doc.positionedObjects || (tab && tab.positionedObjects) || {};\n\n// Photos are numbered in the order they appear in the Doc. contentUri is a\n// temporary (about 30 min) public link to the original image, which Shopify\n// downloads directly a minute or two later.\nconst images = [];\nfunction addImage(obj, oid) {\n  const props = obj && (obj.inlineObjectProperties || obj.positionedObjectProperties);\n  const uri = props && props.embeddedObject && props.embeddedObject.imageProperties && props.embeddedObject.imageProperties.contentUri;\n  if (!uri) return null;\n  images.push({ n: images.length + 1, src: uri, oid: oid || '' });\n  return '[[IMG_' + images.length + ']]';\n}\n\n// Text of one paragraph; bold runs become <strong> (not in headings).\nfunction paraText(p, keepBold) {\n  let out = '';\n  const ph = [];\n  for (const el of p.elements || []) {\n    if (el.textRun) {\n      const t = String(el.textRun.content || '').replace(/\\n/g, '').replace(/\\u000b/g, keepBold ? '\\u0003' : ' ');\n      const bold = keepBold && el.textRun.textStyle && el.textRun.textStyle.bold && t.trim();\n      out += bold ? '\\u0001' + t + '\\u0002' : t;\n    } else if (el.inlineObjectElement) {\n      const x = addImage(inlineObjects[el.inlineObjectElement.inlineObjectId], el.inlineObjectElement.inlineObjectId);\n      if (x) ph.push(x);\n    }\n  }\n  for (const id of p.positionedObjectIds || []) {\n    const x = addImage(positionedObjects[id], id);\n    if (x) ph.push(x);\n  }\n  let s = out.replace(/[ \\t ]+/g, ' ').replace(/ *\\n */g, '\\n').trim();\n  s = s.replace(/\\u0002(\\s*)\\u0001/g, '$1').replace(/\\u0001\\s*\\u0002/g, '');\n  s = s.replace(/\\s*\\u0003\\s*/g, '<br>');\n  s = keepBold ? s.replace(/\\u0001/g, '<strong>').replace(/\\u0002/g, '</strong>') : s.replace(/[\\u0001\\u0002]/g, '');\n  return { text: s, ph };\n}\n\nconst lines = [];\nfor (const se of content) {\n  if (se.paragraph) {\n    const p = se.paragraph;\n    const st = (p.paragraphStyle && p.paragraphStyle.namedStyleType) || 'NORMAL_TEXT';\n    const isTitle = st === 'TITLE' || st === 'SUBTITLE';\n    // A \"heading\" that contains Shift+Enter line breaks is really a block of\n    // lines (e.g. Material / Dimensions / Finish) -- keep it as a paragraph.\n    const multiLine = (p.elements || []).some(el => el.textRun && /\\u000b/.test(el.textRun.content || ''));\n    const isHeading = isTitle || (/^HEADING_\\d$/.test(st) && !multiLine);\n    const { text, ph } = paraText(p, !isHeading);\n    const label = isTitle ? 'TITLE' : isHeading ? 'H' + st.slice(-1) : (p.bullet ? 'LI' : 'P');\n    if (text) lines.push('[' + label + '] ' + text);\n    if (ph.length) lines.push('[IMAGES] ' + ph.join(' '));\n  } else if (se.table) {\n    const rows = [];\n    for (const r of se.table.tableRows || []) {\n      const cells = [];\n      for (const c of r.tableCells || []) {\n        const parts = [];\n        const phs = [];\n        for (const ce of c.content || []) {\n          if (!ce.paragraph) continue;\n          const x = paraText(ce.paragraph, true);\n          if (x.text) parts.push(x.text.replace(/\\n/g, ' '));\n          phs.push(...x.ph);\n        }\n        cells.push((parts.join(' ') + ' ' + phs.join(' ')).trim());\n      }\n      if (cells.some(Boolean)) rows.push(cells.join(' | '));\n    }\n    if (rows.length) lines.push('[TABLE]\\n' + rows.join('\\n') + '\\n[/TABLE]');\n  }\n}\n\n// Normalize headings so every Doc gives the same structure:\n// - the first text line is the case title (Docs use H1, H2 or a bold line);\n// - the remaining heading levels are shifted so the top level used becomes\n//   H2 (main sections) and anything deeper becomes H3 (sub-sections).\nconst firstText = lines.findIndex(l => !l.startsWith('[IMAGES]') && !l.startsWith('[TABLE]'));\nif (firstText >= 0) lines[firstText] = lines[firstText].replace(/^\\[(?:TITLE|H\\d|P)\\]/, '[TITLE]').replace(/<\\/?strong>/g, '');\nconst levels = lines.map(l => (l.match(/^\\[H(\\d)\\]/) || [])[1]).filter(Boolean).map(Number);\nconst top = levels.length ? Math.min(...levels) : 2;\nfor (let i = 0; i < lines.length; i++) {\n  lines[i] = lines[i].replace(/^\\[H(\\d)\\]/, (m, lv) => '[H' + Math.min(3, 2 + (Number(lv) - top)) + ']');\n}\n\n// Template label headings with no content of their own (\"2. 首图\" = hero image)\n// are removed before translation; the photo under them stays in place.\nfor (let i = lines.length - 1; i >= 0; i--) {\n  if (/^\\[H\\d\\]\\s*(?:\\d+\\s*[.)）、]\\s*)?(?:首图|主图|封面图|hero image|main image|cover image)\\s*$/i.test(lines[i])) lines.splice(i, 1);\n}\n\nif (!images.length) throw new Error(meta.caseNo + ': no images found in the Doc.');\nif (!lines.length) throw new Error(meta.caseNo + ': no text found in the Doc.');\n\nconst sourceText = lines.join('\\n');\nconst systemPrompt = \"You are the editor for Marblebee, a company that designs and fabricates custom natural-stone (marble) products. You turn an internal project case document into a polished English web page for the company's \\\"Project Showcase\\\" section.\\n\\nThe document is given as tagged lines: [TITLE] and [H1]-[H6] headings, [P] paragraphs, [LI] list items, [TABLE]...[/TABLE] blocks (one row per line, cells separated by \\\" | \\\"), and [IMAGES] lines that contain image placeholders such as [[IMG_3]]. Bold text is marked with <strong>...</strong>. Parts are written in Chinese; some parts may already be in English.\\n\\nReturn a JSON object with exactly two keys: \\\"title\\\" and \\\"body_html\\\".\\n\\nRules:\\n1. Translate all Chinese into natural, professional US English. Keep the meaning. Do not add facts, claims, prices, promises or contact details that are not in the document. Keep text that is already in English (fix only obvious typos). Keep measurements, units, weights, dates, stone/material names and quoted client words exactly.\\n2. \\\"title\\\": the project's English title, taken from the document's main title or first heading (translate it if needed). No case number, no numbering, no surrounding quotes.\\n3. \\\"body_html\\\": the complete case study below the title. Do not repeat the title.\\n   - Allowed tags only: h2, h3, p, br, ul, ol, li, strong, em, blockquote, table, thead, tbody, tr, th, td. No h1, no classes, no inline styles, no links, no <img> tags.\\n   - Follow the document's own sections and order. Use h2 for main sections (for example Project Overview, Client Requirements, Our Solution, Design & Production Process, Technical Details, Finished Project Gallery, Client Feedback, Planning a Similar Project?) and h3 for sub-sections.\\n   - Heading levels are already normalized: output every [H2] as h2 and every [H3] as h3, never change a level. The [TITLE] line is the title only and must not appear in body_html.\\n   - Keep every heading the document has, translated; never replace a heading with a generic one (for example keep a closing heading like \\\"Renovating an old fireplace?\\\" as it is in the document).\\n   - Remove document-outline numbering in front of section headings and bold label lines (such as \\\"2. \\\", \\\"3. \\\", \\\"1\\uff09\\\", \\\"\\u2465 \\\"). Keep step numbering of solution sub-headings such as \\\"01\\uff5c\\\", written as \\\"01 | \\\".\\n   - Drop headings that are only template labels with no content of their own, such as \\\"Hero Image\\\" / \\\"\\u9996\\u56fe\\\"; keep their images exactly where they were.\\n   - <br> inside a line is a deliberate line break in the document (for example a list of specifications such as Material / Dimensions / Finish): keep every <br> where it is.\\n   - Join lines that were broken in the middle of a sentence into one paragraph. If a line is marked as a heading but is clearly an ordinary sentence, output it as a paragraph.\\n   - Text inside <strong>...</strong> in the document is bold in the original: keep the corresponding translated words in <strong>. Do not add bold anywhere else, and never inside headings.\\n   - Tables: output an HTML table with two columns. If the first row is a header such as \\\"\\u9879\\u76ee | \\u4fe1\\u606f\\\" or \\\"\\u9879\\u76ee | \\u89c4\\u683c\\\" (or \\\"Item | Details\\\"), output it as a header row (\\\"Item | Details\\\" or \\\"Item | Specification\\\"). If project information appears as a run of \\\"Label: value\\\" pairs in one paragraph, convert it into such a table.\\n   - Image placeholders: every placeholder [[IMG_n]] in the document must appear exactly once in body_html, in the same position and order as in the document. Put each [IMAGES] line in its own <p>; placeholders from the same [IMAGES] line stay together in that one <p>, separated by spaces. Never invent, renumber, move or drop placeholders.\\n   - If the document contains the same case twice (for example a Chinese version followed by an English version without images), output it only once: use the version that contains the image placeholders as the structure, and you may reuse wording from the existing English version.\\n   - Remove notes meant for the editor or staff (for example upload notes, \\\"UP\\\", \\\"\\u5f85\\u8865\\u5145\\\", reminders in brackets).\\n4. Output valid JSON only.\";\nconst userPrompt = 'Case number: ' + meta.caseNo + '\\nNumber of image placeholders: ' + images.length + '\\n\\nDOCUMENT:\\n' + sourceText;\nreturn [{ json: { ...meta, imageCount: images.length, images, sourceText, systemPrompt, userPrompt } }];"
+      },
+      "id": "2d6ce19b-bbcf-4876-96a6-da7c9f15df7e",
+      "name": "Parse Doc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22752,
+        3632
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.systemPrompt }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.userPrompt }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "maxTokens": 12000,
+          "temperature": 0.2
+        }
+      },
+      "id": "a408838e-bcd6-4774-9825-382a1c3c63bb",
+      "name": "Translate & Structure (GPT)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        22992,
+        3632
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "openAiApi": {
+          "id": "2A9snppPp3TR9vjL",
+          "name": "OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const aid = $('Pick Next Case').first().json.articleId; const q = 'query recent($q: String!' + (aid ? ', $aid: ID!' : '') + ') { files(first: 250, sortKey: CREATED_AT, reverse: true, query: $q) { nodes { id alt fileStatus } }' + (aid ? ' article(id: $aid) { body metafield(namespace: \"showcase\", key: \"image_map\") { value } }' : '') + ' }'; const v = { q: \"media_type:IMAGE AND created_at:>'\" + $now.minus({ days: 3 }).toISO() + \"'\" }; if (aid) v.aid = 'gid://shopify/Article/' + aid; return JSON.stringify({ query: q, variables: v }); })() }}",
+        "options": {}
+      },
+      "id": "de778fbb-84d8-4c0c-ad68-94c75712ea93",
+      "name": "Find Already Uploaded",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23312,
+        3632
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Never upload the same photo twice:\n// 1) Updating a posted case: every photo still unchanged in the Doc (same Doc\n//    image id) keeps its existing Shopify URL, however long ago it was uploaded.\n//    The Doc-image-id -> URL map is saved on the post as the metafield\n//    showcase.image_map, so editing the post in Shopify admin can't lose it.\n//    (The data-doc-img attributes in the body are only a fallback.)\n//    Only new or replaced photos upload.\n// 2) Re-running after a failed run: photos that run already uploaded (alt\n//    \"CA### - Image n\", last 3 days, not FAILED) are reused.\nconst parsed = $('Parse Doc').first().json;\nconst res = $json;\nif (res.errors) throw new Error('Shopify files lookup error: ' + JSON.stringify(res.errors));\n\nconst byOid = {};\nconst art = (res.data && res.data.article) || {};\ntry { Object.assign(byOid, JSON.parse((art.metafield && art.metafield.value) || '{}')); } catch (e) {}\nconst body = String((res.data && res.data.article && res.data.article.body) || '');\nfor (const m of body.matchAll(/<img\\b[^>]*>/gi)) {\n  const tag = m[0];\n  const oid = (tag.match(/data-doc-img=\"([^\"]+)\"/) || [])[1];\n  const src = (tag.match(/\\ssrc=\"([^\"]+)\"/) || [])[1];\n  if (oid && src && !byOid[oid]) byOid[oid] = src.replace(/&amp;/g, '&');\n}\n\nconst nodes = (res.data && res.data.files && res.data.files.nodes) || [];\nconst prefix = parsed.caseNo + ' - Image ';\nconst recent = {};\nfor (const f of nodes) {\n  const alt = String(f.alt || '');\n  if (!alt.startsWith(prefix) || f.fileStatus === 'FAILED') continue;\n  const n = Number(alt.slice(prefix.length));\n  if (n && !recent[n]) recent[n] = f.id;\n}\n\nconst reuseUrls = {};\nconst reuseIds = [];\nconst toUpload = [];\nfor (const i of parsed.images) {\n  if (i.oid && byOid[i.oid]) reuseUrls[i.n] = byOid[i.oid];\n  else if (recent[i.n]) reuseIds.push(recent[i.n]);\n  else toUpload.push(i);\n}\nreturn [{ json: { reuseUrls, reuseIds, reusedCount: Object.keys(reuseUrls).length + reuseIds.length, toUpload, uploadCount: toUpload.length } }];"
+      },
+      "id": "fc2b8fcf-ccfc-4f5d-9248-0fe0e800311c",
+      "name": "Skip Already Uploaded",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21680,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "u1",
+              "leftValue": "={{ $json.uploadCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a91188eb-f099-4dbd-ac66-275a1e4c2084",
+      "name": "Anything to Upload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        21904,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: $('Skip Already Uploaded').first().json.toUpload.map(i => ({ alt: $('Parse Doc').first().json.caseNo + ' - Image ' + i.n, contentType: 'IMAGE', originalSource: i.src })) } }) }}",
+        "options": {}
+      },
+      "id": "6cb05acb-1ef7-4a54-81f1-7a63e358e0d5",
+      "name": "Upload Images to Shopify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        21920,
+        4176
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "11b5aff2-e5c5-404b-aa7b-e5a7daebf289",
+      "name": "Wait for Shopify",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        22432,
+        4176
+      ],
+      "webhookId": "e350352f-f56e-446c-9371-8e00b9f03b4e"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query files($ids: [ID!]!) { nodes(ids: $ids) { ... on MediaImage { id alt fileStatus fileErrors { message } image { url } } } }', variables: { ids: $('Skip Already Uploaded').first().json.reuseIds.concat($('Upload Images to Shopify').isExecuted ? ((($('Upload Images to Shopify').first().json.data || {}).fileCreate || { files: [] }).files.map(f => f.id)) : []) } }) }}",
+        "options": {}
+      },
+      "id": "94455b5d-b260-4a07-81eb-12b9f7a33575",
+      "name": "Get Image URLs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        22208,
+        3984
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Upload is skipped when every photo was already uploaded on an earlier run.\nconst created = $('Upload Images to Shopify').isExecuted ? $('Upload Images to Shopify').first().json : { data: { fileCreate: { files: [], userErrors: [] } } };\nif (created.errors) throw new Error('Shopify fileCreate error: ' + JSON.stringify(created.errors));\nconst fc = created.data && created.data.fileCreate;\nif (!fc) throw new Error('Unexpected fileCreate response: ' + JSON.stringify(created).slice(0, 500));\nif (fc.userErrors && fc.userErrors.length) throw new Error('Shopify rejected some images: ' + JSON.stringify(fc.userErrors));\n\nconst expected = $('Parse Doc').first().json.imageCount;\nconst res = $json;\nif (res.errors) throw new Error('Shopify file lookup error: ' + JSON.stringify(res.errors));\nconst nodes = (res.data && res.data.nodes) || [];\nconst urls = { ...($('Skip Already Uploaded').first().json.reuseUrls || {}) };\nconst failed = [];\nlet pending = 0;\nfor (const node of nodes) {\n  if (!node) { pending++; continue; }\n  const m = String(node.alt || '').match(/Image (\\d+)$/);\n  const n = m ? Number(m[1]) : null;\n  if (node.fileStatus === 'FAILED') {\n    failed.push((node.alt || node.id) + ': ' + JSON.stringify(node.fileErrors || []));\n  } else if (node.fileStatus === 'READY' && node.image && node.image.url && n) {\n    urls[n] = node.image.url;\n  } else {\n    pending++;\n  }\n}\nif (failed.length) throw new Error('Shopify could not process these images: ' + failed.join(' ; ') + ' -- the Doc image links may not be publicly reachable.');\n\nconst attempt = $runIndex + 1;\nif (pending || Object.keys(urls).length < expected) {\n  if (attempt >= 12) throw new Error('Images still not ready after ' + attempt + ' checks (' + Object.keys(urls).length + '/' + expected + ').');\n  return [{ json: { ready: false, attempt, ready_count: Object.keys(urls).length, expected } }];\n}\nreturn [{ json: { ready: true, urls, count: Object.keys(urls).length } }];"
+      },
+      "id": "bd26eb6a-5c82-4e3f-80da-e1a49e26004e",
+      "name": "Images Ready?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22432,
+        3984
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "r1",
+              "leftValue": "={{ $json.ready }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4382ecb4-3633-4133-8253-cd3779e0e8db",
+      "name": "All Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        22656,
+        3984
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Parse Doc').first().json;\nconst cfg = $('Set Config').first().json;\nconst urls = $json.urls || {};\nconst raw = $('Translate & Structure (GPT)').first().json;\n// The OpenAI node returns the first choice directly ({ message, finish_reason });\n// the raw API shape ({ choices: [...] }) is accepted too.\nconst choice = (raw.choices && raw.choices[0]) || raw;\nif (!choice || !choice.message) throw new Error(meta.caseNo + ': no response from OpenAI: ' + JSON.stringify(raw).slice(0, 500));\nif (choice.finish_reason === 'length') throw new Error(meta.caseNo + ': the translation was cut off (max_tokens reached). Raise Maximum Number of Tokens in the OpenAI node.');\nlet out;\ntry {\n  const c = choice.message && choice.message.content;\n  out = typeof c === 'string' ? JSON.parse(c) : c;\n} catch (e) {\n  throw new Error(meta.caseNo + ': OpenAI did not return valid JSON.');\n}\nconst title = String(out.title || '').trim();\nlet html = String(out.body_html || '').trim();\nif (!title || !html) throw new Error(meta.caseNo + ': translation is missing the title or the body.');\n// The page already shows the title -- drop it if the body repeats it as a heading.\nconst norm = s => String(s).replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim().toLowerCase();\nhtml = html.replace(/^\\s*<h[1-3][^>]*>([\\s\\S]*?)<\\/h[1-3]>\\s*/i, (m, inner) => norm(inner) === norm(title) ? '' : m);\n\n// Template labels with no content of their own (\"Hero Image\" / 首图) are dropped;\n// the photo under them stays where it is.\nhtml = html.replace(/<h[23][^>]*>\\s*(?:\\d+[.)）]\\s*)?(?:hero image|main image|cover image|featured image|首图|主图)\\s*<\\/h[23]>\\s*/gi, '');\n// Leftover outline numbering on bold label lines, e.g. \"<strong>3) Factory finished product</strong>\".\nhtml = html.replace(/<p>\\s*<strong>\\s*\\d+\\s*[)）.]\\s*/gi, '<p><strong>');\n// Table labels (first column) are bold in the Docs -- keep that consistent\n// whether or not the translation kept the <strong>.\nhtml = html.replace(/<tr>(\\s*)<td>(?!\\s*<strong>)([\\s\\S]*?)<\\/td>/gi, (m, sp, inner) => inner.trim() ? '<tr>' + sp + '<td><strong>' + inner.trim() + '</strong></td>' : m);\n\nconst esc = s => String(s).replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;');\nconst oidOf = {};\nfor (const i of meta.images || []) oidOf[i.n] = i.oid || '';\nconst img = n => '<img src=\"' + urls[n] + '\"' + (oidOf[n] ? ' data-doc-img=\"' + esc(oidOf[n]) + '\"' : '') + ' alt=\"' + esc(title) + ' - photo ' + n + '\" loading=\"lazy\" style=\"width:100%;height:auto;display:block;\">';\n\nconst used = new Set();\n// Photo 1 is also the post's featured image (shown at the top of the page).\n// Skip it only when it would be the very first thing in the body -- the same\n// photo stacked twice. When the Doc places it under text (e.g. after the\n// Project Overview intro), keep it there, as the existing blog posts do.\nhtml = html.replace(/^\\s*<p>\\s*\\[\\[IMG_1\\]\\]\\s*<\\/p>\\s*/i, () => { used.add(1); return ''; });\n// Photos keep the Doc's layout: each one full width, in the Doc's order\n// (several photos in one Doc paragraph are still stacked full width there).\nhtml = html.replace(/<p>\\s*((?:\\[\\[IMG_\\d+\\]\\]\\s*)+)<\\/p>/gi, (m, group) => {\n  const ns = [...group.matchAll(/\\[\\[IMG_(\\d+)\\]\\]/g)].map(x => Number(x[1])).filter(n => urls[n] && !used.has(n));\n  ns.forEach(n => used.add(n));\n  if (!ns.length) return '';\n  return ns.map(n => '<p>' + img(n) + '</p>').join('');\n});\n// Any placeholder left inside other text.\nhtml = html.replace(/\\[\\[IMG_(\\d+)\\]\\]/g, (m, n) => {\n  n = Number(n);\n  if (!urls[n] || used.has(n)) return '';\n  used.add(n);\n  return img(n);\n});\n\nconst warnings = [];\nconst missing = Object.keys(urls).map(Number).filter(n => !used.has(n)).sort((a, b) => a - b);\nif (missing.length) {\n  warnings.push('Photos the translation left out were added at the end: ' + missing.join(', '));\n  html += missing.map(n => '<p>' + img(n) + '</p>').join('');\n}\nif (/[㐀-鿿]/.test(title + html)) warnings.push('Some Chinese text is still in the post -- check it before publishing.');\n\nconst publish = String(cfg.publish).toLowerCase() === 'true';\nconst article = {\n  title,\n  body_html: html,\n  author: 'Marblebee',\n  tags: meta.caseNo,\n  template_suffix: cfg.templateSuffix,\n  published: publish,\n  image: { src: urls[1], alt: title }\n};\nconst articleId = $('Pick Next Case').first().json.articleId || null;\n// Updating keeps the post's current visibility.\nif (articleId) delete article.published;\n// Doc image id -> Shopify URL for every photo in this post; saved as a metafield.\nconst imageMap = {};\nfor (const i of meta.images || []) if (i.oid && urls[i.n]) imageMap[i.oid] = urls[i.n];\nreturn [{ json: { article, articleId, imageMap, caseNo: meta.caseNo, docName: meta.docName, warnings } }];"
+      },
+      "id": "b4a56e14-fb31-4633-a3f7-0382e7f41af6",
+      "name": "Build Article",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22912,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "x1",
+              "leftValue": "={{ $json.articleId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4758aa03-8fbe-42d5-ba81-b97b5f28cdaf",
+      "name": "Update Existing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        23136,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/blogs/' + $('Set Config').first().json.blogId + '/articles.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ article: $json.article }) }}",
+        "options": {}
+      },
+      "id": "c6103cf3-889c-4852-8405-6aaa1d197abc",
+      "name": "Create Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23360,
+        3872
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/blogs/' + $('Set Config').first().json.blogId + '/articles/' + $json.articleId + '.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ article: $json.article }) }}",
+        "options": {}
+      },
+      "id": "10309443-654e-451c-95a7-d0a1a4297e51",
+      "name": "Update Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23360,
+        4064
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://' + $('Set Config').first().json.shop + '/admin/api/' + $('Set Config').first().json.apiVersion + '/graphql.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation set($m: [MetafieldsSetInput!]!) { metafieldsSet(metafields: $m) { metafields { id } userErrors { field message } } }', variables: { m: [{ ownerId: 'gid://shopify/Article/' + $json.article.id, namespace: 'showcase', key: 'image_map', type: 'json', value: JSON.stringify($('Build Article').first().json.imageMap) }] } }) }}",
+        "options": {}
+      },
+      "id": "49bcb7be-f674-43bf-9fa5-c9bf2dfde1cf",
+      "name": "Save Image Map",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23584,
+        3968
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const posted = $('Update Post').isExecuted ? $('Update Post').first().json : $('Create Post').first().json;\nconst a = posted.article || {};\nconst saved = (($json.data || {}).metafieldsSet || {});\nconst mapErrors = ($json.errors || saved.userErrors || []);\nconst b = $('Build Article').first().json;\nconst cfg = $('Set Config').first().json;\nif (!a.id) throw new Error(b.caseNo + ': Shopify did not create the post: ' + JSON.stringify(posted).slice(0, 500));\nreturn [{ json: {\n  caseNo: b.caseNo,\n  action: b.articleId ? 'updated' : 'created',\n  doc: b.docName,\n  title: a.title,\n  published: !!a.published_at,\n  adminUrl: 'https://admin.shopify.com/store/' + cfg.shop.replace('.myshopify.com', '') + '/content/articles/' + a.id,\n  storeUrl: 'https://' + cfg.publicDomain + '/blogs/' + cfg.blogHandle + '/' + a.handle,\n  warnings: b.warnings.concat(mapErrors.length ? ['Image map not saved (next update may re-upload photos): ' + JSON.stringify(mapErrors).slice(0, 300)] : []),\n  photos: $('Parse Doc').first().json.imageCount,\n  firstPublished: a.published_at || '',\n  remainingCases: $('Pick Next Case').first().json.remainingAfterThis\n} }];"
+      },
+      "id": "b3815342-248a-477b-8f32-84f330d9edd6",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        23808,
+        3968
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Set Config').first().json.logSheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Cases",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Case No": "={{ $json.caseNo }}",
+            "Doc Name": "={{ $json.doc }}",
+            "Title": "={{ $json.title }}",
+            "Live URL": "={{ $json.storeUrl }}",
+            "Admin URL": "={{ $json.adminUrl }}",
+            "Status": "={{ $json.published ? 'Published' : 'Hidden' }}",
+            "Photos": "={{ $json.photos }}",
+            "Warnings": "={{ ($json.warnings || []).join(' | ') }}",
+            "First Published": "={{ $json.firstPublished ? DateTime.fromISO($json.firstPublished).toFormat('yyyy-LL-dd HH:mm') : '' }}",
+            "Last Updated": "={{ $now.toFormat('yyyy-LL-dd HH:mm') }}"
+          },
+          "matchingColumns": [
+            "Case No"
+          ],
+          "schema": [
+            {
+              "id": "Case No",
+              "displayName": "Case No",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Doc Name",
+              "displayName": "Doc Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Live URL",
+              "displayName": "Live URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Admin URL",
+              "displayName": "Admin URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Photos",
+              "displayName": "Photos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Warnings",
+              "displayName": "Warnings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "First Published",
+              "displayName": "First Published",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Last Updated",
+              "displayName": "Last Updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "eb8d9fdc-8c56-4036-aa61-ae704a2418d6",
+      "name": "Log to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        24032,
+        3968
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hourly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "List Case Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Case Docs": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Cases": {
+      "main": [
+        [
+          {
+            "node": "Pick Next Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Next Case": {
+      "main": [
+        [
+          {
+            "node": "Get Doc (Google Docs API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Doc": {
+      "main": [
+        [
+          {
+            "node": "Translate & Structure (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translate & Structure (GPT)": {
+      "main": [
+        [
+          {
+            "node": "Find Already Uploaded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Images to Shopify": {
+      "main": [
+        [
+          {
+            "node": "Wait for Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Shopify": {
+      "main": [
+        [
+          {
+            "node": "Get Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image URLs": {
+      "main": [
+        [
+          {
+            "node": "Images Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Images Ready?": {
+      "main": [
+        [
+          {
+            "node": "All Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All Ready?": {
+      "main": [
+        [
+          {
+            "node": "Build Article",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Article": {
+      "main": [
+        [
+          {
+            "node": "Update Existing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Post": {
+      "main": [
+        [
+          {
+            "node": "Save Image Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Doc (Google Docs API)": {
+      "main": [
+        [
+          {
+            "node": "Parse Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Already Uploaded": {
+      "main": [
+        [
+          {
+            "node": "Skip Already Uploaded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Already Uploaded": {
+      "main": [
+        [
+          {
+            "node": "Anything to Upload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything to Upload?": {
+      "main": [
+        [
+          {
+            "node": "Upload Images to Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Image URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing?": {
+      "main": [
+        [
+          {
+            "node": "Update Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Post": {
+      "main": [
+        [
+          {
+            "node": "Save Image Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Image Map": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result": {
+      "main": [
+        [
+          {
+            "node": "Log to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "10cddc98-d9a9-48eb-9b7b-f83ffd19c3e9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "18Gxkpf1gmyqfcqT",
+  "tags": []
+}
