@@ -3,17 +3,17 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Process Product (sub-workflow)\n\nExtracted from **Shopify Merge product sync Pipeline (GraphQL)** to fix a confirmed n8n platform bug in the Loop Over Items (Split In Batches) node: when the same SplitInBatches node is triggered more than once within an execution (which is exactly what happened -- Process Each Product was fed once per sheet by the outer loop), its internal state goes stale after the first activation and every later activation silently processes almost nothing (confirmed live: 289 runs, only 2 produced output). n8n's own fix for this (PR #23775) was closed without being merged, so there's no version upgrade that resolves it.\n\nThis sub-workflow does the full per-product work -- create/update, image sync, collections, metafields, publish -- for exactly ONE item. The main pipeline calls it via an Execute Sub-workflow node in \"Run once for each item\" mode instead of using a second SplitInBatches node, which sidesteps the buggy code path entirely: each call is a fresh execution with its own clean state.\n\n**Image sync (one file per image):** runs only when `Fields_to_update` has an IMAGE URL token. `Find Original Files` looks up the Shopify File behind each sheet URL; `Build GraphQL: Sync Product Images` attaches that same file to the product by ID (no copy, so the sheet URL = the product URL), deletes replaced files the product owns (name starts with the product number, or an old `_<uuid>` copy), only detaches anything else, never changes the alt of the shared CAD file, and re-orders the gallery to sheet order. A sheet URL with no matching Shopify File stops the run with an error naming the slot; a file still processing is skipped until the next run.\n\n**One-time setup after importing both files:** open the main pipeline's \"▶️ Process Product (per item)\" node and select this workflow from the dropdown -- its ID doesn't exist yet at export time so it can't be pre-linked.",
+        "content": "## Process Product (sub-workflow)\n\nExtracted from **Shopify Merge product sync Pipeline (GraphQL)** to fix a confirmed n8n platform bug in the Loop Over Items (Split In Batches) node: when the same SplitInBatches node is triggered more than once within an execution (which is exactly what happened -- Process Each Product was fed once per sheet by the outer loop), its internal state goes stale after the first activation and every later activation silently processes almost nothing (confirmed live: 289 runs, only 2 produced output). n8n's own fix for this (PR #23775) was closed without being merged, so there's no version upgrade that resolves it.\n\nThis sub-workflow does the full per-product work -- create/update, image sync, collections, metafields, publish -- for exactly ONE item. The main pipeline calls it via an Execute Sub-workflow node in \"Run once for each item\" mode instead of using a second SplitInBatches node, which sidesteps the buggy code path entirely: each call is a fresh execution with its own clean state.\n\n**Image sync (one file per image):** runs only when `Fields_to_update` has an IMAGE URL token. `Find Original Files` looks up the Shopify File behind each sheet URL; `Build GraphQL: Sync Product Images` attaches that same file to the product by ID (no copy, so the sheet URL = the product URL), deletes replaced files the product owns (name starts with the product number, or an old `_<uuid>` copy), only detaches anything else, never changes the alt of the shared CAD file, and re-orders the gallery to sheet order. A sheet URL with no matching Shopify File stops the run with an error naming the slot; a file still processing is skipped until the next run.\n\n**One-time setup after importing both files:** open the main pipeline's \"▶️ Process Product (per item)\" node and select this workflow from the dropdown -- its ID doesn't exist yet at export time so it can't be pre-linked.\n\n**Gallery order stage (2026-10-23):** after fireplace feature photos changed on the live store, the image sync no longer sends the reorder together with attach/delete. Execution 27034 (LSBLD358): attach 8 originals + delete 8 copies + reorder in one go left the gallery as 5,6,7,CAD,1,2,3,4 -- Shopify applies attach/delete asynchronously, so the reorder arrived early and a failed reorder was ignored. Now: Collect Sync Results -> wait 15s -> read media -> if any wanted file is not on the product yet, wait 30s and read again -> move only the files that are present into sheet order -> wait -> read -> Verify Gallery Order (records reorderVerified true/false; never silent).",
         "height": 1008,
         "width": 480
       },
-      "id": "2408c5d8-a969-42f0-bce8-5dc1f35ec36d",
+      "id": "e4be48cd-3c60-486a-8353-e2e395df2bb9",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -2720,
-        960
+        3152,
+        3856
       ]
     },
     {
@@ -21,13 +21,13 @@
         "inputSource": "passthrough",
         "returnOutput": "allRuns"
       },
-      "id": "cd160639-c083-4d1c-be5e-1058ed1884eb",
+      "id": "db1190ec-7aca-4c0a-95e0-a7ec1ee1569c",
       "name": "🚀 Triggered by Main Pipeline (per product)",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -1664,
-        1952
+        4208,
+        4848
       ]
     },
     {
@@ -37,49 +37,49 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1424,
-        1296
+        7296,
+        4192
       ],
-      "id": "241071dd-5aaa-40cd-bf36-32a48a08eaa7",
+      "id": "c3e3dace-4f8d-4f3c-b703-a83e523da29e",
       "name": "🔗 Build Collection Mappings"
     },
     {
       "parameters": {
         "jsCode": "// metafieldsSet is a true upsert -- it needs ownerId + namespace + key, not the\n// metafield's own id. owner_id/namespace/key were added onto this \"update\"\n// operation object in \"🧠 Sync Metafields\" (additive fields only, the\n// create/update/delete decision logic there is untouched).\nconst QUERY = `mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {\n  metafieldsSet(metafields: $metafields) {\n    metafields { id }\n    userErrors { field message code }\n  }\n}`;\n\n// Runs once per input item -- multiple metafield updates can be in flight at\n// once (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const op = item.json;\n  const m = op.payload.metafield;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${op.owner_id}`,\n            namespace: op.namespace,\n            key: op.key,\n            type: m.type,\n            value: m.value\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "57b0a938-201f-453f-a20c-4de6981e8f30",
+      "id": "8ffe3851-1723-4333-96cb-0115557f3d1c",
       "name": "🔀 Build GraphQL: Update Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        304,
-        256
+        6176,
+        3152
       ]
     },
     {
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple collection-add calls can be in flight\n// at once, each with its own response to check. A failure here (e.g. the\n// product already existed on Shopify from a race, or a transient Shopify\n// error) must not throw and abort the run -- collection assignment is a lesser\n// concern than blocking the rest of this product's processing over it.\nreturn $input.all().map(item => {\n  const res = item.json;\n  const errors = res?.errors;\n  const userErrors = res?.data?.collectionAddProducts?.userErrors;\n  if (errors?.length || userErrors?.length) {\n    return { json: { added: false, error: JSON.stringify(errors?.length ? errors : userErrors) } };\n  }\n  return { json: { added: true } };\n});"
       },
-      "id": "7406cb0b-23c6-48aa-b09a-fb91e43928a4",
+      "id": "e3400730-6aa5-47fb-863b-cf51f70bf96e",
       "name": "✅ Check Add to Collection Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1920,
-        1104
+        7792,
+        4000
       ]
     },
     {
       "parameters": {
         "jsCode": "// REST auto-publishes a newly created product to the Online Store sales\n// channel; GraphQL's productSet/productCreate does not -- status: ACTIVE only\n// means \"publishable\", not published to any channel. This looks up the\n// store's \"Online Store\" publication and explicitly publishes the product to\n// it, so newly created products actually appear on the live storefront.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get publications): ' + JSON.stringify(res.errors));\n}\nconst pubs = res?.data?.publications?.nodes || [];\nconst onlineStore = pubs.find(p => p.name === 'Online Store');\nif (!onlineStore) {\n  throw new Error('Could not find an \"Online Store\" publication/sales channel on this shop: ' + JSON.stringify(pubs));\n}\n\nconst product = $('🔀 Adapt Response: Create Product').item.json.product;\n\nconst QUERY = `mutation PublishProduct($id: ID!, $input: [PublicationInput!]!) {\n  publishablePublish(id: $id, input: $input) {\n    publishable {\n      ... on Product { id }\n    }\n    userErrors { field message }\n  }\n}`;\n\nreturn [{\n  json: {\n    body: {\n      query: QUERY,\n      variables: {\n        id: `gid://shopify/Product/${product.id}`,\n        input: [{ publicationId: onlineStore.id }]\n      }\n    }\n  }\n}];"
       },
-      "id": "75611134-14f4-4d65-8f88-a77e5cadac5c",
+      "id": "c9c5b768-bff2-45fd-9beb-351fa276bcd0",
       "name": "🔀 Build GraphQL: Publish Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1488,
-        2720
+        7360,
+        5616
       ]
     },
     {
@@ -89,10 +89,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -432,
-        1936
+        5440,
+        4832
       ],
-      "id": "fd7c5e79-1104-4872-862a-cf7aa5b8c08a",
+      "id": "0c2a8fc3-1d81-48d9-9b52-5e0a699475ad",
       "name": "🩺 Check For Dead Images"
     },
     {
@@ -102,10 +102,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2912,
-        2352
+        8784,
+        5248
       ],
-      "id": "8637e033-4366-4264-a5ce-e783240d01f7",
+      "id": "813733b9-9edb-44ff-b4f7-a5b0c3ae4a06",
       "name": "Wait",
       "webhookId": "0379cbb1-959e-4dac-8288-de3b3fd763bc"
     },
@@ -197,10 +197,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        176,
-        1552
+        6048,
+        4448
       ],
-      "id": "22022a0f-8b4d-4874-830c-2b5b2e819009",
+      "id": "b7489329-7a26-48d8-9114-971752c26373",
       "name": "❓Check if update request needed",
       "alwaysOutputData": false
     },
@@ -208,13 +208,13 @@
       "parameters": {
         "jsCode": "const res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productVariantsBulkUpdate): ' + JSON.stringify(res.errors));\n}\nconst userErrors = res?.data?.productVariantsBulkUpdate?.userErrors;\nif (userErrors?.length) {\n  throw new Error('Shopify productVariantsBulkUpdate userErrors: ' + JSON.stringify(userErrors));\n}\nreturn [{ json: {} }];"
       },
-      "id": "9382b13c-8c3b-42d3-bb5c-b00fef092f97",
+      "id": "0c7c1e40-fa72-48de-adb1-cb8a0b3030ab",
       "name": "✅ Check Variant Update Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2288,
-        1520
+        8160,
+        4416
       ]
     },
     {
@@ -237,13 +237,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "61545ee7-fdd4-409b-9273-73d4a755711d",
+      "id": "2dad8061-7daa-4ec6-b1f1-914f5880f30c",
       "name": "➕ Shopify: Create Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        224,
-        0
+        6096,
+        2896
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -258,26 +258,26 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield deletes can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsDelete): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsDelete?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsDelete userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "10a15c56-e661-4a02-a7b4-40d95b718a5c",
+      "id": "d659575e-b021-4e29-b846-357b42db1c3b",
       "name": "✅ Check Delete Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        464
+        6784,
+        3360
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes into the REST-shaped { collects: [{id, collection_id}] } array that\n// \"❓ Has Existing Collections?\" and \"🔧 Extract Collects to update or delete\"\n// already expect unchanged. GraphQL has no separate \"collect join-record id\"\n// concept -- a collection's own id doubles as the collect_id here, which is\n// exactly what the new collection-removal call needs anyway.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get collections): ' + JSON.stringify(res.errors));\n}\nconst productId = $('📝 Format Update Request').item.json.product.id;\nconst edges = res?.data?.product?.collections?.edges || [];\nconst collects = edges.map(e => ({\n  id: e.node.legacyResourceId,\n  collection_id: e.node.legacyResourceId,\n  product_id: productId\n}));\nreturn [{ json: { collects } }];"
       },
-      "id": "4e729402-a842-48ca-857e-27411067b2b0",
+      "id": "cadf5fdf-db5e-4528-8f30-7cfea01b452f",
       "name": "🔀 Adapt Response: Product Collections",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        448,
-        1280
+        6320,
+        4176
       ]
     },
     {
@@ -308,10 +308,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1152,
-        1104
+        4752,
+        4000
       ],
-      "id": "7fa18895-3b0b-4352-b080-5c612f702ea1",
+      "id": "79f49d7a-d479-47e3-bc2c-f0a9dba09942",
       "name": "❓ Has Image Operations to Sync?"
     },
     {
@@ -337,10 +337,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -864,
-        1088
+        5008,
+        3984
       ],
-      "id": "23860ffb-b341-49be-bac4-68077c1b3bbf",
+      "id": "6e92efcd-49b4-4956-8453-e963b3db93f2",
       "name": "➕ Shopify: Sync Product Images (GraphQL)",
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -388,10 +388,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1904,
-        1312
+        3792,
+        4304
       ],
-      "id": "e249dc40-fde1-403f-9e33-aceb01866fab",
+      "id": "15e843f9-92e6-465b-9a6b-d54f3d5b9a24",
       "name": "✅ Check if Image Update Needed",
       "alwaysOutputData": false
     },
@@ -402,10 +402,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1072,
-        1296
+        6944,
+        4192
       ],
-      "id": "7455ab6a-e61f-4f08-b4f1-a74a03930526",
+      "id": "86150706-5e03-4cbd-ac2f-3e6a79d87ee8",
       "name": "🔗 Pass Update Request"
     },
     {
@@ -415,10 +415,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -256,
-        2352
+        5616,
+        5248
       ],
-      "id": "938154a5-1973-4af1-947b-5b40257c0d24",
+      "id": "0980c99a-9bb3-465f-bb5d-b33dc8cd70a3",
       "name": "📝 Format Create Request"
     },
     {
@@ -441,13 +441,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "da062645-ced5-4f32-bd7d-c9d559300f9b",
+      "id": "88f051e7-0ce3-4caf-a3fa-5cce5af2f719",
       "name": "📥 Get Online Store Publication (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1232,
-        2720
+        7104,
+        5616
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -495,10 +495,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -768,
-        1936
+        5104,
+        4832
       ],
-      "id": "a9c966e4-0e5b-4ea7-ac33-754155d032b8",
+      "id": "cb7de821-4248-439b-a6f3-7d1dac0d2040",
       "name": "🩺 HEAD Check Image URL",
       "onError": "continueRegularOutput"
     },
@@ -506,13 +506,13 @@
       "parameters": {
         "jsCode": "// Reshapes into the SAME { product: { id, title, handle, variants: [{id}] } }\n// shape \"Adapt Response: Create Product\" produces on a normal success, so\n// everything downstream (publish, collection mapping, sheet write-back) works\n// identically whether the product was just created or recovered here.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (find product by handle): ' + JSON.stringify(res.errors));\n}\nconst product = res?.data?.productByHandle;\nif (!product) {\n  // Shopify said the handle was taken, but a direct lookup by that same\n  // handle found nothing -- a genuinely confusing state worth surfacing\n  // loudly rather than silently creating a duplicate or looping forever.\n  const attemptedHandle = $('🔍 Build GraphQL: Find Product By Handle').item.json.body.variables.handle;\n  throw new Error(`Handle \"${attemptedHandle}\" was reported as already in use, but no product with that handle could be found.`);\n}\n\nconst variantEdge = product.variants?.edges?.[0]?.node;\n\nreturn [{\n  json: {\n    product: {\n      id: product.legacyResourceId,\n      title: product.title,\n      handle: product.handle,\n      variants: [{ id: variantEdge?.legacyResourceId ?? '' }]\n    }\n  }\n}];"
       },
-      "id": "dd17e05b-2088-4bab-9f2c-df89b0f0e031",
+      "id": "900caf72-7533-4450-97fa-ca7a0aa9df69",
       "name": "🔄 Adapt Response: Recovered Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1440,
-        2336
+        7312,
+        5232
       ]
     },
     {
@@ -522,10 +522,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -640,
-        1088
+        5232,
+        3984
       ],
-      "id": "363a8742-4d04-43d6-9d3f-124b9fc7881d",
+      "id": "068c06cd-a5f5-4046-9033-d3426be34d45",
       "name": "✅ Check Sync Images Result"
     },
     {
@@ -535,10 +535,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -160,
-        1552
+        5712,
+        4448
       ],
-      "id": "510101a7-35fe-40b2-8525-0268f92a81e6",
+      "id": "c7d8fca6-1677-4098-b4d8-76362808f0ec",
       "name": "📝 Format Update Request"
     },
     {
@@ -569,10 +569,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        992,
-        1088
+        6864,
+        3984
       ],
-      "id": "f56e2998-04e2-4c43-b54a-494cc80cd930",
+      "id": "dc832066-ae5c-4c17-9f7e-a1cc50ae0a9a",
       "name": "❓Check for update or delete"
     },
     {
@@ -633,10 +633,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -192,
-        640
+        5680,
+        3536
       ],
-      "id": "1dd90ee0-0e18-406e-a7fd-ce701a633f64",
+      "id": "22b0becf-37e4-4750-930f-cbb235667417",
       "name": "Check Metafields Update",
       "alwaysOutputData": false
     },
@@ -660,13 +660,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "b9eb41ee-53de-42df-a41e-5b7e31747f82",
+      "id": "2d0b3648-9e07-4522-b26c-2056e1954340",
       "name": "📥 Get Existing Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -656,
-        256
+        5216,
+        3152
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -681,39 +681,39 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield updates can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsSet/update): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsSet?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsSet (update) userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "eabb9794-4973-490a-aeb3-15eee01a9fd1",
+      "id": "65b2d168-c87a-4112-8e91-4764465afbdc",
       "name": "✅ Check Update Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        768,
-        256
+        6640,
+        3152
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes the GraphQL productSet response back into the REST-shaped\n// { product: { id, title, handle, variants: [{id}] } } object that\n// \"📦 Parse Create Response\" and \"🔗 Build Collection Mappings\" already expect,\n// so those nodes did not need to change at all.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productSet): ' + JSON.stringify(res.errors));\n}\nconst result = res?.data?.productSet;\n\n// A HANDLE_NOT_UNIQUE error here almost always means this exact product was\n// already created successfully on a prior run, but that run failed somewhere\n// between the create call and the sheet write-back (so the row still looks\n// \"never created\" and retries productSet with the same deterministic handle\n// every time, colliding with itself forever). Recover instead of failing\n// permanently: look up the existing product by the handle Shopify just told\n// us is taken, and reconcile the sheet with it.\nconst handleCollision = result?.userErrors?.some(e => e.code === 'HANDLE_NOT_UNIQUE');\nif (handleCollision) {\n  const attemptedHandle = $('🔀 Build GraphQL: Create Product').item.json.body.variables.input.handle;\n  return [{ json: { handle_collision: true, attempted_handle: attemptedHandle } }];\n}\n\nif (result?.userErrors?.length) {\n  throw new Error('Shopify productSet userErrors: ' + JSON.stringify(result.userErrors));\n}\n\nconst product = result?.product;\nif (!product) {\n  throw new Error('Shopify productSet returned no product: ' + JSON.stringify(res));\n}\n\nconst variantEdge = product.variants?.edges?.[0]?.node;\n\nreturn [{\n  json: {\n    handle_collision: false,\n    product: {\n      id: product.legacyResourceId,\n      title: product.title,\n      handle: product.handle,\n      variants: [{ id: variantEdge?.legacyResourceId ?? '' }]\n    }\n  }\n}];"
       },
-      "id": "db31bf80-7c95-45ae-a015-2e68f46fbd05",
+      "id": "9de120c8-1a30-44e7-8837-a7651952d432",
       "name": "🔀 Adapt Response: Create Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        2352
+        6272,
+        5248
       ]
     },
     {
       "parameters": {
         "jsCode": "const productId = $json.product.id;\nconst QUERY = `query GetProductCollections($id: ID!) {\n  product(id: $id) {\n    collections(first: 250) {\n      edges { node { id legacyResourceId title } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
       },
-      "id": "bb5cfc66-595e-4730-9bc9-593b63da85ff",
+      "id": "24b533e5-82f4-4062-a1ea-425352512b1e",
       "name": "🔀 Build GraphQL: Get Product Collections",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -128,
-        1280
+        5744,
+        4176
       ]
     },
     {
@@ -736,13 +736,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "f7bcd639-b008-4840-a19d-9cc76b0f3f1d",
+      "id": "ad0cb298-b873-47d1-9e8f-d3f2a9b4358c",
       "name": "🗑️ Remove from Collections (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1136,
-        880
+        7008,
+        3776
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -773,13 +773,13 @@
         "jsonBody": "={{ $json.variantBody }}",
         "options": {}
       },
-      "id": "54902ecc-7b8d-42f8-89c6-b0fc8619f17e",
+      "id": "be70e3c2-4e83-4c11-8b2c-c86c1f465810",
       "name": "🔄 Shopify: Update Variant (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1888,
-        1520
+        7760,
+        4416
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -797,10 +797,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        656,
-        1088
+        6528,
+        3984
       ],
-      "id": "4f7fea0f-e5a4-4cb6-952d-88911730624a",
+      "id": "a2352521-bc93-4937-aae6-fece208f7c36",
       "name": "🔧 Extract Collects to update or delete",
       "alwaysOutputData": false
     },
@@ -808,13 +808,13 @@
       "parameters": {
         "jsCode": "// Note: unlike REST's synchronous DELETE, collectionRemoveProducts is\n// asynchronous (returns a background job). Nothing downstream in this\n// workflow depends on immediate removal, so we only check for userErrors.\n// Runs once per input item -- multiple removals can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (collectionRemoveProducts): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.collectionRemoveProducts?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify collectionRemoveProducts userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "35147bf2-897c-4257-b2da-544f5fe98a0e",
+      "id": "02dd98da-0fba-4ccd-8475-43b4805454f4",
       "name": "✅ Check Remove from Collection Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1376,
-        880
+        7248,
+        3776
       ]
     },
     {
@@ -824,23 +824,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1360,
-        1952
+        4512,
+        4848
       ],
-      "id": "048210b7-77bd-47be-9f81-251154fea912",
+      "id": "15d62363-0549-41eb-a815-ace1cd09a6fe",
       "name": "🩺 Build Image Checks"
     },
     {
       "parameters": {
         "jsCode": "const GID = (type, id) => `gid://shopify/${type}/${id}`;\nconst QUERY = `mutation CollectionAddProducts($id: ID!, $productIds: [ID!]!) {\n  collectionAddProducts(id: $id, productIds: $productIds) {\n    collection { id }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- \"🔧 Extract Collects to update or delete\" and\n// \"🔗 Build Collection Mappings\" can both emit multiple items at once (e.g.\n// several collections to add), and this node must build one request per item,\n// not just the first (the default \"run once for all items\" Code node mode\n// only sees $json as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const collect = item.json.collect;\n\n  // \"🔧 Extract Collects to update or delete\"'s add branch depends on\n  // product_id coming through the collections-fetch response -- fall back to\n  // the same source \"🔀 Build GraphQL: Remove from Collection\" already uses,\n  // and fail loudly rather than silently sending an invalid gid to Shopify.\n  const productId = collect.product_id ?? $('📝 Format Update Request').item.json.product.id;\n  if (!productId) {\n    throw new Error('Add to Collection: could not resolve a product_id. collect=' + JSON.stringify(collect));\n  }\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          id: GID('Collection', collect.collection_id),\n          productIds: [GID('Product', productId)]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "129260d0-c7a7-4590-8a0a-8c5194a5f089",
+      "id": "c45d2479-694f-48d2-bef3-403fbe5b42b3",
       "name": "🔀 Build GraphQL: Add to Collection",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        1104
+        7232,
+        4000
       ]
     },
     {
@@ -863,13 +863,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "b1e47e97-1c67-4981-887a-b89e0afead43",
+      "id": "effd3c55-2255-4020-a0e0-da69d45daa79",
       "name": "📥 Find Product By Handle (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1104,
-        2336
+        6976,
+        5232
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -909,10 +909,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1088,
-        1952
+        4784,
+        4848
       ],
-      "id": "1d14f23a-7ef3-4ec7-9f1c-371659d61595",
+      "id": "a451344d-7250-4dd2-879d-e2052cc21ad6",
       "name": "🩺 Any Images to Check?"
     },
     {
@@ -922,10 +922,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2496,
-        608
+        8368,
+        3504
       ],
-      "id": "82bf3058-c086-481f-9174-0fef480a6dbe",
+      "id": "74ac5bb8-fea3-4b2a-bcd4-b07d21437f67",
       "name": "📦 Parse Update Response"
     },
     {
@@ -935,10 +935,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1616,
-        1296
+        4080,
+        4288
       ],
-      "id": "34e93517-dbce-4cdd-bbf9-67beaafde72f",
+      "id": "7fe6f09f-f0f4-491b-9ecb-24326fed7017",
       "name": "🔀 Build GraphQL: Get Product Media (Update)"
     },
     {
@@ -948,10 +948,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2112,
-        2352
+        7984,
+        5248
       ],
-      "id": "99697a71-46a8-4446-9754-84758c47b54b",
+      "id": "d52cd9d3-dc54-47cd-bf6c-be22e6843cb0",
       "name": "📦 Parse Create Response"
     },
     {
@@ -974,13 +974,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "b77b1669-34f8-443a-a6c6-1a1c8e9188e5",
+      "id": "3710355b-44da-4b53-95da-a302d7eea40c",
       "name": "🔄 Shopify: Update Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        992,
-        1536
+        6864,
+        4432
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1018,10 +1018,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -80,
-        1936
+        5792,
+        4832
       ],
-      "id": "ae195147-d774-4c38-99fc-67089b44a999",
+      "id": "539d260a-64e0-40ec-b6a6-fd165a3fd6cf",
       "name": "🔀 Route: Create or Update"
     },
     {
@@ -1044,13 +1044,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "2b80ffb1-4ccd-4b8d-8e48-7a4405c55807",
+      "id": "36ba388f-0e9c-4f54-9bdf-5c167f2dc8ce",
       "name": "📥 Get Product Collections (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        128,
-        1280
+        6000,
+        4176
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1063,15 +1063,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Keeps the product gallery in step with the sheet's IMAGE URL columns.\n//\n// One file per image: the sheet's IMAGE URL is the file that already exists in\n// Shopify Files (image-sync's upload, or the shared CAD drawing), and that SAME\n// file is attached to the product (fileUpdate referencesToAdd). No copy is\n// made, so the sheet URL and the product URL are identical, and a CAD file used\n// by several products is one shared file. New products already work this way\n// (productSet reuses the file); this step makes updates match.\n//\n// Only runs for products whose Fields_to_update contains an IMAGE URL token --\n// nothing here touches a product nobody flagged.\n//\n// Matching: the exact file a sheet URL points to wins (so a product already\n// showing the right file is left alone, whatever its alt says); otherwise the\n// \"- Image N\" alt suffix (slot = sheet column) identifies the gallery item that\n// is being replaced.\n//\n// Safety rules (each closes a failure seen on LSBLD723-725):\n//  * A file the product does not own is never overwritten, re-labelled or\n//    deleted -- only detached. Owned = name starts with the product number, or\n//    it is a Shopify-made \"_<uuid>\" copy of an earlier sync.\n//  * The CAD drawing is shared across products, so its alt text is never\n//    touched (alt belongs to the file, not the product).\n//  * No copies are ever created here. A file that cannot be found stops the\n//    sync with an error naming the slot; a file that is still processing is\n//    skipped until the next run.\n//  * Gallery order is restored to sheet order after any change.\nconst SLOT_SUFFIX = / - Image (\\d+)$/;\nconst slotOf = (alt) => {\n  const m = SLOT_SUFFIX.exec(alt || '');\n  return m ? Number(m[1]) : null;\n};\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst SHOP_FILES = /(\\/s\\/files\\/1\\/0503\\/5730\\/5497\\/files\\/|\\/cdn\\/shop\\/files\\/)/;\nconst fileNameOf = (u) => {\n  const last = baseUrl(u).split('/').pop() || '';\n  try { return decodeURIComponent(last); } catch (e) { return last; }\n};\n// Identity of a file: its name when it is one of this shop's files (names are\n// unique per shop); the `?v=` cache-buster and the host never matter.\nconst keyOf = (u) => { const b = baseUrl(u); return b ? (SHOP_FILES.test(b) ? 'f:' + fileNameOf(b) : b) : ''; };\nconst UUID_COPY = /_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[A-Za-z0-9]+$/;\n\nconst mediaRes = $('📥 Get Product Media (GraphQL) (Update)').item.json;\nif (mediaRes?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get product media): ' + JSON.stringify(mediaRes.errors));\n}\nconst existingNodes = (mediaRes?.data?.product?.media?.nodes || []).map(n => ({\n  id: n.id, alt: n.alt || '', url: n.image?.url || ''\n}));\n\n// Candidate files from the lookup node; matched by exact file name below.\nconst findRes = $json || {};\nconst lookupFailed = !!(findRes.errors && findRes.errors.length);\nconst candidates = new Map();\nif (!lookupFailed) {\n  for (const conn of Object.values(findRes.data || {})) {\n    for (const n of (conn?.nodes || [])) {\n      const k = keyOf(n?.image?.url);\n      if (k && !candidates.has(k)) candidates.set(k, n);\n    }\n  }\n}\n\nconst upd = $('📝 Format Update Request').item.json.product;\nconst productId = upd.id;\nconst productGid = `gid://shopify/Product/${productId}`;\nconst route = $('🔀 Route: Create or Update').item.json.product || {};\nconst productNumber = String(route.product_number || '').trim();\nconst cadKey = keyOf(route.cad_drawing_url);\n\nconst desired = [];\nfor (const img of (upd.images || [])) {\n  const slot = slotOf(img.alt);\n  if (slot === null || !img.src) continue;\n  desired.push({ slot, src: img.src, alt: img.alt || '', key: keyOf(img.src) });\n}\ndesired.sort((a, b) => a.slot - b.slot);\nconst desiredKeys = new Set(desired.map(d => d.key));\nconst isCad = (d) => d.slot === 11 || (!!cadKey && d.key === cadKey);\n\nconst prefixed = (u) => {\n  const f = fileNameOf(u);\n  return !!productNumber && (f.startsWith(productNumber + '-') || f.startsWith(productNumber + '_') || f.startsWith(productNumber + '.'));\n};\nconst isOwned = (u) => UUID_COPY.test(fileNameOf(u)) || prefixed(u);\n\nconst existingBySlot = new Map();\nconst existingByKey = new Map();\nfor (const n of existingNodes) {\n  const s = slotOf(n.alt);\n  if (s !== null) {\n    const b = existingBySlot.get(s) || [];\n    b.push(n);\n    existingBySlot.set(s, b);\n  }\n  if (n.url) existingByKey.set(keyOf(n.url), n);\n}\n\nconst attach = [];      // { id, alt (optional), add }\nconst detachIds = [];\nconst deleteIds = [];\nconst claimed = new Set();\nconst finalIdBySlot = new Map();\nconst missing = [];\nlet changedGallery = false;\n\nfor (const d of desired) {\n  // 1. This exact file is already on the product -> keep it, even if its alt\n  //    names another slot: the sheet URL is the source of truth. Alt is only\n  //    corrected on files this product owns (never on the shared CAD).\n  const present = existingByKey.get(d.key);\n  if (present) {\n    claimed.add(present.id);\n    finalIdBySlot.set(d.slot, present.id);\n    if (present.alt !== d.alt && isOwned(present.url) && !isCad(d)) attach.push({ id: present.id, alt: d.alt, add: false });\n    continue;\n  }\n\n  // 2. Attach the file the sheet URL points to.\n  const f = candidates.get(d.key);\n  if (!f) {\n    missing.push(`Image ${d.slot} (${fileNameOf(d.src) || d.src})`);\n    continue;\n  }\n  if (f.fileStatus !== 'READY') {\n    // Still processing: keep whatever is in that slot now and retry next run.\n    for (const c of (existingBySlot.get(d.slot) || [])) {\n      if (claimed.has(c.id)) continue;\n      claimed.add(c.id);\n      if (!finalIdBySlot.has(d.slot)) finalIdBySlot.set(d.slot, c.id);\n    }\n    continue;\n  }\n  const entry = { id: f.id, add: true };\n  if (!isCad(d)) entry.alt = d.alt;      // CAD is shared: its alt stays as it is\n  attach.push(entry);\n  claimed.add(f.id);\n  finalIdBySlot.set(d.slot, f.id);\n  changedGallery = true;\n}\n\nif (missing.length > 0) {\n  throw new Error(\n    `Image sync stopped for ${productNumber || productId}: ${missing.length} sheet image(s) not found in Shopify Files -- ` +\n    missing.join(', ') +\n    (lookupFailed ? ` (file lookup returned an error: ${JSON.stringify(findRes.errors).slice(0, 300)})` : '') +\n    '. Nothing was changed. Fix the IMAGE URL cell (or re-run image-sync) and flag the row again.'\n  );\n}\n\n// Everything on the product that no sheet slot claimed: replaced copies or\n// files, removed slots, duplicates. Own files are deleted; anything not provably\n// ours is only detached from the product.\nfor (const n of existingNodes) {\n  if (claimed.has(n.id)) continue;\n  const slot = slotOf(n.alt);\n  if (slot !== null) {\n    const stillWanted = n.url && desiredKeys.has(keyOf(n.url));\n    if (isOwned(n.url) && !stillWanted) deleteIds.push(n.id); else detachIds.push(n.id);\n    changedGallery = true;\n  } else if (prefixed(n.url)) {\n    // Alt-less upload made by this pipeline before alt tagging existed.\n    deleteIds.push(n.id);\n    changedGallery = true;\n  }\n}\n\nconst FILE_UPDATE = `mutation FileUpdate($files: [FileUpdateInput!]!) {\n  fileUpdate(files: $files) {\n    files { id }\n    userErrors { field message code }\n  }\n}`;\nconst operations = [];\n\nif (attach.length > 0) {\n  operations.push({\n    type: 'attach',\n    body: {\n      query: FILE_UPDATE,\n      variables: {\n        files: attach.map(a => {\n          const o = { id: a.id };\n          if (a.alt !== undefined) o.alt = a.alt;\n          if (a.add) o.referencesToAdd = [productGid];\n          return o;\n        })\n      }\n    }\n  });\n}\nif (detachIds.length > 0) {\n  operations.push({\n    type: 'detach',\n    body: {\n      query: FILE_UPDATE,\n      variables: { files: detachIds.map(id => ({ id, referencesToRemove: [productGid] })) }\n    }\n  });\n}\nif (deleteIds.length > 0) {\n  operations.push({\n    type: 'delete',\n    body: {\n      query: `mutation FileDelete($fileIds: [ID!]!) {\n  fileDelete(fileIds: $fileIds) {\n    deletedFileIds\n    userErrors { field message }\n  }\n}`,\n      variables: { fileIds: deleteIds }\n    }\n  });\n}\n\n// Put the gallery back in sheet order (slot 1, 2, 3 ...). Attached files land at\n// the end by default, so without this a swapped photo would jump to the last\n// position.\nif (changedGallery) {\n  const targetIds = desired.map(d => finalIdBySlot.get(d.slot)).filter(Boolean);\n  if (targetIds.length > 1) {\n    operations.push({\n      type: 'reorder',\n      body: {\n        query: `mutation ProductReorderMedia($id: ID!, $moves: [MoveInput!]!) {\n  productReorderMedia(id: $id, moves: $moves) {\n    job { id }\n    mediaUserErrors { field message code }\n  }\n}`,\n        variables: { id: productGid, moves: targetIds.map((id, i) => ({ id, newPosition: String(i) })) }\n      }\n    });\n  }\n}\n\nif (operations.length === 0) {\n  return [{ json: { message: 'No image changes to sync' } }];\n}\n\nreturn operations.map(op => ({ json: op }));\n"
+        "jsCode": "// Keeps the product gallery in step with the sheet's IMAGE URL columns.\n//\n// One file per image: the sheet's IMAGE URL is the file that already exists in\n// Shopify Files (image-sync's upload, or the shared CAD drawing), and that SAME\n// file is attached to the product (fileUpdate referencesToAdd). No copy is\n// made, so the sheet URL and the product URL are identical, and a CAD file used\n// by several products is one shared file. New products already work this way\n// (productSet reuses the file); this step makes updates match.\n//\n// Only runs for products whose Fields_to_update contains an IMAGE URL token --\n// nothing here touches a product nobody flagged.\n//\n// Matching: the exact file a sheet URL points to wins (so a product already\n// showing the right file is left alone, whatever its alt says); otherwise the\n// \"- Image N\" alt suffix (slot = sheet column) identifies the gallery item that\n// is being replaced.\n//\n// Safety rules (each closes a failure seen on LSBLD723-725):\n//  * A file the product does not own is never overwritten, re-labelled or\n//    deleted -- only detached. Owned = name starts with the product number, or\n//    it is a Shopify-made \"_<uuid>\" copy of an earlier sync.\n//  * The CAD drawing is shared across products, so its alt text is never\n//    touched (alt belongs to the file, not the product).\n//  * No copies are ever created here. A file that cannot be found stops the\n//    sync with an error naming the slot; a file that is still processing is\n//    skipped until the next run.\n//  * Gallery order is restored to sheet order after any change.\nconst SLOT_SUFFIX = / - Image (\\d+)$/;\nconst slotOf = (alt) => {\n  const m = SLOT_SUFFIX.exec(alt || '');\n  return m ? Number(m[1]) : null;\n};\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst SHOP_FILES = /(\\/s\\/files\\/1\\/0503\\/5730\\/5497\\/files\\/|\\/cdn\\/shop\\/files\\/)/;\nconst fileNameOf = (u) => {\n  const last = baseUrl(u).split('/').pop() || '';\n  try { return decodeURIComponent(last); } catch (e) { return last; }\n};\n// Identity of a file: its name when it is one of this shop's files (names are\n// unique per shop); the `?v=` cache-buster and the host never matter.\nconst keyOf = (u) => { const b = baseUrl(u); return b ? (SHOP_FILES.test(b) ? 'f:' + fileNameOf(b) : b) : ''; };\nconst UUID_COPY = /_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[A-Za-z0-9]+$/;\n\nconst mediaRes = $('📥 Get Product Media (GraphQL) (Update)').item.json;\nif (mediaRes?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get product media): ' + JSON.stringify(mediaRes.errors));\n}\nconst existingNodes = (mediaRes?.data?.product?.media?.nodes || []).map(n => ({\n  id: n.id, alt: n.alt || '', url: n.image?.url || ''\n}));\n\n// Candidate files from the lookup node; matched by exact file name below.\nconst findRes = $json || {};\nconst lookupFailed = !!(findRes.errors && findRes.errors.length);\nconst candidates = new Map();\nif (!lookupFailed) {\n  for (const conn of Object.values(findRes.data || {})) {\n    for (const n of (conn?.nodes || [])) {\n      const k = keyOf(n?.image?.url);\n      if (k && !candidates.has(k)) candidates.set(k, n);\n    }\n  }\n}\n\nconst upd = $('📝 Format Update Request').item.json.product;\nconst productId = upd.id;\nconst productGid = `gid://shopify/Product/${productId}`;\nconst route = $('🔀 Route: Create or Update').item.json.product || {};\nconst productNumber = String(route.product_number || '').trim();\nconst cadKey = keyOf(route.cad_drawing_url);\n\nconst desired = [];\nfor (const img of (upd.images || [])) {\n  const slot = slotOf(img.alt);\n  if (slot === null || !img.src) continue;\n  desired.push({ slot, src: img.src, alt: img.alt || '', key: keyOf(img.src) });\n}\ndesired.sort((a, b) => a.slot - b.slot);\nconst desiredKeys = new Set(desired.map(d => d.key));\nconst isCad = (d) => d.slot === 11 || (!!cadKey && d.key === cadKey);\n\nconst prefixed = (u) => {\n  const f = fileNameOf(u);\n  return !!productNumber && (f.startsWith(productNumber + '-') || f.startsWith(productNumber + '_') || f.startsWith(productNumber + '.'));\n};\nconst isOwned = (u) => UUID_COPY.test(fileNameOf(u)) || prefixed(u);\n\nconst existingBySlot = new Map();\nconst existingByKey = new Map();\nfor (const n of existingNodes) {\n  const s = slotOf(n.alt);\n  if (s !== null) {\n    const b = existingBySlot.get(s) || [];\n    b.push(n);\n    existingBySlot.set(s, b);\n  }\n  if (n.url) existingByKey.set(keyOf(n.url), n);\n}\n\nconst attach = [];      // { id, alt (optional), add }\nconst detachIds = [];\nconst deleteIds = [];\nconst claimed = new Set();\nconst finalIdBySlot = new Map();\nconst missing = [];\nlet changedGallery = false;\n\nfor (const d of desired) {\n  // 1. This exact file is already on the product -> keep it, even if its alt\n  //    names another slot: the sheet URL is the source of truth. Alt is only\n  //    corrected on files this product owns (never on the shared CAD).\n  const present = existingByKey.get(d.key);\n  if (present) {\n    claimed.add(present.id);\n    finalIdBySlot.set(d.slot, present.id);\n    if (present.alt !== d.alt && isOwned(present.url) && !isCad(d)) {\n      attach.push({ id: present.id, alt: d.alt, add: false });\n      // Precaution: any change to the gallery gets the order checked and restored afterwards (see the\n      // gallery order stage). Not proven to be needed for alt-only changes; harmless if the order is already right.\n      changedGallery = true;\n    }\n    continue;\n  }\n\n  // 2. Attach the file the sheet URL points to.\n  const f = candidates.get(d.key);\n  if (!f) {\n    missing.push(`Image ${d.slot} (${fileNameOf(d.src) || d.src})`);\n    continue;\n  }\n  if (f.fileStatus !== 'READY') {\n    // Still processing: keep whatever is in that slot now and retry next run.\n    for (const c of (existingBySlot.get(d.slot) || [])) {\n      if (claimed.has(c.id)) continue;\n      claimed.add(c.id);\n      if (!finalIdBySlot.has(d.slot)) finalIdBySlot.set(d.slot, c.id);\n    }\n    continue;\n  }\n  const entry = { id: f.id, add: true };\n  if (!isCad(d)) entry.alt = d.alt;      // CAD is shared: its alt stays as it is\n  attach.push(entry);\n  claimed.add(f.id);\n  finalIdBySlot.set(d.slot, f.id);\n  changedGallery = true;\n}\n\nif (missing.length > 0) {\n  throw new Error(\n    `Image sync stopped for ${productNumber || productId}: ${missing.length} sheet image(s) not found in Shopify Files -- ` +\n    missing.join(', ') +\n    (lookupFailed ? ` (file lookup returned an error: ${JSON.stringify(findRes.errors).slice(0, 300)})` : '') +\n    '. Nothing was changed. Fix the IMAGE URL cell (or re-run image-sync) and flag the row again.'\n  );\n}\n\n// Everything on the product that no sheet slot claimed: replaced copies or\n// files, removed slots, duplicates. Own files are deleted; anything not provably\n// ours is only detached from the product.\nfor (const n of existingNodes) {\n  if (claimed.has(n.id)) continue;\n  const slot = slotOf(n.alt);\n  if (slot !== null) {\n    const stillWanted = n.url && desiredKeys.has(keyOf(n.url));\n    if (isOwned(n.url) && !stillWanted) deleteIds.push(n.id); else detachIds.push(n.id);\n    changedGallery = true;\n  } else if (prefixed(n.url)) {\n    // Alt-less upload made by this pipeline before alt tagging existed.\n    deleteIds.push(n.id);\n    changedGallery = true;\n  }\n}\n\nconst FILE_UPDATE = `mutation FileUpdate($files: [FileUpdateInput!]!) {\n  fileUpdate(files: $files) {\n    files { id }\n    userErrors { field message code }\n  }\n}`;\nconst operations = [];\n\nif (attach.length > 0) {\n  operations.push({\n    type: 'attach',\n    body: {\n      query: FILE_UPDATE,\n      variables: {\n        files: attach.map(a => {\n          const o = { id: a.id };\n          if (a.alt !== undefined) o.alt = a.alt;\n          if (a.add) o.referencesToAdd = [productGid];\n          return o;\n        })\n      }\n    }\n  });\n}\nif (detachIds.length > 0) {\n  operations.push({\n    type: 'detach',\n    body: {\n      query: FILE_UPDATE,\n      variables: { files: detachIds.map(id => ({ id, referencesToRemove: [productGid] })) }\n    }\n  });\n}\nif (deleteIds.length > 0) {\n  operations.push({\n    type: 'delete',\n    body: {\n      query: `mutation FileDelete($fileIds: [ID!]!) {\n  fileDelete(fileIds: $fileIds) {\n    deletedFileIds\n    userErrors { field message }\n  }\n}`,\n      variables: { fileIds: deleteIds }\n    }\n  });\n}\n\n// The gallery order is restored in a SEPARATE, later stage (see \"🧩 Collect Sync Results\" onward).\n// It used to be sent right here, back to back with the attach / delete above. Shopify applies file\n// attach and delete asynchronously, so the reorder arrived before the files were on the product and\n// was silently dropped (a failed reorder was ignored by design), leaving photos in whatever order\n// they landed -- the featured photo changed on ~200 fireplaces. Now: wait, confirm the files are on\n// the product, reorder, re-read, verify.\nconst desiredIds = desired.map(d => finalIdBySlot.get(d.slot)).filter(Boolean);\nconst curIds = existingNodes.map(n => n.id).filter(id => desiredIds.includes(id));\nconst orderMismatch = desiredIds.length > 1 && curIds.length === desiredIds.length && JSON.stringify(curIds) !== JSON.stringify(desiredIds);\nconst plan = { productGid, desiredIds, wantReorder: changedGallery || orderMismatch || attach.length > 0 };\n\nif (operations.length === 0) {\n  return [{ json: { message: 'No image changes to sync', plan } }];\n}\n\nreturn operations.map(op => ({ json: { ...op, plan } }));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1152,
-        1296
+        5120,
+        4288
       ],
-      "id": "725c84cd-c6cc-4111-a9e4-89d0322ab2bf",
+      "id": "bd0b6763-ad5c-4968-ae75-c02650423a8d",
       "name": "🔀 Build GraphQL: Sync Product Images"
     },
     {
@@ -1094,13 +1094,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "35d3f051-2346-4f35-abbf-8846cb17c3e9",
+      "id": "765156fa-a766-4856-bfe2-c871d7ec33fe",
       "name": "➕ Shopify: Create Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        160,
-        2352
+        6032,
+        5248
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1131,13 +1131,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "fd094b90-624e-46d8-8890-475edea0621f",
+      "id": "152ee4ea-0542-4b7b-a923-7f7aee0f7372",
       "name": "🔄 Shopify: Update Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        528,
-        256
+        6400,
+        3152
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1168,13 +1168,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "af6fad9a-c4ff-4653-8df1-32362ce4cf8b",
+      "id": "89fcc0b3-ae9c-4863-9d6f-2f4179c6ea3d",
       "name": "➕ Shopify: Add to Collection (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1632,
-        1104
+        7504,
+        4000
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1190,65 +1190,65 @@
       "parameters": {
         "jsCode": "// Reads the SAME payload object built (unchanged) by \"📝 Format Update Request\".\n// Only translates it into GraphQL productUpdate / productVariantsBulkUpdate calls.\nconst p = $json.product;\nconst numericId = p.id;\n\nconst productInput = { id: `gid://shopify/Product/${numericId}` };\nif (p.body_html !== undefined) productInput.descriptionHtml = p.body_html;\nif (p.title !== undefined) productInput.title = p.title;\nif (p.tags !== undefined) {\n  productInput.tags = String(p.tags).split(',').map(t => t.trim()).filter(Boolean);\n}\nif (Array.isArray(p.metafields) && p.metafields.length > 0) {\n  productInput.metafields = p.metafields;\n}\n\n// Image sync is handled separately (see \"✅ Check if Image Update Needed\" and\n// its branch) via fileUpdate/productCreateMedia -- productUpdate's own `media`\n// argument only ever ADDS new media, it can never replace an existing image in\n// place, so resubmitting the full image list here on every image-triggered\n// update was silently duplicating every unchanged image alongside the one that\n// actually changed.\nconst PRODUCT_UPDATE_QUERY = `mutation ProductUpdate($product: ProductUpdateInput!) {\n  productUpdate(product: $product) {\n    product { id }\n    userErrors { field message }\n  }\n}`;\n\nconst variables = { product: productInput };\n\n// productUpdate does not support variant fields (Shopify docs) -- price/weight\n// need a separate productVariantsBulkUpdate call, same as REST effectively\n// needed a variant sub-object but in one call; here it's two calls.\nconst variant = (Array.isArray(p.variants) && p.variants[0]) || null;\nconst needsVariantUpdate = !!(variant && variant.id && (variant.price !== undefined || variant.weight !== undefined));\n\nlet variantBody = null;\nif (needsVariantUpdate) {\n  const variantInput = { id: `gid://shopify/ProductVariant/${variant.id}` };\n  // never push a missing / 0 price onto an existing product\nif (variant.price !== undefined && Number(variant.price) > 0) variantInput.price = variant.price;\n  if (variant.weight !== undefined) {\n    // Marblebee's weight unit is always 'kg' (CONFIG.WEIGHT_UNIT in the sibling\n    // create-path node) -- there is no per-item weight_unit on the update payload.\n    variantInput.inventoryItem = {\n      measurement: { weight: { value: variant.weight, unit: 'KILOGRAMS' } }\n    };\n  }\n\n  const PRODUCT_VARIANTS_BULK_UPDATE_QUERY = `mutation ProductVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {\n  productVariantsBulkUpdate(productId: $productId, variants: $variants) {\n    productVariants { id }\n    userErrors { field message }\n  }\n}`;\n\n  variantBody = {\n    query: PRODUCT_VARIANTS_BULK_UPDATE_QUERY,\n    variables: { productId: `gid://shopify/Product/${numericId}`, variants: [variantInput] }\n  };\n}\n\nreturn [{\n  json: {\n    body: { query: PRODUCT_UPDATE_QUERY, variables },\n    needsVariantUpdate,\n    variantBody\n  }\n}];"
       },
-      "id": "fd74e97b-20af-4f35-9fc0-8bdd8e95fb0e",
+      "id": "2ddfdbb8-7a26-42f1-848b-0528f84c1dff",
       "name": "🔀 Build GraphQL: Update Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        768,
-        1536
+        6640,
+        4432
       ]
     },
     {
       "parameters": {
         "jsCode": "// metafieldsDelete addresses metafields by ownerId + namespace + key (the\n// singular metafieldDelete-by-id mutation no longer exists on current API\n// versions) -- owner_id/namespace/key were added onto this \"delete\" operation\n// object in \"🧠 Sync Metafields\" (additive fields only).\nconst QUERY = `mutation MetafieldsDelete($metafields: [MetafieldIdentifierInput!]!) {\n  metafieldsDelete(metafields: $metafields) {\n    deletedMetafields { key }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- multiple metafield deletes can be in flight at\n// once (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const op = item.json;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${op.owner_id}`,\n            namespace: op.namespace,\n            key: op.key\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "94f5b5a8-8622-4039-9349-163b0e71e480",
+      "id": "2c0e7715-efd4-46d2-83af-6159c73a3b2e",
       "name": "🔀 Build GraphQL: Delete Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        448,
-        464
+        6320,
+        3360
       ]
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `query GetOnlineStorePublication {\n  publications(first: 10) {\n    nodes { id name }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY } } }];"
       },
-      "id": "3625a62b-a887-4b4d-a5b3-28f6eeec3b1e",
+      "id": "d67545ed-c433-43b0-b931-2346b737da67",
       "name": "🔀 Build GraphQL: Get Online Store Publication",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1008,
-        2720
+        6880,
+        5616
       ]
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {\n  metafieldsSet(metafields: $metafields) {\n    metafields { id }\n    userErrors { field message code }\n  }\n}`;\n\n// Runs once per input item -- \"🧠 Sync Metafields\" can emit multiple create\n// operations at once (e.g. Material Catalog URL + Care Guide URL both new in\n// the same run), and this node must build one request per item, not just the\n// first (the default \"run once for all items\" Code node mode only sees $json\n// as the first item, silently dropping the rest).\nreturn $input.all().map(item => {\n  const m = item.json.payload.metafield;\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          metafields: [{\n            ownerId: `gid://shopify/Product/${m.owner_id}`,\n            namespace: m.namespace,\n            key: m.key,\n            type: m.type,\n            value: m.value\n          }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "e5abf026-6230-4d96-bb8e-4877e1689104",
+      "id": "3693a094-2da7-4c47-b0a2-44c2994effea",
       "name": "🔀 Build GraphQL: Create Metafield",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        5872,
+        2896
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reshapes into the REST-shaped { metafields: [{id, namespace, key, value, type}] }\n// array that \"🧠 Sync Metafields (CREATE / UPDATE / DELETE)\" already expects unchanged.\nconst res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (get metafields): ' + JSON.stringify(res.errors));\n}\nconst edges = res?.data?.product?.metafields?.edges || [];\nconst metafields = edges.map(e => ({\n  id: e.node.id,\n  namespace: e.node.namespace,\n  key: e.node.key,\n  value: e.node.value,\n  type: e.node.type\n}));\nreturn [{ json: { metafields } }];"
       },
-      "id": "39fb9684-50d3-4708-ac3d-de519646c3fe",
+      "id": "f89e9797-ab30-4868-b729-4606761d320d",
       "name": "🔀 Adapt Response: Existing Metafields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -416,
-        256
+        5456,
+        3152
       ]
     },
     {
@@ -1309,10 +1309,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -416,
-        1296
+        5456,
+        4192
       ],
-      "id": "cb02b57c-6d4c-48a9-872d-7dee71b94449",
+      "id": "c56e5113-b352-48cd-a2d2-cfb24e4a929e",
       "name": "❓Check if colletion update request needed",
       "alwaysOutputData": false
     },
@@ -1341,13 +1341,13 @@
         },
         "options": {}
       },
-      "id": "f25ebf66-50e4-418f-ab40-ed466afc5840",
+      "id": "ef2e1802-0d89-4b4e-8bc9-a05db8838b4c",
       "name": "❓ Needs Variant Update? (GraphQL)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1520,
-        1536
+        7392,
+        4432
       ]
     },
     {
@@ -1357,10 +1357,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -576,
-        2256
+        5296,
+        5152
       ],
-      "id": "8577517e-7a8f-4ae0-b93b-464c9a601fb8",
+      "id": "557769f1-f17f-4d9f-ace6-6549a789f7c5",
       "name": "🩺 Pass Through Product"
     },
     {
@@ -1370,23 +1370,23 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        2128,
-        576
+        8000,
+        3472
       ],
-      "id": "fa0559c6-ac31-4cfd-aade-6719f8598dac",
+      "id": "90a7d088-9bfe-49ce-a03d-5c98949979d2",
       "name": "Merge"
     },
     {
       "parameters": {
         "jsCode": "const productId = $json.product.id;\nconst QUERY = `query GetProductMetafields($id: ID!) {\n  product(id: $id) {\n    metafields(first: 250) {\n      edges { node { id legacyResourceId namespace key value type } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { id: `gid://shopify/Product/${productId}` } } } }];"
       },
-      "id": "87ee1389-851b-4ca5-a743-afc1b364ab8f",
+      "id": "a4efed94-ec72-4824-87ef-e01583d723ee",
       "name": "🔀 Build GraphQL: Get Metafields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -880,
-        256
+        4992,
+        3152
       ]
     },
     {
@@ -1409,13 +1409,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "df5dfe89-cf12-43e1-9e67-f87b77829866",
+      "id": "2c32dd62-9a68-49ae-bdd0-444372b30dbd",
       "name": "➕ Shopify: Publish Product (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1760,
-        2720
+        7632,
+        5616
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1431,13 +1431,13 @@
       "parameters": {
         "jsCode": "// Runs once per input item -- multiple metafield creates can be in flight at once.\nreturn $input.all().map(item => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (metafieldsSet/create): ' + JSON.stringify(res.errors));\n  }\n  const userErrors = res?.data?.metafieldsSet?.userErrors;\n  if (userErrors?.length) {\n    throw new Error('Shopify metafieldsSet (create) userErrors: ' + JSON.stringify(userErrors));\n  }\n  return { json: {} };\n});"
       },
-      "id": "fb29e8d8-d689-40c5-889f-600bc6b54975",
+      "id": "777aff35-2ed5-4694-8c95-9612422fea33",
       "name": "✅ Check Create Metafield Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        0
+        6336,
+        2896
       ]
     },
     {
@@ -1460,13 +1460,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "563e3032-d217-4eab-b0fa-bc2a30a7ced9",
+      "id": "bc153e0c-28ac-44ab-9d1e-a300fef36fd2",
       "name": "🗑️ Remove Metafields (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        672,
-        464
+        6544,
+        3360
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1481,39 +1481,39 @@
       "parameters": {
         "jsCode": "const res = $json;\nconst errors = res?.errors;\nconst userErrors = res?.data?.publishablePublish?.userErrors;\n\n// Reordering this node ahead of \"🔗 Build Collection Mappings\" and\n// \"📦 Parse Create Response\" means it is now their direct input -- both expect\n// a `.product` field (the shape \"🔀 Adapt Response: Create Product\" produces),\n// so it must be carried forward here or those nodes silently break (one throws\n// on undefined.id, the other silently falls back to {} and writes blank data\n// to the sheet).\nconst product = $('🔀 Adapt Response: Create Product').item.json.product;\n\n// A failed publish must not throw and halt the run -- the sheet write-back\n// (which records the product's Shopify URL) needs to happen regardless, or the\n// row looks \"not yet created\" next run and retries productSet with the same\n// handle, guaranteed to fail with HANDLE_NOT_UNIQUE since the product already\n// exists. A product left unpublished here is caught by the periodic\n// \"unpublished product\" reconciliation check instead.\nif (errors?.length || userErrors?.length) {\n  return [{ json: { product, published: false, publish_error: JSON.stringify(errors?.length ? errors : userErrors) } }];\n}\nreturn [{ json: { product, published: true } }];"
       },
-      "id": "20ac599d-2465-42bc-82e9-88efe1f4811d",
+      "id": "5e34513d-96c3-46b5-bb22-984934611901",
       "name": "✅ Check Publish Product Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1680,
-        2352
+        7552,
+        5248
       ]
     },
     {
       "parameters": {
         "jsCode": "// Reads the SAME cleanedProduct object built (unchanged) by \"📝 Format Create Request\".\nconst p = $json.product;\n\nconst tagsArr = String(p.tags || '').split(',').map(t => t.trim()).filter(Boolean);\nconst WEIGHT_UNIT_MAP = { kg: 'KILOGRAMS', g: 'GRAMS', lb: 'POUNDS', oz: 'OUNCES' };\nconst variant = (Array.isArray(p.variants) && p.variants[0]) || {};\n\n// Second guard (the main pipeline already skips rows without a price): never create a product\n// whose price is missing or 0 -- it would be orderable for free.\nif (!(Number(variant.price) > 0)) {\n  throw new Error(`Refusing to create \"${p.title}\" (${p.handle}): price is missing or 0`);\n}\n\n// Shopify requires an explicit productOptions entry whenever `variants` is\n// present on productSet, even for a plain single-SKU product with no real\n// customer-facing options -- omitting it (or passing optionValues: []) fails\n// with PRODUCT_OPTIONS_INPUT_MISSING. \"Title\" / \"Default Title\" is Shopify's\n// own magic-string convention for its internal single-default-variant option\n// (exact casing required, confirmed against a live productSet call) -- it's\n// the same hidden pseudo-option a plain REST product without options gets,\n// so it never shows a variant selector on the storefront.\nconst DEFAULT_OPTION_NAME = 'Title';\nconst DEFAULT_OPTION_VALUE = 'Default Title';\n\nconst variantInput = {\n  optionValues: [\n    { optionName: DEFAULT_OPTION_NAME, name: DEFAULT_OPTION_VALUE }\n  ],\n  price: variant.price,\n  inventoryItem: {\n    requiresShipping: !!variant.requires_shipping,\n    measurement: {\n      weight: {\n        value: variant.weight,\n        unit: WEIGHT_UNIT_MAP[variant.weight_unit] || 'KILOGRAMS'\n      }\n    }\n  }\n};\n\nconst input = {\n  title: p.title,\n  vendor: p.vendor,\n  productType: p.product_type,\n  tags: tagsArr,\n  handle: p.handle,\n  descriptionHtml: p.body_html || '',\n  // GraphQL's ACTIVE status only means \"publishable\", unlike REST where a\n  // created product is also auto-published to the Online Store channel --\n  // see the separate publish step appended after this create call.\n  status: 'ACTIVE',\n  productOptions: [\n    { name: DEFAULT_OPTION_NAME, values: [{ name: DEFAULT_OPTION_VALUE }] }\n  ],\n  variants: [variantInput]\n};\n\nif (Array.isArray(p.metafields) && p.metafields.length > 0) {\n  input.metafields = p.metafields;\n}\n\nif (Array.isArray(p.images) && p.images.length > 0) {\n  input.files = p.images.map(img => ({\n    originalSource: img.src,\n    alt: img.alt || '',\n    contentType: 'IMAGE'\n  }));\n}\n\nconst PRODUCT_SET_QUERY = `mutation ProductSet($input: ProductSetInput!, $synchronous: Boolean!) {\n  productSet(input: $input, synchronous: $synchronous) {\n    product {\n      id\n      legacyResourceId\n      title\n      handle\n      variants(first: 1) {\n        edges { node { id legacyResourceId } }\n      }\n    }\n    userErrors { field message code }\n  }\n}`;\n\nreturn [{\n  json: {\n    body: { query: PRODUCT_SET_QUERY, variables: { input, synchronous: true } }\n  }\n}];"
       },
-      "id": "bd96d99c-b2d8-43b9-ac58-9c725114f657",
+      "id": "ea359956-6e61-41c9-9a37-e6bb4793f61e",
       "name": "🔀 Build GraphQL: Create Product",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -64,
-        2352
+        5808,
+        5248
       ]
     },
     {
       "parameters": {
         "jsCode": "const GID = (type, id) => `gid://shopify/${type}/${id}`;\nconst QUERY = `mutation CollectionRemoveProducts($id: ID!, $productIds: [ID!]!) {\n  collectionRemoveProducts(id: $id, productIds: $productIds) {\n    job { id done }\n    userErrors { field message }\n  }\n}`;\n\n// Runs once per input item -- \"🔧 Extract Collects to update or delete\" can\n// emit multiple collections to remove at once (the default \"run once for all\n// items\" Code node mode only sees $json as the first item, silently dropping\n// the rest).\nreturn $input.all().map(item => {\n  // \"🔧 Extract Collects to update or delete\" only carries collect_id forward\n  // on its delete branch (REST never needed product_id for a DELETE-by-collect-id\n  // call) -- GraphQL's collectionRemoveProducts needs both, so product_id is\n  // pulled back in here from the same source node the rest of this branch\n  // already reads from, without touching that existing decision-logic node.\n  const collectionId = item.json.collect_id;\n  const productId = $('📝 Format Update Request').item.json.product.id;\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: { id: GID('Collection', collectionId), productIds: [GID('Product', productId)] }\n      }\n    }\n  };\n});"
       },
-      "id": "3b71eaca-403f-481b-9992-1c451835a7bc",
+      "id": "d6a93700-60ad-4510-a065-899f80b921a4",
       "name": "🔀 Build GraphQL: Remove from Collection",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        880
+        6784,
+        3776
       ]
     },
     {
@@ -1523,23 +1523,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -208,
-        256
+        5664,
+        3152
       ],
-      "id": "fc91ec19-20b5-4e6e-b010-a4677fbbe8cc",
+      "id": "3121dbe0-22d7-41c2-98e0-33c45fb5c5f4",
       "name": "🧠 Sync Metafields (CREATE / UPDATE / DELETE)"
     },
     {
       "parameters": {
         "jsCode": "const QUERY = `query FindProductByHandle($handle: String!) {\n  productByHandle(handle: $handle) {\n    id\n    legacyResourceId\n    title\n    handle\n    variants(first: 1) {\n      edges { node { id legacyResourceId } }\n    }\n  }\n}`;\nreturn [{ json: { body: { query: QUERY, variables: { handle: $json.attempted_handle } } } }];"
       },
-      "id": "36e3586b-29a1-41b4-b9a8-164392f704cb",
+      "id": "1ccff81a-f0ac-42fc-b2a9-e81c0b94563f",
       "name": "🔍 Build GraphQL: Find Product By Handle",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        2336
+        6752,
+        5232
       ]
     },
     {
@@ -1625,23 +1625,23 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        48,
-        240
+        5920,
+        3136
       ],
-      "id": "f239c9fc-121d-49e0-93ad-91ed6c0e61a3",
+      "id": "2cbbb694-3246-4677-a131-d3ac1397fd30",
       "name": "Switch1"
     },
     {
       "parameters": {
         "jsCode": "const res = $json;\nif (res?.errors?.length) {\n  throw new Error('Shopify GraphQL error (productUpdate): ' + JSON.stringify(res.errors));\n}\nconst userErrors = res?.data?.productUpdate?.userErrors;\nif (userErrors?.length) {\n  throw new Error('Shopify productUpdate userErrors: ' + JSON.stringify(userErrors));\n}\n\nconst build = $('🔀 Build GraphQL: Update Product').item.json;\nreturn [{ json: { needsVariantUpdate: build.needsVariantUpdate, variantBody: build.variantBody } }];"
       },
-      "id": "94973d5f-1505-42b1-8d25-86f7fb7d4408",
+      "id": "1bcb5b8b-eff9-41f3-a31b-3ca886032a26",
       "name": "✅ Check Update Product Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1232,
-        1536
+        7104,
+        4432
       ]
     },
     {
@@ -1680,10 +1680,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        2512,
-        2352
+        8384,
+        5248
       ],
-      "id": "3c247bc8-8588-4986-bb21-7113a168b19f",
+      "id": "1cb3f0a4-6514-418d-b7e1-a71e42c8843e",
       "name": "💾 Update Google Sheet",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1717,10 +1717,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1344,
-        1296
+        4352,
+        4288
       ],
-      "id": "4ae28624-c271-4588-bef5-5885178ee507",
+      "id": "b2b93ee0-06fb-4f98-aad5-4184beb5de7b",
       "name": "📥 Get Product Media (GraphQL) (Update)",
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1738,10 +1738,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1344,
-        1504
+        4528,
+        4288
       ],
-      "id": "a21e9138-8a8b-4d31-be0c-6f2c995ea6ce",
+      "id": "35ffc8cc-ce4b-40ca-be05-0b1474f6b1c4",
       "name": "🔀 Build GraphQL: Find Original Files"
     },
     {
@@ -1767,10 +1767,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1152,
-        1504
+        4832,
+        4288
       ],
-      "id": "05adbf86-8890-43a1-a155-81baf4321e78",
+      "id": "2c21c0d1-1b39-4c20-898c-61ccd7a8b708",
       "name": "📥 Find Original Files (GraphQL)",
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -1809,10 +1809,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        752,
-        1280
+        6624,
+        4176
       ],
-      "id": "acd54195-39e4-496d-9ce1-bfd0cc46557b",
+      "id": "27cfc9a0-7635-4e31-b9b2-302b785d45f2",
       "name": "❓ Has Existing Collections?"
     },
     {
@@ -1840,13 +1840,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "f8a028a2-f8d3-410e-b790-22008cb03bd2",
+      "id": "3512e0c4-0c82-4ebf-961e-93b8036fcc6f",
       "name": "🔀 Handle Collision?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        608,
-        2352
+        6480,
+        5248
       ]
     },
     {
@@ -1871,13 +1871,13 @@
           }
         }
       },
-      "id": "ed878230-d120-4024-9a1e-9d5b2789026f",
+      "id": "06f61fab-de2f-4a72-ac55-a77c48385336",
       "name": "📖 Re-Read Row (Fresh Fields_to_update)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        2688,
-        608
+        8560,
+        3504
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1892,14 +1892,326 @@
       "parameters": {
         "jsCode": "// Fixes a race between this update's Fields_to_update clear and any OTHER\n// branch (e.g. the CAD-Image11 sync) writing a NEW token to the same row's\n// Fields_to_update while this update was in flight. Re-reads the sheet fresh\n// (right now, not the stale snapshot from when this row's processing started)\n// and only removes the specific fields THIS update actually processed --\n// anything else present now (added concurrently) is preserved untouched.\nconst input = $('📦 Parse Update Response').item.json;\nconst rows = $input.all().map(i => i.json);\nconst row = rows.find(r => String(r.row_number) === String(input.row_number));\nconst currentFresh = row ? String(row['Fields_to_update'] || '') : '';\n\nconst processed = new Set(String(input.processedFields || '').split(',').map(t => t.trim()).filter(Boolean));\nconst remaining = currentFresh.split(',').map(t => t.trim()).filter(Boolean).filter(t => !processed.has(t));\n\nreturn [{\n  json: {\n    sheet_name: input.sheet_name,\n    row_number: input.row_number,\n    Ready_to_post: input.Ready_to_post,\n    last_update_time: input.last_update_time,\n    Fields_to_update: remaining.join(','),\n  }\n}];"
       },
-      "id": "190c872f-822d-4959-a227-9c976210c34b",
+      "id": "2358c11f-31be-4527-927a-f5df4b62bd55",
       "name": "🔀 Compute Field Diff",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2704,
-        864
+        8576,
+        3760
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item for the whole product, whether or not file operations ran (this node is reached from\n// \"Check Sync Images Result\" -- after every attach / delete answered -- or directly when there was\n// nothing to attach or delete). Carries the plan from \"Build GraphQL: Sync Product Images\".\nconst plan = $('🔀 Build GraphQL: Sync Product Images').first().json.plan;\nconst READ = `query GetProductMedia($id: ID!) {\n  product(id: $id) { media(first: 250) { nodes { id alt ... on MediaImage { image { url } } } } }\n}`;\nreturn [{ json: { plan, readBody: { query: READ, variables: { id: plan.productGid } } } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5232,
+        3792
+      ],
+      "id": "ec57773e-4294-4a00-982c-fa5c4af72faf",
+      "name": "🧩 Collect Sync Results"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5456,
+        3792
+      ],
+      "id": "e72b7f35-7c8d-4af9-aa92-2e64a8f06b4a",
+      "name": "⏳ Wait for Shopify Files (first check)",
+      "webhookId": "3ecdbf11-51cc-4ffb-befe-d3e72be2bd34"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('🧩 Collect Sync Results').first().json.readBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5680,
+        3792
+      ],
+      "id": "709c0450-0171-438b-ae7f-30d93a521144",
+      "name": "📥 Read Product Gallery (first check)",
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compares the product's CURRENT gallery with the sheet order. Only files that are already on the\n// product are moved, so a file that has not arrived yet can never make the whole reorder fail.\nconst plan = $('🧩 Collect Sync Results').first().json.plan;\nconst media = $input.first().json.data?.product?.media?.nodes || [];\nconst cur = media.map(m => m.id);\nconst present = plan.desiredIds.filter(id => cur.includes(id));\nconst missing = plan.desiredIds.filter(id => !cur.includes(id));\nconst inOrder = JSON.stringify(cur.slice(0, present.length)) === JSON.stringify(present);\nconst moves = (!inOrder && present.length > 1) ? present.map((id, i) => ({ id, newPosition: String(i) })) : [];\nconst REORDER = `mutation ProductReorderMedia($id: ID!, $moves: [MoveInput!]!) {\n  productReorderMedia(id: $id, moves: $moves) {\n    job { id }\n    mediaUserErrors { field message code }\n  }\n}`;\nreturn [{ json: {\n  allFilesPresent: missing.length === 0, missing, inOrder, needsReorder: moves.length > 0,\n  reorderBody: { query: REORDER, variables: { id: plan.productGid, moves } }\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5904,
+        3792
+      ],
+      "id": "f43258a2-91da-44b9-8ccc-60aca6eea31c",
+      "name": "🧭 Compare Gallery to Sheet Order (first check)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e06210d1-5e37-47ad-bece-b43981e053a2",
+              "leftValue": "={{ $json.allFilesPresent }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6112,
+        3792
+      ],
+      "id": "e114d10d-bf3b-4d17-bc8f-c1037cf27cf6",
+      "name": "❓ All Files On Product?"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6368,
+        3808
+      ],
+      "id": "5acf8ddc-27d8-4066-aaa7-def534f0dba7",
+      "name": "⏳ Wait for Shopify Files (retry)",
+      "webhookId": "c19bc90b-9128-456a-9936-ea1ebaf7b520"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('🧩 Collect Sync Results').first().json.readBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6576,
+        3808
+      ],
+      "id": "ea9fced9-a3ac-45a6-b03c-80df50fcd6ae",
+      "name": "📥 Read Product Gallery (retry)",
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compares the product's CURRENT gallery with the sheet order. Only files that are already on the\n// product are moved, so a file that has not arrived yet can never make the whole reorder fail.\nconst plan = $('🧩 Collect Sync Results').first().json.plan;\nconst media = $input.first().json.data?.product?.media?.nodes || [];\nconst cur = media.map(m => m.id);\nconst present = plan.desiredIds.filter(id => cur.includes(id));\nconst missing = plan.desiredIds.filter(id => !cur.includes(id));\nconst inOrder = JSON.stringify(cur.slice(0, present.length)) === JSON.stringify(present);\nconst moves = (!inOrder && present.length > 1) ? present.map((id, i) => ({ id, newPosition: String(i) })) : [];\nconst REORDER = `mutation ProductReorderMedia($id: ID!, $moves: [MoveInput!]!) {\n  productReorderMedia(id: $id, moves: $moves) {\n    job { id }\n    mediaUserErrors { field message code }\n  }\n}`;\nreturn [{ json: {\n  allFilesPresent: missing.length === 0, missing, inOrder, needsReorder: moves.length > 0,\n  reorderBody: { query: REORDER, variables: { id: plan.productGid, moves } }\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6112,
+        3616
+      ],
+      "id": "688f4d5e-8d79-428f-8766-8c98deb4d422",
+      "name": "🧭 Compare Gallery to Sheet Order (retry)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2e1df5ef-bb9b-4fd7-b440-4c3d7a676492",
+              "leftValue": "={{ $json.needsReorder }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6352,
+        3616
+      ],
+      "id": "3d5230f4-eb9b-4f0e-8202-495de431ee25",
+      "name": "❓ Needs Reorder?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.reorderBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6608,
+        3600
+      ],
+      "id": "f6373917-eec2-4b5f-908c-c42fa9be2037",
+      "name": "🔃 Reorder Media",
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6832,
+        3600
+      ],
+      "id": "b886a30f-9088-4bb6-96fe-249ac2c6e287",
+      "name": "⏳ Wait for Reorder",
+      "webhookId": "5bcdc1f7-86e4-4dd0-bd70-1381f2f470f4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('🧩 Collect Sync Results').first().json.readBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        7152,
+        3392
+      ],
+      "id": "5ed020c8-90e0-4c32-9e58-a9c8ec72fe02",
+      "name": "📥 Read Product Gallery (after reorder)",
+      "retryOnFail": true,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Re-reads the gallery after the reorder and checks it. A reorder is an asynchronous job, so this\n// is the only way to know it worked. The result is recorded in this node's output; it does NOT fail\n// the product's sync (the photos exist either way), but it is no longer silent.\nconst plan = $('🧩 Collect Sync Results').first().json.plan;\nconst media = $input.first().json.data?.product?.media?.nodes || [];\nconst cur = media.map(m => m.id);\nconst present = plan.desiredIds.filter(id => cur.includes(id));\nconst ok = JSON.stringify(cur.slice(0, present.length)) === JSON.stringify(present);\nreturn [{ json: { reorderVerified: ok, wanted: present, actual: cur.slice(0, present.length), message: ok ? 'Gallery is in sheet order' : 'GALLERY ORDER NOT RESTORED -- run the Repair Gallery Order workflow for this product' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7376,
+        3392
+      ],
+      "id": "f22bd597-8059-4352-9a50-3a533f9772cf",
+      "name": "✅ Verify Gallery Order"
     }
   ],
   "pinData": {},
@@ -2527,6 +2839,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "🧩 Collect Sync Results",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -2735,6 +3054,156 @@
           }
         ]
       ]
+    },
+    "✅ Check Sync Images Result": {
+      "main": [
+        [
+          {
+            "node": "🧩 Collect Sync Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧩 Collect Sync Results": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait for Shopify Files (first check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait for Shopify Files (first check)": {
+      "main": [
+        [
+          {
+            "node": "📥 Read Product Gallery (first check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read Product Gallery (first check)": {
+      "main": [
+        [
+          {
+            "node": "🧭 Compare Gallery to Sheet Order (first check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧭 Compare Gallery to Sheet Order (first check)": {
+      "main": [
+        [
+          {
+            "node": "❓ All Files On Product?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ All Files On Product?": {
+      "main": [
+        [
+          {
+            "node": "❓ Needs Reorder?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⏳ Wait for Shopify Files (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait for Shopify Files (retry)": {
+      "main": [
+        [
+          {
+            "node": "📥 Read Product Gallery (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read Product Gallery (retry)": {
+      "main": [
+        [
+          {
+            "node": "🧭 Compare Gallery to Sheet Order (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧭 Compare Gallery to Sheet Order (retry)": {
+      "main": [
+        [
+          {
+            "node": "❓ Needs Reorder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Needs Reorder?": {
+      "main": [
+        [
+          {
+            "node": "🔃 Reorder Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔃 Reorder Media": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait for Reorder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait for Reorder": {
+      "main": [
+        [
+          {
+            "node": "📥 Read Product Gallery (after reorder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Read Product Gallery (after reorder)": {
+      "main": [
+        [
+          {
+            "node": "✅ Verify Gallery Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -2746,7 +3215,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "85785dba-d54c-4922-b9cd-46a48688b7c7",
+  "versionId": "e78b2c82-e76b-4308-87a9-f7412afcf7b7",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
