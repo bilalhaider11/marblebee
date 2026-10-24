@@ -5,13 +5,13 @@
       "parameters": {
         "jsCode": "// Isolated, self-contained publish sub-chain for reconciliation -- does not\n// share nodes with the create-path publish chain, so this can never regress\n// the already-working create flow. Runs once per input item -- multiple\n// unpublished products can be in flight at once.\nconst producers = $('🩺 Build GraphQL: Get Publication (Reconcile)').all();\nreturn $input.all().map((item, i) => {\n  const res = item.json;\n  if (res?.errors?.length) {\n    throw new Error('Shopify GraphQL error (get publications, reconcile): ' + JSON.stringify(res.errors));\n  }\n  const pubs = res?.data?.publications?.nodes || [];\n  const onlineStore = pubs.find(p => p.name === 'Online Store');\n  if (!onlineStore) {\n    throw new Error('Could not find an \"Online Store\" publication/sales channel on this shop: ' + JSON.stringify(pubs));\n  }\n\n  const productLegacyId = producers[i]?.json?.product_legacy_id;\n  if (!productLegacyId) {\n    throw new Error('Reconcile publish: missing product id for item ' + i);\n  }\n\n  const QUERY = `mutation PublishProduct($id: ID!, $input: [PublicationInput!]!) {\n  publishablePublish(id: $id, input: $input) {\n    publishable { ... on Product { id } }\n    userErrors { field message }\n  }\n}`;\n\n  return {\n    json: {\n      body: {\n        query: QUERY,\n        variables: {\n          id: `gid://shopify/Product/${productLegacyId}`,\n          input: [{ publicationId: onlineStore.id }]\n        }\n      }\n    }\n  };\n});"
       },
-      "id": "54f4d256-00da-4fd1-b95c-16d5807b5cc8",
+      "id": "2df81821-3d42-433e-96c4-b9a4239d02a4",
       "name": "🩺 Build GraphQL: Publish (Reconcile)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4448,
-        1264
+        9856,
+        2656
       ]
     },
     {
@@ -34,13 +34,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "a33acb09-69ab-480b-82a7-2ed786512354",
+      "id": "a5372ac9-2826-43fd-b9bd-7112fd26dc31",
       "name": "🩺 Get Publication (Reconcile) (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        4240,
-        1264
+        9648,
+        2656
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -55,13 +55,13 @@
       "parameters": {
         "jsCode": "return $input.all().map(item => ({\n  json: {\n    product_legacy_id: item.json?.data?.product?.legacyResourceId,\n    body: { query: `query GetOnlineStorePublication { publications(first: 10) { nodes { id name } } }` }\n  }\n}));"
       },
-      "id": "9c1a18ae-f928-4d96-8252-836faa8ae624",
+      "id": "1f33de09-0229-42ef-a518-bb1673dca926",
       "name": "🩺 Build GraphQL: Get Publication (Reconcile)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4016,
-        1264
+        9424,
+        2656
       ]
     },
     {
@@ -71,10 +71,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        5088,
-        1520
+        10496,
+        2912
       ],
-      "id": "7f65d8f0-aaa4-4d67-aefc-52065068e6f0",
+      "id": "55eef9e4-42b7-4458-9b99-c66b7d180f53",
       "name": "⏸️ Rate Limit (200ms)",
       "webhookId": "fd9ab9a4-171f-443a-b98e-b0f99561bfb7"
     },
@@ -104,13 +104,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "3aa106e4-14dd-4663-b0f8-bf73ff910b19",
+      "id": "e4a259ba-d281-447c-823d-eb15bec8d5d3",
       "name": "🩺 Any Products to Check?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        5408,
-        1008
+        10816,
+        2400
       ]
     },
     {
@@ -126,11 +126,34 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        2528,
-        992
+        7696,
+        2384
       ],
-      "id": "8f608653-fe11-4e71-982d-feb8b61344fa",
+      "id": "aebe295c-c39c-4819-a633-2bb0aa530c40",
       "name": "⏰ Daily Trigger at 9 AM"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-allow-updates",
+              "name": "allowUpdatesToPublished",
+              "type": "boolean",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc77e6bd-98a8-4891-ae14-3a8c3da5d563",
+      "name": "⚙️ Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7936,
+        2384
+      ]
     },
     {
       "parameters": {
@@ -152,13 +175,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "a4c78570-0088-4c84-b473-2fa1c7089e0f",
+      "id": "293b6870-e7f6-4440-9c05-7e6538f9f793",
       "name": "🩺 Check Publication Status (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        3440,
-        1280
+        8848,
+        2672
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -173,13 +196,13 @@
       "parameters": {
         "jsCode": "return $input.all().map(item => ({\n  json: {\n    body: {\n      query: `query CheckPublication($id: ID!) { product(id: $id) { legacyResourceId onlineStoreUrl } }`,\n      variables: { id: `gid://shopify/Product/${item.json.product_id}` }\n    }\n  }\n}));"
       },
-      "id": "e7f61875-edc7-41eb-8aca-3b6640a1793d",
+      "id": "4a3860d5-6b77-4015-a596-58fe6e101bb3",
       "name": "🩺 Build GraphQL: Check Publication",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3216,
-        1280
+        8624,
+        2672
       ]
     },
     {
@@ -189,24 +212,24 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4208,
-        1008
+        9616,
+        2400
       ],
-      "id": "94da06b0-6841-4aae-8060-16a5b64199dc",
+      "id": "3f79bdee-b982-4887-acb6-a08e9470ff22",
       "name": "🗑️ Detect CAD-Image11 Sync",
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  MAX_CREATE_ITEMS: 3,\n  VENDOR: 'Marblebee',\n  WEIGHT_UNIT: 'kg',\n  DECIMAL_PLACES: 2,\n\n  // LOCK SWITCH: when false, products that already exist on Shopify are never changed by this sync.\n  // Currently TRUE (updates allowed) -- set to false to stop all updates to published products if needed.\n  // Only CREATE (new products) goes through. Turn it on (true) only for a run where someone has\n  // deliberately flagged rows for update, then turn it off again.\n  ALLOW_UPDATES_TO_PUBLISHED: true,\n\n  IMAGE_KEYS: [\n    'IMAGE URL1',\n    'IMAGE URL2',\n    'IMAGE URL3',\n    'IMAGE URL4',\n    'IMAGE URL5',\n    'IMAGE URL6',\n    'IMAGE URL7',\n    'IMAGE URL8',\n    'IMAGE URL9',\n    'IMAGE URL10',\n    'IMAGE URL11'\n  ],\n\n  SHEET_NAME: $input.first()?.json?.__sheet_name ?? $('🔄 Loop Through Sheets').item.json.sheet_name\n};\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst safeRound = (value, decimals = CONFIG.DECIMAL_PLACES) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? Number(num.toFixed(decimals))\n    : '';\n};\n\nconst cleanWeight = (weightRaw) => {\n  const cleaned = String(weightRaw ?? '0').replace(/[^\\d.]/g, '');\n  return cleaned ? parseFloat(cleaned) : 0.0;\n};\n\nconst safeNumeric = (value, defaultValue = 0) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? num\n    : defaultValue;\n};\n\n// Sheet price -> number, or null when it is blank / not a number / zero or negative.\n// Tolerates \"$1,285.00\", \"1,285\", \"USD 625\". A null price must NEVER be turned into 0:\n// a product created with a 0 price is orderable for free (LSLT046-054 went live at $0.00\n// and order #1567 was placed for $0).\nconst parsePrice = (value) => {\n  const cleaned = String(value ?? '').replace(/[^0-9.\\-]/g, '');\n  const num = parseFloat(cleaned);\n  return Number.isFinite(num) && num > 0 ? num : null;\n};\n\nconst hasValidPrice = (data) => parsePrice(data?.['Price IN USD $ (Jack)']) !== null;\n\nconst hasValue = (value) =>\n  value !== undefined &&\n  value !== null &&\n  String(value).trim() !== '';\n\n\n// ============================================\n// SEO HELPERS\n// ============================================\n\n// Shopify handle formatter\nconst slugify = (text = '') =>\n  String(text)\n    .toLowerCase()\n    .trim()\n    .replace(/&/g, 'and')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n\n\n// URL HANDLE RULE:\n// \"{keyword}-{material}-{product-number}\"\nconst buildHandle = (data) => {\n  const keyword = data['Keywords (Luna)'] ?? '';\n  const material = data.Material ?? '';\n  const productNumber = String(data['Product No.'] ?? '').trim();\n\n  // Product No. is the primary disambiguator for the handle -- without it, two\n  // rows sharing the same keyword+material (common for a generic category like\n  // \"Stone Mosaic\" + \"Marble\") slugify to the identical handle and Shopify\n  // rejects the create with HANDLE_NOT_UNIQUE. Fall back to this row's own\n  // sheet+row_number (already guaranteed unique) so a missing Product No. can\n  // never cause a handle collision.\n  const disambiguator = productNumber || `${CONFIG.SHEET_NAME}-row${data.row_number ?? ''}`;\n\n  return slugify(\n    `${keyword}-${material}-${disambiguator}`\n  );\n};\n\n\n// IMAGE ALT RULE:\n// \"{keyword} in {material} - Image {index}\"\nconst buildAltText = (data, index) => {\n  const keyword = (data['Keywords (Luna)'] ?? 'Marble Product').trim();\n  const material = (data.Material ?? 'Natural Marble').trim();\n\n  return `${keyword} in ${material} - Image ${index}`;\n};\n\n\n// Shopify's CDN appends a `v=` cache-busting query param that changes on every\n// fetch/serve without indicating a different file -- confirmed directly via\n// curl: two URLs differing only in `v=` return identical content-length and\n// Shopify's own `Link: rel=\"canonical\"` response header, which strips `v=`\n// and points BOTH at the exact same canonical URL. So `v=` is stripped only\n// for the purposes of comparing \"is this the same image\" -- it is NOT a fuzzy\n// filename/suffix match (still forbidden -- see extractImages below), it is a\n// verified-equivalent query param on an otherwise byte-identical URL.\n// Pure string manipulation -- deliberately avoids the `URL`/`URLSearchParams`\n// globals, which are not guaranteed to exist in every Code-node execution\n// sandbox (confirmed the hard way: an earlier version used `new URL()` and\n// silently no-op'd via its own try/catch in production, with zero visible\n// error, because that global wasn't available there).\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\n// Build Shopify images with alt text -- any IMAGE URL slot whose value is an\n// EXACT duplicate of an earlier slot's URL (after stripping Shopify's `v=`\n// cache-buster, see normalizeImageUrl above) is skipped so the same photo is\n// never uploaded to Shopify twice. Filenames can legitimately be similar\n// (e.g. \"-2.jpg\" / \"-2_1.jpg\" / \"-2_2.jpg\" as genuinely different photos from\n// the same shoot) so no other normalization is applied -- never a fuzzy\n// filename/suffix match.\nconst extractImages = (data, keys) => {\n  const seenUrls = new Set();\n  const images = [];\n  keys.forEach((key, idx) => {\n    if (!hasValue(data[key])) return;\n    const src = String(data[key]).trim();\n    const normalized = normalizeImageUrl(src);\n    if (seenUrls.has(normalized)) return;\n    seenUrls.add(normalized);\n    // Slot number is the image's fixed position in CONFIG.IMAGE_KEYS (IMAGE\n    // URL1 -> 1, ..., IMAGE URL11 -> 11) -- NOT a running count of images seen\n    // so far. A running count silently renumbers every later slot whenever an\n    // earlier one is added, removed, or deduped (e.g. the IMAGE URL11 CAD sync\n    // toggling on and off) -- and that renumbering broke the Shopify-side\n    // alt-text identity match used to correlate \"this is the same photo\" on\n    // every subsequent update, causing real photos to be deleted as\n    // \"orphans\" and silently replaced with dead sheet links.\n    images.push({ src, alt: buildAltText(data, idx + 1) });\n  });\n  return images;\n};\n\n\n// ============================================\n// VALIDATION & OPERATION TYPE\n// ============================================\n\nconst isReadyToPost = (data) => {\n  const value = String(data?.Ready_to_post ?? '')\n    .trim()\n    .toLowerCase();\n\n  return value === 'yes' || value === 'true';\n};\n\nconst hasTitle = (data) =>\n  hasValue(data?.Title_Shopify);\n\nconst getOperationType = (data) => {\n\n  if (!isReadyToPost(data) || !hasTitle(data)) {\n    return null;\n  }\n\n  const hasFieldsToUpdate = hasValue(data.Fields_to_update);\n  const hasPublicUrl = hasValue(data.Shopify_Product_URL);\n  const hasAdminUrl = hasValue(data.Shopify_Update_product_URL);\n\n  // UPDATE\n  if (\n    hasFieldsToUpdate &&\n    hasPublicUrl &&\n    hasAdminUrl\n  ) {\n    // Locked by default: the row is left exactly as it is (no Shopify call, no sheet write).\n    return CONFIG.ALLOW_UPDATES_TO_PUBLISHED ? 'update' : null;\n  }\n\n  // CREATE\n  if (\n    !hasFieldsToUpdate &&\n    !hasPublicUrl &&\n    !hasAdminUrl\n  ) {\n    // No valid price -> do NOT create the product. 'mark false' sets Ready_to_post back to\n    // \"no\" on the row (the existing path), so nothing is posted and the row visibly drops out\n    // of the ready list until someone fills in the price and ticks it again.\n    return hasValidPrice(data) ? 'create' : 'mark false';\n  }\n\n  return 'mark false';\n};\n\n\n// ============================================\n// PRODUCT BUILDER\n// ============================================\n\nconst buildProduct = (data, operation) => {\n\n  const weight = safeRound(\n    cleanWeight(data['Weight KG'])\n  );\n\n  // null when blank / invalid / <= 0 (see parsePrice). Create rows never get here without a\n  // valid price; for updates a null price is simply left out, so an existing price is never\n  // overwritten with 0.\n  const price = parsePrice(\n    data['Price IN USD $ (Jack)']\n  );\n\n  // ============================================\n  // DIMENSIONS\n  // ============================================\n\n  const isFireplace =\n    CONFIG.SHEET_NAME === 'Fireplace'  ||\n    CONFIG.SHEET_NAME === 'Test data';\n\n  const isCarving =\n    CONFIG.SHEET_NAME === 'Carving';\n\n  const isWindowSurround =\n    CONFIG.SHEET_NAME === 'WindowSurround';\n\n  const isWallCoverings =\n    CONFIG.SHEET_NAME === 'Wall-Coverings'\n\n  const isExteriorWallDecoration =\n    CONFIG.SHEET_NAME === 'Exterior-Wall-Decoration'\n  \n  const isMarbleSlab =\n    CONFIG.SHEET_NAME === 'MarbleSlab';\n\n  const isMarbleRangeHood =\n    CONFIG.SHEET_NAME === 'MarbleRangeHood';\n\n  const isMoulding =\n    CONFIG.SHEET_NAME === 'Moulding';\n\n  const isStoneMosaicTile =\n    CONFIG.SHEET_NAME === 'StoneMosaicTile';\n\n  const isMarbleMedallion =\n    CONFIG.SHEET_NAME === 'MarbleMedallion';\n\n  const isWainscoting =\n    CONFIG.SHEET_NAME === 'Wainscoting';\n\n  const isOutdoorCornice =\n    CONFIG.SHEET_NAME === 'OutdoorCornice';\n\n  const isBookMatchedSlabs =\n    CONFIG.SHEET_NAME === 'BookMatchedSlabs';\n\n  const isStairs =\n    CONFIG.SHEET_NAME === 'Stairs';\n\n  const isBalustrade =\n    CONFIG.SHEET_NAME === 'Balustrade';\n\n  const dimensions = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration || isWainscoting\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isFireplace || isMarbleRangeHood || isCarving || isWindowSurround \n    ? {\n        d_cm: data['Depth CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        d_in: safeRound(data['Depth Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      }\n    : isMoulding\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isOutdoorCornice\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        p_cm: data['Projection CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        p_in: safeRound(data['Projection Inch'])\n      }\n    : isStairs\n    ? {\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        diam_cm: data['Diameter CM'] ?? '',\n        io_diam_cm: data['Inner Opening Diameter CM'] ?? '',\n      \n        w_in: safeRound(data['Width Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        diam_in: safeRound(data['Diameter Inch']) ?? '',\n        io_diam_in: safeRound(data['Inner Opening Diameter Inch']) ?? '',\n      }\n    : isBalustrade\n    ? {\n        oh_cm: data['Overall Height CM'] ?? '',\n        hh_cm: data['Handrail Height CM'] ?? '',\n        hw_cm: data['Handrail Width CM'] ?? '',\n        bd_cm: data['Baluster Diameter CM'] ?? '',\n        bh_cm: data['Baluster Height CM'] ?? '',\n        bpw_cm: data['Base/Plinth Width CM'] ?? '',\n        bph_cm: data['Base/Plinth Height CM'] ?? '',\n      \n        oh_in: safeRound(data['Overall Height Inch']) ?? '',\n        hh_in: safeRound(data['Handrail Height Inch']) ?? '',\n        hw_in: safeRound(data['Handrail Width Inch']) ?? '',\n        bd_in: safeRound(data['Baluster Diameter Inch']) ?? '',\n        bh_in: safeRound(data['Baluster Height Inch']) ?? '',\n        bpw_in: safeRound(data['Base/Plinth Width Inch']) ?? '',\n        bph_in: safeRound(data['Base/Plinth Height Inch']) ?? '',\n      }\n    : isBookMatchedSlabs\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n      }\n    : {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      };\n\n  // ============================================\n  // Opening Size For Fireplace\n  // ============================================\n\n  const opening_size = isFireplace\n    ? {\n        opening_w_cm: data['Width_CM'] ?? '',\n        opening_h_cm: data['Height_CM'] ?? '',\n\n        opening_w_in: safeRound(data['Width_Inch']),\n        opening_h_in: safeRound(data['Height_Inch'])\n      }\n    : {}\n\n  // ============================================\n  // SEO\n  // ============================================\n\n  const seoTitle =\n    String(data.Shopify_SEO_Title || data.Title_Shopify || '').trim();\n\n  const seoDescription =\n    String(data.Shopify_SEO_Description ?? '').trim();\n\n  const handle = buildHandle(data);\n\n  // ============================================\n  // RETURN PRODUCT\n  // ============================================\n\n  return {\n\n    // Metadata\n    row_number: data.row_number ?? 0,\n    sheet_name: CONFIG.SHEET_NAME ?? '',\n    updating_fields: data.Fields_to_update ?? '',\n    operation,\n\n    // URLs\n    public_shopify_url:\n      data.Shopify_Product_URL ?? '',\n\n    admin_shopify_url:\n      data.Shopify_Update_product_URL ?? '',\n\n    // Dimensions\n    ...dimensions,\n    ...opening_size,\n\n    // Shopify Product\n    title: String(data.Title_Shopify ?? '').trim(),\n    description: String(data.Description_Shopify ?? '').trim(),\n\n    material: String(data.Material ?? '').trim(),\n    product_number: String(data['Product No.'] ?? '').trim(),\n\n    weight,\n\n    drain_diameter:\n      data.Drain_Diameter ?? '',\n\n    radius: data.Radius ?? '',\n    surface: data.Surface ?? '',\n\n    signature:\n      data.Signature ?? '',\n\n    // SEO\n\n    seo_title: seoTitle,\n    seo_description: seoDescription,\n    handle,\n\n    // Custom buttons\n    material_catalog_url:\n      String(data['Material Catalog URL'] ?? '').trim(),\n\n    care_guide_url:\n      String(data['Care Guide URL'] ?? '').trim(),\n\n    cad_drawing_url:\n      String(data['CAD Drawing URL'] ?? '').trim(),\n\n    price_unit_suffix: (isExteriorWallDecoration || isMoulding || isOutdoorCornice || isStoneMosaicTile || isWallCoverings) ? '/piece' : isBalustrade ? '/linear ft' : '',\n    \n    // Etsy\n    title_Etsy:\n      data.Title_Etsy ?? '',\n\n    description_Etsy:\n      data.Description_Etsy ?? '',\n\n    tags_Etsy:\n      data.Tags_Etsy ?? '',\n\n    who_made:\n      data.who_made ?? '',\n\n    when_made:\n      data.when_made ?? '',\n\n    product_type_Etsy:\n      data.Etsy_type ?? '',\n\n    quantity_Etsy:\n      data.Etsy_quantity ?? 0,\n\n    // Shopify\n    vendor: CONFIG.VENDOR,\n\n    product_type:\n      String(data.Product_Type ?? 'Default').trim(),\n\n    tags:\n      String(data.Tags_Shopify ?? '').trim(),\n\n    // Variants\n    variants: [\n      {\n        requires_shipping: false,\n        ...(price !== null ? { price } : {}),\n        weight,\n        weight_unit: CONFIG.WEIGHT_UNIT\n      }\n    ],\n\n    // Images + ALT TEXT\n    images: extractImages(\n      data,\n      CONFIG.IMAGE_KEYS\n    )\n  };\n};\n\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\n\n// Step 1\nconst categorized = items\n  .map(item => {\n\n    const data = item.json ?? {};\n    const operation = getOperationType(data);\n\n    return { data, operation };\n\n  })\n  .filter(({ operation }) => operation !== null);\n\n\n// Step 2\nconst createItems =\n  categorized.filter(\n    ({ operation }) => operation === 'create'\n  );\n\nconst updateItems =\n  categorized.filter(\n    ({ operation }) => operation === 'update'\n  );\n\nconst mark_false =\n  categorized.filter(\n    ({ operation }) => operation === 'mark false'\n  );\n\n\n// Step 3\nconst limitedCreateItems =\n  createItems.slice(0, CONFIG.MAX_CREATE_ITEMS);\n\n\n// Step 4\nconst selectedItems = [\n  ...limitedCreateItems,\n  ...updateItems,\n  ...mark_false\n];\n\n\n// Step 5\nconst outputItems = selectedItems.map(\n  ({ data, operation }) => ({\n\n    json: {\n\n      collection_id1: String(data.Collection_ID1 ?? '').trim(),\n\n      collection_id2: String(data.Collection_ID2 ?? '').trim(),\n\n      collection_id3: String(data.Collection_ID3 ?? '').trim(),\n\n      collection_id4: String(data.Collection_ID4 ?? '').trim(),\n\n      operation,\n\n      product: buildProduct(\n        data,\n        operation\n      )\n    }\n  })\n);\n\n\nreturn outputItems.length > 0\n  ? outputItems\n  : [\n      {\n        json: {\n          sheet_name: CONFIG.SHEET_NAME,\n          operation: 'None'\n        }\n      }\n    ];"
+        "jsCode": "// ============================================\n// CONFIGURATION\n// ============================================\nconst CONFIG = {\n  MAX_CREATE_ITEMS: 3,\n  VENDOR: 'Marblebee',\n  WEIGHT_UNIT: 'kg',\n  DECIMAL_PLACES: 2,\n\n  // LOCK SWITCH -- set in the '⚙️ Settings' node at the start of the workflow\n  // (allowUpdatesToPublished). false = products already on Shopify are never\n  // changed; only new products are created. Flagged update rows stay untouched\n  // in the sheet and go through once it's switched back to true.\n  // Falls back to false (locked) if the Settings node didn't run, e.g. a partial test run.\n  ALLOW_UPDATES_TO_PUBLISHED: (() => { try { return $('⚙️ Settings').first().json.allowUpdatesToPublished === true; } catch (e) { return false; } })(),\n\n  IMAGE_KEYS: [\n    'IMAGE URL1',\n    'IMAGE URL2',\n    'IMAGE URL3',\n    'IMAGE URL4',\n    'IMAGE URL5',\n    'IMAGE URL6',\n    'IMAGE URL7',\n    'IMAGE URL8',\n    'IMAGE URL9',\n    'IMAGE URL10',\n    'IMAGE URL11'\n  ],\n\n  SHEET_NAME: $input.first()?.json?.__sheet_name ?? $('🔄 Loop Through Sheets').item.json.sheet_name\n};\n\n// ============================================\n// UTILITIES\n// ============================================\n\nconst safeRound = (value, decimals = CONFIG.DECIMAL_PLACES) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? Number(num.toFixed(decimals))\n    : '';\n};\n\nconst cleanWeight = (weightRaw) => {\n  const cleaned = String(weightRaw ?? '0').replace(/[^\\d.]/g, '');\n  return cleaned ? parseFloat(cleaned) : 0.0;\n};\n\nconst safeNumeric = (value, defaultValue = 0) => {\n  const num = parseFloat(value);\n  return Number.isFinite(num)\n    ? num\n    : defaultValue;\n};\n\n// Sheet price -> number, or null when it is blank / not a number / zero or negative.\n// Tolerates \"$1,285.00\", \"1,285\", \"USD 625\". A null price must NEVER be turned into 0:\n// a product created with a 0 price is orderable for free (LSLT046-054 went live at $0.00\n// and order #1567 was placed for $0).\nconst parsePrice = (value) => {\n  const cleaned = String(value ?? '').replace(/[^0-9.\\-]/g, '');\n  const num = parseFloat(cleaned);\n  return Number.isFinite(num) && num > 0 ? num : null;\n};\n\nconst hasValidPrice = (data) => parsePrice(data?.['Price IN USD $ (Jack)']) !== null;\n\nconst hasValue = (value) =>\n  value !== undefined &&\n  value !== null &&\n  String(value).trim() !== '';\n\n\n// ============================================\n// SEO HELPERS\n// ============================================\n\n// Shopify handle formatter\nconst slugify = (text = '') =>\n  String(text)\n    .toLowerCase()\n    .trim()\n    .replace(/&/g, 'and')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n\n\n// URL HANDLE RULE:\n// \"{keyword}-{material}-{product-number}\"\nconst buildHandle = (data) => {\n  const keyword = data['Keywords (Luna)'] ?? '';\n  const material = data.Material ?? '';\n  const productNumber = String(data['Product No.'] ?? '').trim();\n\n  // Product No. is the primary disambiguator for the handle -- without it, two\n  // rows sharing the same keyword+material (common for a generic category like\n  // \"Stone Mosaic\" + \"Marble\") slugify to the identical handle and Shopify\n  // rejects the create with HANDLE_NOT_UNIQUE. Fall back to this row's own\n  // sheet+row_number (already guaranteed unique) so a missing Product No. can\n  // never cause a handle collision.\n  const disambiguator = productNumber || `${CONFIG.SHEET_NAME}-row${data.row_number ?? ''}`;\n\n  return slugify(\n    `${keyword}-${material}-${disambiguator}`\n  );\n};\n\n\n// IMAGE ALT RULE:\n// \"{keyword} in {material} - Image {index}\"\nconst buildAltText = (data, index) => {\n  const keyword = (data['Keywords (Luna)'] ?? 'Marble Product').trim();\n  const material = (data.Material ?? 'Natural Marble').trim();\n\n  return `${keyword} in ${material} - Image ${index}`;\n};\n\n\n// Shopify's CDN appends a `v=` cache-busting query param that changes on every\n// fetch/serve without indicating a different file -- confirmed directly via\n// curl: two URLs differing only in `v=` return identical content-length and\n// Shopify's own `Link: rel=\"canonical\"` response header, which strips `v=`\n// and points BOTH at the exact same canonical URL. So `v=` is stripped only\n// for the purposes of comparing \"is this the same image\" -- it is NOT a fuzzy\n// filename/suffix match (still forbidden -- see extractImages below), it is a\n// verified-equivalent query param on an otherwise byte-identical URL.\n// Pure string manipulation -- deliberately avoids the `URL`/`URLSearchParams`\n// globals, which are not guaranteed to exist in every Code-node execution\n// sandbox (confirmed the hard way: an earlier version used `new URL()` and\n// silently no-op'd via its own try/catch in production, with zero visible\n// error, because that global wasn't available there).\nconst normalizeImageUrl = (url) => {\n  const str = String(url || '');\n  const qIndex = str.indexOf('?');\n  if (qIndex === -1) return str;\n  const base = str.slice(0, qIndex);\n  const keptParams = str.slice(qIndex + 1)\n    .split('&')\n    .filter(pair => pair && !/^v=/.test(pair))\n    .join('&');\n  return keptParams ? `${base}?${keptParams}` : base;\n};\n\n// Build Shopify images with alt text -- any IMAGE URL slot whose value is an\n// EXACT duplicate of an earlier slot's URL (after stripping Shopify's `v=`\n// cache-buster, see normalizeImageUrl above) is skipped so the same photo is\n// never uploaded to Shopify twice. Filenames can legitimately be similar\n// (e.g. \"-2.jpg\" / \"-2_1.jpg\" / \"-2_2.jpg\" as genuinely different photos from\n// the same shoot) so no other normalization is applied -- never a fuzzy\n// filename/suffix match.\nconst extractImages = (data, keys) => {\n  const seenUrls = new Set();\n  const images = [];\n  keys.forEach((key, idx) => {\n    if (!hasValue(data[key])) return;\n    const src = String(data[key]).trim();\n    const normalized = normalizeImageUrl(src);\n    if (seenUrls.has(normalized)) return;\n    seenUrls.add(normalized);\n    // Slot number is the image's fixed position in CONFIG.IMAGE_KEYS (IMAGE\n    // URL1 -> 1, ..., IMAGE URL11 -> 11) -- NOT a running count of images seen\n    // so far. A running count silently renumbers every later slot whenever an\n    // earlier one is added, removed, or deduped (e.g. the IMAGE URL11 CAD sync\n    // toggling on and off) -- and that renumbering broke the Shopify-side\n    // alt-text identity match used to correlate \"this is the same photo\" on\n    // every subsequent update, causing real photos to be deleted as\n    // \"orphans\" and silently replaced with dead sheet links.\n    images.push({ src, alt: buildAltText(data, idx + 1) });\n  });\n  return images;\n};\n\n\n// ============================================\n// VALIDATION & OPERATION TYPE\n// ============================================\n\nconst isReadyToPost = (data) => {\n  const value = String(data?.Ready_to_post ?? '')\n    .trim()\n    .toLowerCase();\n\n  return value === 'yes' || value === 'true';\n};\n\nconst hasTitle = (data) =>\n  hasValue(data?.Title_Shopify);\n\nconst getOperationType = (data) => {\n\n  if (!isReadyToPost(data) || !hasTitle(data)) {\n    return null;\n  }\n\n  const hasFieldsToUpdate = hasValue(data.Fields_to_update);\n  const hasPublicUrl = hasValue(data.Shopify_Product_URL);\n  const hasAdminUrl = hasValue(data.Shopify_Update_product_URL);\n\n  // UPDATE\n  if (\n    hasFieldsToUpdate &&\n    hasPublicUrl &&\n    hasAdminUrl\n  ) {\n    // Locked by default: the row is left exactly as it is (no Shopify call, no sheet write).\n    return CONFIG.ALLOW_UPDATES_TO_PUBLISHED ? 'update' : null;\n  }\n\n  // CREATE\n  if (\n    !hasFieldsToUpdate &&\n    !hasPublicUrl &&\n    !hasAdminUrl\n  ) {\n    // No valid price -> do NOT create the product. 'mark false' sets Ready_to_post back to\n    // \"no\" on the row (the existing path), so nothing is posted and the row visibly drops out\n    // of the ready list until someone fills in the price and ticks it again.\n    return hasValidPrice(data) ? 'create' : 'mark false';\n  }\n\n  return 'mark false';\n};\n\n\n// ============================================\n// PRODUCT BUILDER\n// ============================================\n\nconst buildProduct = (data, operation) => {\n\n  const weight = safeRound(\n    cleanWeight(data['Weight KG'])\n  );\n\n  // null when blank / invalid / <= 0 (see parsePrice). Create rows never get here without a\n  // valid price; for updates a null price is simply left out, so an existing price is never\n  // overwritten with 0.\n  const price = parsePrice(\n    data['Price IN USD $ (Jack)']\n  );\n\n  // ============================================\n  // DIMENSIONS\n  // ============================================\n\n  const isFireplace =\n    CONFIG.SHEET_NAME === 'Fireplace'  ||\n    CONFIG.SHEET_NAME === 'Test data';\n\n  const isCarving =\n    CONFIG.SHEET_NAME === 'Carving';\n\n  const isWindowSurround =\n    CONFIG.SHEET_NAME === 'WindowSurround';\n\n  const isWallCoverings =\n    CONFIG.SHEET_NAME === 'Wall-Coverings'\n\n  const isExteriorWallDecoration =\n    CONFIG.SHEET_NAME === 'Exterior-Wall-Decoration'\n  \n  const isMarbleSlab =\n    CONFIG.SHEET_NAME === 'MarbleSlab';\n\n  const isMarbleRangeHood =\n    CONFIG.SHEET_NAME === 'MarbleRangeHood';\n\n  const isMoulding =\n    CONFIG.SHEET_NAME === 'Moulding';\n\n  const isStoneMosaicTile =\n    CONFIG.SHEET_NAME === 'StoneMosaicTile';\n\n  const isMarbleMedallion =\n    CONFIG.SHEET_NAME === 'MarbleMedallion';\n\n  const isWainscoting =\n    CONFIG.SHEET_NAME === 'Wainscoting';\n\n  const isOutdoorCornice =\n    CONFIG.SHEET_NAME === 'OutdoorCornice';\n\n  const isBookMatchedSlabs =\n    CONFIG.SHEET_NAME === 'BookMatchedSlabs';\n\n  const isStairs =\n    CONFIG.SHEET_NAME === 'Stairs';\n\n  const isBalustrade =\n    CONFIG.SHEET_NAME === 'Balustrade';\n\n  const dimensions = isMarbleSlab || isWallCoverings || isStoneMosaicTile || isMarbleMedallion || isExteriorWallDecoration || isWainscoting\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isFireplace || isMarbleRangeHood || isCarving || isWindowSurround \n    ? {\n        d_cm: data['Depth CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        d_in: safeRound(data['Depth Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      }\n    : isMoulding\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        t_cm: data['Thickness CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        t_in: safeRound(data['Thickness Inch'])\n      }\n    : isOutdoorCornice\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        p_cm: data['Projection CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        p_in: safeRound(data['Projection Inch'])\n      }\n    : isStairs\n    ? {\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n        diam_cm: data['Diameter CM'] ?? '',\n        io_diam_cm: data['Inner Opening Diameter CM'] ?? '',\n      \n        w_in: safeRound(data['Width Inch']) ?? '',\n        h_in: safeRound(data['Height Inch']),\n        diam_in: safeRound(data['Diameter Inch']) ?? '',\n        io_diam_in: safeRound(data['Inner Opening Diameter Inch']) ?? '',\n      }\n    : isBalustrade\n    ? {\n        oh_cm: data['Overall Height CM'] ?? '',\n        hh_cm: data['Handrail Height CM'] ?? '',\n        hw_cm: data['Handrail Width CM'] ?? '',\n        bd_cm: data['Baluster Diameter CM'] ?? '',\n        bh_cm: data['Baluster Height CM'] ?? '',\n        bpw_cm: data['Base/Plinth Width CM'] ?? '',\n        bph_cm: data['Base/Plinth Height CM'] ?? '',\n      \n        oh_in: safeRound(data['Overall Height Inch']) ?? '',\n        hh_in: safeRound(data['Handrail Height Inch']) ?? '',\n        hw_in: safeRound(data['Handrail Width Inch']) ?? '',\n        bd_in: safeRound(data['Baluster Diameter Inch']) ?? '',\n        bh_in: safeRound(data['Baluster Height Inch']) ?? '',\n        bpw_in: safeRound(data['Base/Plinth Width Inch']) ?? '',\n        bph_in: safeRound(data['Base/Plinth Height Inch']) ?? '',\n      }\n    : isBookMatchedSlabs\n    ? {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n      }\n    : {\n        l_cm: data['Length CM'] ?? '',\n        w_cm: data['Width CM'] ?? '',\n        h_cm: data['Height CM'] ?? '',\n\n        l_in: safeRound(data['Length Inch']) ?? '',\n        w_in: safeRound(data['Width Inch']),\n        h_in: safeRound(data['Height Inch'])\n      };\n\n  // ============================================\n  // Opening Size For Fireplace\n  // ============================================\n\n  const opening_size = isFireplace\n    ? {\n        opening_w_cm: data['Width_CM'] ?? '',\n        opening_h_cm: data['Height_CM'] ?? '',\n\n        opening_w_in: safeRound(data['Width_Inch']),\n        opening_h_in: safeRound(data['Height_Inch'])\n      }\n    : {}\n\n  // ============================================\n  // SEO\n  // ============================================\n\n  const seoTitle =\n    String(data.Shopify_SEO_Title || data.Title_Shopify || '').trim();\n\n  const seoDescription =\n    String(data.Shopify_SEO_Description ?? '').trim();\n\n  const handle = buildHandle(data);\n\n  // ============================================\n  // RETURN PRODUCT\n  // ============================================\n\n  return {\n\n    // Metadata\n    row_number: data.row_number ?? 0,\n    sheet_name: CONFIG.SHEET_NAME ?? '',\n    updating_fields: data.Fields_to_update ?? '',\n    operation,\n\n    // URLs\n    public_shopify_url:\n      data.Shopify_Product_URL ?? '',\n\n    admin_shopify_url:\n      data.Shopify_Update_product_URL ?? '',\n\n    // Dimensions\n    ...dimensions,\n    ...opening_size,\n\n    // Shopify Product\n    title: String(data.Title_Shopify ?? '').trim(),\n    description: String(data.Description_Shopify ?? '').trim(),\n\n    material: String(data.Material ?? '').trim(),\n    product_number: String(data['Product No.'] ?? '').trim(),\n\n    weight,\n\n    drain_diameter:\n      data.Drain_Diameter ?? '',\n\n    radius: data.Radius ?? '',\n    surface: data.Surface ?? '',\n\n    signature:\n      data.Signature ?? '',\n\n    // SEO\n\n    seo_title: seoTitle,\n    seo_description: seoDescription,\n    handle,\n\n    // Custom buttons\n    material_catalog_url:\n      String(data['Material Catalog URL'] ?? '').trim(),\n\n    care_guide_url:\n      String(data['Care Guide URL'] ?? '').trim(),\n\n    cad_drawing_url:\n      String(data['CAD Drawing URL'] ?? '').trim(),\n\n    price_unit_suffix: (isExteriorWallDecoration || isMoulding || isOutdoorCornice || isStoneMosaicTile || isWallCoverings) ? '/piece' : isBalustrade ? '/linear ft' : '',\n    \n    // Etsy\n    title_Etsy:\n      data.Title_Etsy ?? '',\n\n    description_Etsy:\n      data.Description_Etsy ?? '',\n\n    tags_Etsy:\n      data.Tags_Etsy ?? '',\n\n    who_made:\n      data.who_made ?? '',\n\n    when_made:\n      data.when_made ?? '',\n\n    product_type_Etsy:\n      data.Etsy_type ?? '',\n\n    quantity_Etsy:\n      data.Etsy_quantity ?? 0,\n\n    // Shopify\n    vendor: CONFIG.VENDOR,\n\n    product_type:\n      String(data.Product_Type ?? 'Default').trim(),\n\n    tags:\n      String(data.Tags_Shopify ?? '').trim(),\n\n    // Variants\n    variants: [\n      {\n        requires_shipping: false,\n        ...(price !== null ? { price } : {}),\n        weight,\n        weight_unit: CONFIG.WEIGHT_UNIT\n      }\n    ],\n\n    // Images + ALT TEXT\n    images: extractImages(\n      data,\n      CONFIG.IMAGE_KEYS\n    )\n  };\n};\n\n\n// ============================================\n// MAIN PROCESSING\n// ============================================\n\n// Step 1\nconst categorized = items\n  .map(item => {\n\n    const data = item.json ?? {};\n    const operation = getOperationType(data);\n\n    return { data, operation };\n\n  })\n  .filter(({ operation }) => operation !== null);\n\n\n// Step 2\nconst createItems =\n  categorized.filter(\n    ({ operation }) => operation === 'create'\n  );\n\nconst updateItems =\n  categorized.filter(\n    ({ operation }) => operation === 'update'\n  );\n\nconst mark_false =\n  categorized.filter(\n    ({ operation }) => operation === 'mark false'\n  );\n\n\n// Step 3\nconst limitedCreateItems =\n  createItems.slice(0, CONFIG.MAX_CREATE_ITEMS);\n\n\n// Step 4\nconst selectedItems = [\n  ...limitedCreateItems,\n  ...updateItems,\n  ...mark_false\n];\n\n\n// Step 5\nconst outputItems = selectedItems.map(\n  ({ data, operation }) => ({\n\n    json: {\n\n      collection_id1: String(data.Collection_ID1 ?? '').trim(),\n\n      collection_id2: String(data.Collection_ID2 ?? '').trim(),\n\n      collection_id3: String(data.Collection_ID3 ?? '').trim(),\n\n      collection_id4: String(data.Collection_ID4 ?? '').trim(),\n\n      operation,\n\n      product: buildProduct(\n        data,\n        operation\n      )\n    }\n  })\n);\n\n\nreturn outputItems.length > 0\n  ? outputItems\n  : [\n      {\n        json: {\n          sheet_name: CONFIG.SHEET_NAME,\n          operation: 'None'\n        }\n      }\n    ];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4864,
-        1520
+        10272,
+        2912
       ],
-      "id": "09150882-3c59-4851-8263-b50774192bad",
+      "id": "93c39003-0e50-4a2c-84aa-ada66c7ce549",
       "name": "✅ Filter Unacknowledged & Ready to Post"
     },
     {
@@ -293,10 +316,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        2752,
-        752
+        8160,
+        2144
       ],
-      "id": "448452d6-30d8-426a-8906-d805f0a5be32",
+      "id": "99dcbb8a-6349-4fc2-89c1-6c998d848743",
       "name": "Switch"
     },
     {
@@ -325,13 +348,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "cfe59bc6-00ad-4aae-bd6a-0411ec585eb4",
+      "id": "61a60582-d8d5-496b-a49e-a8f6c7f970f9",
       "name": "🩺 Needs Publish?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3696,
-        1280
+        9104,
+        2672
       ]
     },
     {
@@ -354,13 +377,13 @@
         "jsonBody": "={{ $json.body }}",
         "options": {}
       },
-      "id": "db1fed43-5a09-4124-94fa-a8d59ce98807",
+      "id": "be113454-cbd4-4c8c-9ed2-d3a70615d104",
       "name": "🩺 Publish (Reconcile) (GraphQL)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        4704,
-        1264
+        10112,
+        2656
       ],
       "retryOnFail": true,
       "waitBetweenTries": 1000,
@@ -410,10 +433,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        3152,
-        512
+        8560,
+        1904
       ],
-      "id": "50aeaa1a-7a7b-4292-8024-f0981335be02",
+      "id": "e7c1572c-8098-4565-849e-b2b70476292a",
       "name": "💾 Update Google Sheet1",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -428,13 +451,13 @@
       "parameters": {
         "jsCode": "const sheetName = $input.first()?.json?.__sheet_name\n  ?? $('🔄 Loop Through Sheets').item?.json?.sheet_name\n  ?? $('🔄 Loop Through Sheets').first()?.json?.sheet_name;\nconst rows = $input.all().map(i => i.json);\n\n// A product can be created on Shopify but fail to become published to the\n// Online Store channel (e.g. an earlier step in the same run threw before the\n// publish step ran, or the publish call itself failed transiently). Only\n// recently-created rows are checked -- older products have had plenty of\n// chances to be caught already, and re-checking the whole historical catalog\n// every day would be a lot of wasted API calls for no benefit.\nconst RECENT_DAYS = 3;\nconst cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;\n\nconst extractProductId = (url) => String(url || '').match(/\\/products\\/(\\d+)/)?.[1] ?? '';\n\nconst out = [];\nfor (const row of rows) {\n  const adminUrl = String(row['Shopify_Update_product_URL'] || '').trim();\n  const createTime = String(row['create_time'] || '').trim();\n  if (!adminUrl || !createTime) continue;\n\n  const created = Date.parse(createTime);\n  if (!Number.isFinite(created) || created < cutoff) continue;\n\n  const productId = extractProductId(adminUrl);\n  if (!productId) continue;\n\n  out.push({ json: { product_id: productId, row_number: row.row_number, sheet_name: sheetName } });\n}\nreturn out.length ? out : [{ json: { _noneToCheck: true } }];"
       },
-      "id": "a0bfa81d-87d4-40d0-8467-c2a37120f215",
+      "id": "f1a97872-292e-4b48-81bf-c0989e6e840f",
       "name": "🩺 Find Recently Created Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5168,
-        1008
+        10576,
+        2400
       ]
     },
     {
@@ -1049,10 +1072,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        4416,
-        784
+        9824,
+        2176
       ],
-      "id": "d6d9954a-1f40-45d4-9111-6af7cf0129f3",
+      "id": "c2dcc60b-b8b1-49ee-b394-4eef04a8fcf6",
       "name": "🔗 Sync Image URL11 from CAD Drawing",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1071,23 +1094,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2784,
-        992
+        8192,
+        2384
       ],
-      "id": "7df0304c-af64-4a8f-816d-574be023801d",
+      "id": "001db9bf-a972-4ee7-9b2b-7f4aa42c69ae",
       "name": "📋 Get Sheet Names"
     },
     {
       "parameters": {
         "jsCode": "// Non-fatal by design -- this is the reconciliation pass itself; a failure\n// here just means it gets retried on the next scheduled run's check.\nreturn $input.all().map(item => {\n  const res = item.json;\n  const errors = res?.errors;\n  const userErrors = res?.data?.publishablePublish?.userErrors;\n  if (errors?.length || userErrors?.length) {\n    return { json: { published: false, publish_error: JSON.stringify(errors?.length ? errors : userErrors) } };\n  }\n  return { json: { published: true } };\n});"
       },
-      "id": "b387c5d8-5de1-4416-902b-e1ecdf4db91e",
+      "id": "9b9b5c0d-5087-497f-86a0-599f01986744",
       "name": "🩺 Check Publish Result (Reconcile)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4928,
-        1264
+        10336,
+        2656
       ]
     },
     {
@@ -1097,10 +1120,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        3024,
-        992
+        8432,
+        2384
       ],
-      "id": "2e74d211-4be5-41c8-bf52-d57175473e20",
+      "id": "d782e42b-a7bb-4974-9333-f865b474cd48",
       "name": "🔄 Loop Through Sheets"
     },
     {
@@ -1125,28 +1148,28 @@
         "mode": "each",
         "options": {}
       },
-      "id": "99fc6cd0-fc7e-4536-93c7-2c55127363cb",
+      "id": "ddbe69b1-acd7-4c19-bdde-5c14b192b60d",
       "name": "▶️ Process Product (per item)",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        3392,
-        768
+        8800,
+        2160
       ]
     },
     {
       "parameters": {
         "content": "## FIXED VERSION -- review before importing\n\nThis replaces the old \"🔁 Process Each Product\" SplitInBatches loop (and everything it drove downstream) with a single \"▶️ Process Product (per item)\" Execute Sub-workflow node running in \"Run once for each item\" mode, calling the new **Shopify Merge product sync Pipeline (GraphQL) - Process Product** sub-workflow.\n\nWhy: the old nested SplitInBatches setup hit a confirmed n8n platform bug -- live execution data showed it running 289 times but only producing real output twice, silently dropping almost every create/update for the rest of the catalog every run. See the sub-workflow's own README sticky note for the full explanation.\n\n**Import both files, then**: open \"▶️ Process Product (per item)\" here and pick the sub-workflow from its dropdown (its ID doesn't exist until you import it, so it can't be pre-wired). Nothing else changed -- every other node, mutation, and piece of business logic is untouched, just relocated.\n\nThe original file this was built from is left completely unmodified.\n\n**Price guard:** a row that is Ready_to_post but has no valid price in 'Price IN USD $ (Jack)' (blank, not a number, or 0) is never created. It goes down the existing 'mark false' path, which sets Ready_to_post back to \"no\". Before, a blank price became 0 and the product was published for free (LSLT046-054, order #1567). For updates, an invalid price is left out so an existing price is never overwritten with 0. The Process Product sub-workflow also refuses to create or price a product at 0 as a second guard.\n\n**One return to the sheet loop:** '🔄 Loop Through Sheets' is a SplitInBatches node and must get exactly ONE return per sheet. 'Read Sheet Data' fans out into 3 parallel branches (product filter, CAD-Image11 sync, publish reconcile) and all of them used to loop back (Rate Limit, Sync Image URL11, Any Products to Check? false, Needs Publish? false, Check Publish Result) -- so the loop fired several times per sheet, its Done output ran repeatedly (a 21-product sheet showed 42 items) and the same products were sent on again (a 'Dedupe Duplicate Batches' node used to hide this by dropping repeats; it was removed once the loop had a single return -- its input and output counts were equal, 1403 in / 1403 out). Now the three stages run in one line per sheet -- Read Sheet Data -> Tag Sheet Rows -> CAD-Image11 sync -> publish reconcile -> product filter -> Rate Limit -> Loop -- and only Rate Limit returns to the loop, so the loop moves to the next sheet only after all the work for the current sheet is done. A step that can produce nothing (CAD sync with nothing to update, publish check with nothing to publish) rejoins through a Merge node (the '🔀 Join:' nodes) so the line never stops. 'Restore Sheet Rows' re-emits the sheet's rows (tagged with __sheet_name) for the stages that need them.\n\n**Memory fix (two-phase sheet read):** each sheet used to be read in full (every column of every row) and kept in memory for the whole run -- thousands of rows with long text across ~30 sheets, copied again by the stages. Now: header row -> only the short columns the CAD sync / publish check / readiness check need, for all rows ('Build Slim Rows') -> after those stages, only the Ready_to_post rows are read in full ('Pick Ready Rows' -> 'Read Full Rows (ready only)' -> 'Build Full Rows') and sent to the unchanged product filter. The full rows are read after the CAD sync, so a ready row picks up the Fields_to_update / IMAGE URL11 the sync just wrote.\n\n**Update lock (2026-10-23):** after fireplace feature photos changed on the live store, products that already exist on Shopify are locked. (1) '✅ Filter Unacknowledged & Ready to Post' has the switch `ALLOW_UPDATES_TO_PUBLISHED` (currently TRUE = updates allowed). Set it to false to stop every update to a product already on Shopify (the row is skipped with no Shopify call and no sheet write; only CREATE goes through). (2) '🗑️ Detect CAD-Image11 Sync' no longer sets Ready_to_post / Fields_to_update on published rows; it only mirrors the sheet's IMAGE URL11 cell. Rows the CAD sync flagged earlier are still queued in the sheet and would all update at once if the lock were turned on -- clear them first.",
-        "height": 668,
-        "width": 480
+        "height": 1164,
+        "width": 640
       },
-      "id": "3abf3d8c-9f6f-4518-9800-14c240b5516c",
+      "id": "035492d3-fadb-4e7f-beec-e048aa906989",
       "name": "README - FIXED VERSION",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1904,
-        736
+        6880,
+        2128
       ]
     },
     {
@@ -1156,10 +1179,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4976,
-        1008
+        10384,
+        2400
       ],
-      "id": "543a2274-01bb-4e9f-95c4-c21870213e93",
+      "id": "d12c7c0e-187b-4977-afce-6b4bb2b74c38",
       "name": "📖 Restore Sheet Rows (reconcile)"
     },
     {
@@ -1191,10 +1214,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        4448,
-        1008
+        9856,
+        2400
       ],
-      "id": "b1c5962c-b917-47ed-8a68-c45fbd6a27d8",
+      "id": "60b20646-3925-42db-b175-de0fdba2b8e6",
       "name": "🗑️ CAD Updates Needed?"
     },
     {
@@ -1202,10 +1225,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        4736,
-        1008
+        10144,
+        2400
       ],
-      "id": "aadb03c3-1588-4d38-87b4-ba745916e42b",
+      "id": "a34a9840-4445-492e-a484-060cb1b5a092",
       "name": "🔀 Join: CAD Stage"
     },
     {
@@ -1213,10 +1236,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        3680,
-        1536
+        9088,
+        2928
       ],
-      "id": "1c752eab-a1fa-41c3-aa11-583d82dd8778",
+      "id": "f50c5b7d-a283-45e7-9c52-d36ff35830d5",
       "name": "🔀 Join: Publish Check"
     },
     {
@@ -1224,10 +1247,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        3952,
-        1520
+        9360,
+        2912
       ],
-      "id": "d8fcf88e-d40a-41b9-aa03-2737498101d9",
+      "id": "f8548f65-983d-493f-a978-b3219a97edda",
       "name": "🔀 Join: Reconcile Stage"
     },
     {
@@ -1240,10 +1263,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        3296,
-        1008
+        8704,
+        2400
       ],
-      "id": "8a192069-2bf4-46c1-8085-415ec5ae9c95",
+      "id": "94d4678b-03d0-417f-b0ca-5211289dbbfc",
       "name": "📖 Read Header Row",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -1261,10 +1284,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3520,
-        1008
+        8928,
+        2400
       ],
-      "id": "12031014-d366-41ed-a8c5-c14e5c6a4b8e",
+      "id": "c4ca347d-6768-4052-9f79-181fcd19639c",
       "name": "🧮 Plan Slim Columns"
     },
     {
@@ -1277,10 +1300,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        3744,
-        1008
+        9152,
+        2400
       ],
-      "id": "af392ce3-5090-48be-afd9-6492cc0d9424",
+      "id": "0a586527-d7ac-41be-bec2-cffd544200c5",
       "name": "📖 Read Slim Columns",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -1298,10 +1321,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3984,
-        1008
+        9392,
+        2400
       ],
-      "id": "41ac6c8c-ddef-4037-a1d6-04c95e039a4d",
+      "id": "71acee2e-1ed5-43c5-9bd1-7135786da48f",
       "name": "🧱 Build Slim Rows"
     },
     {
@@ -1311,10 +1334,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4176,
-        1520
+        9584,
+        2912
       ],
-      "id": "72853920-cc5e-47bf-a562-a7ad92561129",
+      "id": "55c219ac-05bf-4fef-87f8-f9dc2973fe6d",
       "name": "🔎 Pick Ready Rows"
     },
     {
@@ -1327,10 +1350,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        4400,
-        1520
+        9808,
+        2912
       ],
-      "id": "a63e1712-0f3a-40ae-8cf5-83f694dd02c9",
+      "id": "bc87528d-ca5c-4671-b0ca-9a572e7276f3",
       "name": "📖 Read Full Rows (ready only)",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -1348,10 +1371,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4640,
-        1520
+        10048,
+        2912
       ],
-      "id": "83047889-09e1-4c69-9308-fc838f6d681f",
+      "id": "aa0cd680-fad8-4da1-b6b8-bd4771367480",
       "name": "🧱 Build Full Rows"
     }
   ],
@@ -1361,7 +1384,7 @@
       "main": [
         [
           {
-            "node": "📋 Get Sheet Names",
+            "node": "⚙️ Settings",
             "type": "main",
             "index": 0
           }
@@ -1721,6 +1744,17 @@
           }
         ]
       ]
+    },
+    "⚙️ Settings": {
+      "main": [
+        [
+          {
+            "node": "📋 Get Sheet Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1732,7 +1766,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "9aec3f7c-68e3-4334-8e4c-c9aedbd64031",
+  "versionId": "b7d8dc67-b82a-4c5b-af8e-b43e49105785",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
