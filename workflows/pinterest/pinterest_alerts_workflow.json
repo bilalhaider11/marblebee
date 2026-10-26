@@ -1,0 +1,780 @@
+{
+  "name": "Pinterest Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest Alerts (emails to the client)\n\n**Branch 1 - failed pins (every 15 minutes):** looks at the last 48 hours of Pinterest posts in Metricool, plus any row marked Error in the two pin tabs. If a pin failed that has not been reported yet, ONE email lists them in plain words (for example: Pinterest is disconnected, reconnect it in Metricool). Each failure is reported once. What was reported is written to the \"Alert Log\" tab (columns Key, Reported At, Details) AFTER the email was sent, so a failed send is retried next run, and the log survives re-imports. Entries older than 30 days are ignored. A cause that was already emailed within the last 12 hours (cooldownHours) is held back, so a standing problem such as a disconnected Pinterest does not send an email every hour; whatever failed in the meantime goes out together in the next email after the cooldown.\n\n**Branch 2 - running low (every morning at 8:00):** counts, separately for blog pins and 2:3 pins, the pins scheduled in the future plus approved pins waiting to be scheduled. If 2 days or less are left (blog: 15 a day, 2:3: 5 a day), one email says which type is low. No email when stock is fine.\n\n**Settings:** the Config nodes hold the recipient (alertTo), a copy for the admin (alertCc), the 48-hour look-back, the pins per day and the 2-day limit. Mails go out from the Gmail account in the Gmail credential on the two Email nodes.\n\n**Not covered:** workflow errors (a node crashing) still go only to the admin through the Global Error Handler.",
+        "height": 560,
+        "width": 520
+      },
+      "id": "48eca12b-ec5e-492b-9c77-ee35c04f58b8",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "e50ae01c-31b8-4686-8701-12a5403f3929",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        2384,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "userId",
+              "type": "string",
+              "value": "2803097"
+            },
+            {
+              "id": "c2",
+              "name": "blogId",
+              "type": "string",
+              "value": "3535389"
+            },
+            {
+              "id": "c3",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            },
+            {
+              "id": "c4",
+              "name": "pinsTab2",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
+            },
+            {
+              "id": "c5",
+              "name": "alertTo",
+              "type": "string",
+              "value": "newhomestone03@gmail.com"
+            },
+            {
+              "id": "c6",
+              "name": "alertCc",
+              "type": "string",
+              "value": "bilalhaider4706@gmail.com"
+            },
+            {
+              "id": "c7",
+              "name": "lookbackHours",
+              "type": "number",
+              "value": 48
+            },
+            {
+              "id": "c8",
+              "name": "blogPerDay",
+              "type": "number",
+              "value": 15
+            },
+            {
+              "id": "c9",
+              "name": "photoPerDay",
+              "type": "number",
+              "value": 5
+            },
+            {
+              "id": "c10",
+              "name": "lowDays",
+              "type": "number",
+              "value": 2
+            },
+            {
+              "id": "c11",
+              "name": "cooldownHours",
+              "type": "number",
+              "value": 12
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4c742e3-cb3c-426d-9dd8-d851d447bcf6",
+      "name": "Config (Failures)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2608,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://app.metricool.com/api/v2/scheduler/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $('Config (Failures)').first().json.userId }}"
+            },
+            {
+              "name": "blogId",
+              "value": "={{ $('Config (Failures)').first().json.blogId }}"
+            },
+            {
+              "name": "start",
+              "value": "={{ $now.minus({ hours: $('Config (Failures)').first().json.lookbackHours }).toFormat(\"yyyy-LL-dd'T'HH:mm:ss\") }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $now.plus({ hours: 2 }).toFormat(\"yyyy-LL-dd'T'HH:mm:ss\") }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "13027e09-c631-45bd-a809-d19194c5c61a",
+      "name": "Get Recent Metricool Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2816,
+        464
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HyOn8LPYniNVacXo",
+          "name": "Metricool API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config (Failures)').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "884055b0-8a17-40a3-b938-25f60a8fbcc6",
+      "name": "Get Pins (Failures)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3040,
+        464
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config (Failures)').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "576a2503-2da4-464f-b985-4def4f52d0b9",
+      "name": "Get Pins 2 (Failures)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3264,
+        464
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Alert Log",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a304df79-a82c-49b0-9b6b-90b0f44ba08a",
+      "name": "Read Alert Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3488,
+        464
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds Pinterest pins that failed since the last check and builds ONE plain-language digest.\n// A failure is reported once: its key is only written to the Alert Log (by \"Append Alert Log\") AFTER the email went out.\nconst cfg = $('Config (Failures)').first().json;\n// Already-reported failures live in the 'Alert Log' tab (column Key). Rows older than 30 days are ignored.\nconst alerted = {};\nconst lastSent = {};   // cause -> when it was last emailed\nfor (const it of $('Read Alert Log').all()) {\n  const r = it.json || {};\n  const k = String(r['Key'] == null ? '' : r['Key']).trim();\n  if (!k) continue;\n  const at = DateTime.fromISO(String(r['Reported At'] || ''));\n  if (at.isValid && $now.diff(at, 'days').days > 30) continue;\n  alerted[k] = true;\n  const d = String(r['Details'] || '');\n  const cause = d.includes(' | ') ? d.split(' | ').slice(1).join(' | ') : d;\n  if (at.isValid && cause && (!lastSent[cause] || at > lastSent[cause])) lastSent[cause] = at;\n}\nconst cooldownHours = cfg.cooldownHours == null ? 12 : Number(cfg.cooldownHours);\n\nconst str = v => (v == null ? '' : String(v).trim());\nfunction friendly(raw) {\n  const r = str(raw);\n  if (/disconnect/i.test(r)) return 'Pinterest is disconnected in Metricool. Please reconnect it: Metricool > Connections > Pinterest.';\n  if (/account limit|monthly|quota/i.test(r)) return \"Metricool's monthly post limit was reached.\";\n  if (/not found/i.test(r) && /pin/i.test(r)) return 'Pinterest could not find the pin.';\n  if (/token|authoriz/i.test(r)) return 'Pinterest login expired. Please reconnect it in Metricool.';\n  return r ? r.slice(0, 140) : 'Unknown error';\n}\n\nconst fails = [];\nlet metricoolCheckFailed = false;\nfor (const it of $('Get Recent Metricool Posts').all()) {\n  const j = it.json || {};\n  if (j.error) { metricoolCheckFailed = true; continue; }\n  const list = Array.isArray(j.data) ? j.data : Array.isArray(j.posts) ? j.posts : Array.isArray(j) ? j : (j.id ? [j] : []);\n  for (const p of list) {\n    const prov = (p.providers || []).find(x => String(x.network).toLowerCase() === 'pinterest');\n    if (!prov || String(prov.status).toUpperCase() !== 'ERROR') continue;\n    const key = 'mc:' + p.id;\n    if (alerted[key]) continue;\n    fails.push({ key, when: str((p.publicationDate || {}).dateTime).slice(0, 16).replace('T', ' '), reason: friendly(prov.detailedStatus), kind: 'metricool' });\n  }\n}\nif (metricoolCheckFailed) {\n  const key = 'chk:' + $now.toFormat('yyyy-LL-dd');\n  if (!alerted[key]) fails.push({ key, when: '', reason: 'The pin check could not reach Metricool just now. If this repeats, please let Bilal know.', kind: 'check' });\n}\nfor (const [tab, name] of [[cfg.pinsTab, 'Blog pins'], [cfg.pinsTab2, '2:3 pins']]) {\n  const rows = $(tab === cfg.pinsTab ? 'Get Pins (Failures)' : 'Get Pins 2 (Failures)').all();\n  for (const it of rows) {\n    const p = it.json || {};\n    if (str(p['Status']).toLowerCase() !== 'error') continue;\n    const key = 'row:' + name + ':' + str(p['Pin ID']) + ':' + str(p['Error']).slice(0, 60);\n    if (alerted[key]) continue;\n    fails.push({ key, when: str(p['Scheduled Date']), reason: friendly(p['Error']), kind: name });\n  }\n}\n// Same cause already emailed within the cooldown (default 12 h): hold these back. They are NOT logged,\n// so the first run after the cooldown reports everything that failed since in one email. This keeps a\n// standing problem (e.g. Pinterest disconnected, one pin failing every hour) from sending an email an hour.\nconst reportable = fails.filter(f => {\n  const last = lastSent[f.reason];\n  return !(last && $now.diff(last, 'hours').hours < cooldownHours);\n});\nif (reportable.length === 0) return [];\nfails.length = 0; fails.push(...reportable);\n\nconst groups = {};\nfor (const f of fails) (groups[f.reason] = groups[f.reason] || []).push(f);\nconst esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');\nlet html = '<div style=\"font-family:Arial,sans-serif;line-height:1.5;color:#333\">';\nhtml += '<p>Hi Raenia,</p><p><strong>' + fails.length + ' Pinterest pin' + (fails.length === 1 ? '' : 's') + ' failed to publish.</strong></p>';\nfor (const [reason, list] of Object.entries(groups)) {\n  const dates = list.filter(f => f.when).map(f => f.when).sort().slice(0, 6);\n  html += '<p><strong>' + list.length + ' pin' + (list.length === 1 ? '' : 's') + ':</strong> ' + esc(reason) + (dates.length ? '<br><span style=\"color:#777\">Scheduled for: ' + dates.join(', ') + (list.length > dates.length ? ' ...' : '') + '</span>' : '') + '</p>';\n}\nhtml += '<p>Pins that failed are not published automatically. Once the cause is fixed, the failed pins will be resent.</p></div>';\nconst subject = 'Pinterest: ' + fails.length + ' pin' + (fails.length === 1 ? '' : 's') + ' failed to publish';\nreturn [{ json: { to: cfg.alertTo, cc: cfg.alertCc, subject, body: html, entries: fails.map(f => ({ key: f.key, details: (f.when ? f.when + ' | ' : '') + f.reason })) } }];\n"
+      },
+      "id": "a0137159-e042-460c-b9e9-97260bc07a39",
+      "name": "Find New Failures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3696,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "ccList": "={{ $json.cc }}"
+        }
+      },
+      "id": "93267911-1941-4a7b-a2ef-ab1255ba1e2b",
+      "name": "Email Failed Pins",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3920,
+        464
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "webhookId": "f224f1d4-963c-47e7-8baf-4ea3405fda10",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One row per reported failure, written to the 'Alert Log' tab AFTER the email was sent.\nconst entries = $('Find New Failures').first().json.entries || [];\nconst at = $now.toISO();\nreturn entries.map(e => ({ json: { 'Key': e.key, 'Reported At': at, 'Details': String(e.details || '').slice(0, 200) } }));\n"
+      },
+      "id": "38b737a2-44f0-4858-8749-78ff9da04389",
+      "name": "Build Alert Log Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4144,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Alert Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Reported At": "={{ $json['Reported At'] }}",
+            "Details": "={{ $json['Details'] }}",
+            "Key": "={{ $json.Key }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Key",
+              "displayName": "Key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reported At",
+              "displayName": "Reported At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Details",
+              "displayName": "Details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "9c5df12f-23ac-440e-9245-83528a0fa2ad",
+      "name": "Append Alert Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4368,
+        464
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d6369b2b-45f3-4b0d-b13e-144247d2e7a5",
+      "name": "Every Morning 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        2384,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "userId",
+              "type": "string",
+              "value": "2803097"
+            },
+            {
+              "id": "c2",
+              "name": "blogId",
+              "type": "string",
+              "value": "3535389"
+            },
+            {
+              "id": "c3",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            },
+            {
+              "id": "c4",
+              "name": "pinsTab2",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
+            },
+            {
+              "id": "c5",
+              "name": "alertTo",
+              "type": "string",
+              "value": "newhomestone03@gmail.com"
+            },
+            {
+              "id": "c6",
+              "name": "alertCc",
+              "type": "string",
+              "value": "bilalhaider4706@gmail.com"
+            },
+            {
+              "id": "c7",
+              "name": "lookbackHours",
+              "type": "number",
+              "value": 48
+            },
+            {
+              "id": "c8",
+              "name": "blogPerDay",
+              "type": "number",
+              "value": 15
+            },
+            {
+              "id": "c9",
+              "name": "photoPerDay",
+              "type": "number",
+              "value": 5
+            },
+            {
+              "id": "c10",
+              "name": "lowDays",
+              "type": "number",
+              "value": 2
+            },
+            {
+              "id": "c11",
+              "name": "cooldownHours",
+              "type": "number",
+              "value": 12
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "89ebdb0b-c33b-4fa7-a224-dbf0ae468904",
+      "name": "Config (Stock)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2608,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config (Stock)').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "75c20695-62c8-4c99-b488-90e5f694ca6f",
+      "name": "Get Pins (Stock)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2816,
+        816
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config (Stock)').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "ed188cca-521a-4fd6-b09f-6177e33f25b6",
+      "name": "Get Pins 2 (Stock)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3040,
+        816
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Daily check, blog pins and 2:3 pins SEPARATELY. Stock = pins scheduled in the future\n// + approved pins waiting to be scheduled. Days left = stock / pins per day.\nconst cfg = $('Config (Stock)').first().json;\nconst str = v => (v == null ? '' : String(v).trim());\nconst norm = v => str(v).toLowerCase();\nfunction parseDate(s) {\n  const v = str(s); if (!v) return null;\n  for (const f of ['yyyy-LL-dd HH:mm', 'yyyy-LL-dd H:mm', 'M/d/yyyy HH:mm:ss', 'M/d/yyyy H:mm:ss', 'M/d/yyyy H:mm']) {\n    const dt = DateTime.fromFormat(v, f); if (dt.isValid) return dt;\n  }\n  const d = new Date(v); return isNaN(d.getTime()) ? null : DateTime.fromJSDate(d);\n}\nfunction count(items) {\n  let scheduled = 0, ready = 0, needsBoard = 0;\n  for (const it of items) {\n    const p = it.json || {};\n    const st = norm(p['Status']), ap = norm(p['Approval']);\n    if (st === 'scheduled') { const dt = parseDate(p['Scheduled Date']); if (dt && dt > $now) scheduled++; }\n    else if (st === 'review' && ap === 'approved') ready++;\n    else if (st === 'needs board') needsBoard++;\n  }\n  return { scheduled, ready, needsBoard };\n}\nconst tabs = [\n  { name: 'Blog pins', perDay: Number(cfg.blogPerDay) || 15, items: $('Get Pins (Stock)').all() },\n  { name: '2:3 pins', perDay: Number(cfg.photoPerDay) || 5, items: $('Get Pins 2 (Stock)').all() }\n];\nconst lowDays = Number(cfg.lowDays) || 2;\nconst lines = [];\nfor (const t of tabs) {\n  const c = count(t.items);\n  const stock = c.scheduled + c.ready;\n  const days = stock / t.perDay;\n  if (days <= lowDays) {\n    const left = days < 1 ? 'less than 1 day' : 'about ' + Math.floor(days) + ' day' + (Math.floor(days) === 1 ? '' : 's');\n    lines.push('<p><strong>' + t.name + ' are running low:</strong> ' + (stock === 0 ? 'none left to publish' : left + ' of pins left (' + stock + ' pins at ' + t.perDay + ' a day)') + '.' +\n      (c.needsBoard ? '<br><span style=\"color:#777\">' + c.needsBoard + ' more are waiting for a board ID and are not counted.</span>' : '') + '</p>');\n  }\n}\nif (lines.length === 0) return [];\nconst html = '<div style=\"font-family:Arial,sans-serif;line-height:1.5;color:#333\"><p>Hi Raenia,</p>' + lines.join('') + '<p>Please add new content so posting is not interrupted.</p></div>';\nreturn [{ json: { to: cfg.alertTo, cc: cfg.alertCc, subject: 'Pinterest: pins running low', body: html } }];\n"
+      },
+      "id": "62541ecc-fb70-4a2b-8f3d-e3bd197e5b36",
+      "name": "Compute Stock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "ccList": "={{ $json.cc }}"
+        }
+      },
+      "id": "30809058-deb1-4dae-ae2a-3df4d415fba6",
+      "name": "Email Low Stock",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3488,
+        816
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "webhookId": "b6d03fc3-f533-4e08-b37e-a9fdb97e8c28",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OExlXjvHu0l2FaMd",
+          "name": "Axe-AI-Gmail"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Config (Failures)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (Failures)": {
+      "main": [
+        [
+          {
+            "node": "Get Recent Metricool Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Metricool Posts": {
+      "main": [
+        [
+          {
+            "node": "Get Pins (Failures)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins (Failures)": {
+      "main": [
+        [
+          {
+            "node": "Get Pins 2 (Failures)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins 2 (Failures)": {
+      "main": [
+        [
+          {
+            "node": "Read Alert Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Alert Log": {
+      "main": [
+        [
+          {
+            "node": "Find New Failures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find New Failures": {
+      "main": [
+        [
+          {
+            "node": "Email Failed Pins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Failed Pins": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Log Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert Log Rows": {
+      "main": [
+        [
+          {
+            "node": "Append Alert Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Morning 8:00": {
+      "main": [
+        [
+          {
+            "node": "Config (Stock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (Stock)": {
+      "main": [
+        [
+          {
+            "node": "Get Pins (Stock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins (Stock)": {
+      "main": [
+        [
+          {
+            "node": "Get Pins 2 (Stock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins 2 (Stock)": {
+      "main": [
+        [
+          {
+            "node": "Compute Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Stock": {
+      "main": [
+        [
+          {
+            "node": "Email Low Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "executionTimeout": 600
+  },
+  "versionId": "86e9ea45-e1c6-4144-a46e-defb61c65d0b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "vkSU70amJZXwNnIP",
+  "tags": []
+}

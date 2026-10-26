@@ -3,17 +3,17 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Pinterest – Workflow 1: Prepare Pins (runs weekly)\n\n**What it does:** finds newly Posted blogs, reads the blog page, pulls all content images, plans pins (1 carousel of 3 hero images + single pins for the rest, 3/month), AI writes title/description/alt, auto-assigns Board from the Pinterest Boards tab by Category (AI picks the best fit when a category has more than one board), auto-sets Approval = Approved, and writes review rows to the Pinterest Pins tab -- no manual board pick or approval step.\n\n**Setup:**\n1. Credentials: Google Sheets OAuth2 + OpenAI API key on the relevant nodes.\n2. Make sure the Pinterest Boards tab has a Category column filled in for the categories you want auto-assigned (a board's Category cell can list more than one, e.g. `Bathtub | Fireplace`).\n3. Add Pinterest Status column to Blogs.\n4. Check Set Config values.\n\n**Note:** the image-extraction selector (Extract & Plan) may need tuning to your live blog HTML.\n\n**Duplicate protection:** before fetching a blog's page, checks whether its URL already has a non-empty Pinterest Status elsewhere in Blogs/Manual Blogs (e.g. the same URL entered twice) -- if so, skips it and marks that row Pinterest Status = Duplicate instead of reprocessing it.\n\n**Board fallback:** if no Pinterest board matches the blog's category, the row is written with Approval/Status = 'Needs Board' (not auto-Approved) so it never silently fails in WF2 -- a human assigns a board and flips it back to Review.",
+        "content": "## Pinterest – Workflow 1: Prepare Pins (runs every 15 minutes)\n\n**What it does:** finds newly Posted blogs, reads the blog page, pulls all content images, plans pins (1 carousel of 3 hero images + single pins for the rest, 3/month), AI writes title/description/alt, auto-assigns Board from the Pinterest Boards tab by Category (AI picks the best fit when a category has more than one board), auto-sets Approval = Approved, and writes review rows to the Pinterest Pins tab -- no manual board pick or approval step.\n\n**Setup:**\n1. Credentials: Google Sheets OAuth2 + OpenAI API key on the relevant nodes.\n2. Make sure the Pinterest Boards tab has a Category column filled in for the categories you want auto-assigned (a board's Category cell can list more than one, e.g. `Bathtub | Fireplace`).\n3. Add Pinterest Status column to Blogs.\n4. Check Set Config values.\n\n**Note:** the image-extraction selector (Extract & Plan) may need tuning to your live blog HTML.\n\n**Duplicate protection:** before fetching a blog's page, checks whether its URL already has a non-empty Pinterest Status elsewhere in Blogs/Manual Blogs (e.g. the same URL entered twice) -- if so, skips it and marks that row Pinterest Status = Duplicate instead of reprocessing it.\n\n**Board fallback:** if no Pinterest board matches the blog's category, the row is written with Approval/Status = 'Needs Board' (not auto-Approved) so it never silently fails in WF2 -- a human assigns a board and flips it back to Review.\n\n**Overlap guard:** the schedule is every 15 minutes, so a new Manual Blogs link is turned into pins within about 15 minutes. After the blogs to process are found, `Check Run Lock` reads the `Workflow Lock` tab (columns `Workflow`, `Started At`). If a run started less than 30 minutes ago and has not released the lock, this run stops before touching any blog, so nothing is processed twice. A run with nothing new never takes the lock. Each run handles at most 5 blogs (Manual Blogs links first); the rest wait for the next run. The lock is released when the loop finishes; a lock left by a crashed run expires after 30 minutes. The workflow timeout is 25 minutes, so a run can never outlive the lock.",
         "height": 900,
         "width": 420
       },
-      "id": "f7d5aecc-ff36-46c7-ad8d-167a4e7b5d61",
+      "id": "3535d616-6af9-42fc-a749-3df801c710ed",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        42480,
-        12896
+        0,
+        112
       ]
     },
     {
@@ -21,19 +21,19 @@
         "rule": {
           "interval": [
             {
-              "field": "cronExpression",
-              "expression": "0 9 * * *"
+              "field": "minutes",
+              "minutesInterval": 15
             }
           ]
         }
       },
-      "id": "a391d8e0-bfb6-47f9-84ae-286c51736c37",
-      "name": "Daily Trigger",
+      "id": "bd3c6a1b-3acd-48fa-b0dc-5c1eb94d1db0",
+      "name": "Every 15 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        43024,
-        13216
+        544,
+        432
       ]
     },
     {
@@ -92,13 +92,13 @@
         },
         "options": {}
       },
-      "id": "f357f934-59a7-4341-9081-a9dbdfad6696",
+      "id": "8bf9ccf7-5acd-40eb-9a54-f915e1b92586",
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        43232,
-        13216
+        752,
+        432
       ]
     },
     {
@@ -115,13 +115,13 @@
         },
         "options": {}
       },
-      "id": "26d1f02b-9e39-44f6-86ff-d7e2a12fa19c",
+      "id": "f154bf28-51e2-4921-9e63-4d8600f41997",
       "name": "Get Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        43808,
-        13216
+        1328,
+        432
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -137,9 +137,9 @@
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": false,
+            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose",
+            "typeValidation": "strict",
             "version": 2
           },
           "conditions": [
@@ -167,26 +167,26 @@
         },
         "options": {}
       },
-      "id": "3126acf6-dd09-434d-99f3-56347c0bc86c",
+      "id": "2e974abc-ce4d-4741-8546-bc6eacd878ed",
       "name": "Filter Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        44000,
-        13216
+        1520,
+        432
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "9931dc45-c9bb-4c9c-876f-332a3eea57c1",
+      "id": "eb4b0390-d17b-49fb-8883-4f8573eb1bac",
       "name": "Loop Over Blogs",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        44688,
-        13232
+        2432,
+        480
       ]
     },
     {
@@ -201,26 +201,26 @@
           }
         }
       },
-      "id": "b21a9c76-9afd-472b-8199-1189d2fa1ced",
+      "id": "de369c1f-066f-4654-a00f-c624736290a3",
       "name": "Fetch Blog Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        45360,
-        13264
+        3104,
+        512
       ]
     },
     {
       "parameters": {
         "jsCode": "const blog = $('Loop Over Blogs').item.json;\nconst html = $json.html || '';\nconst cfg = $('Set Config').first().json;\nconst hours = (cfg.postingHours || '7,8,9,10,11,12,13,14,15,16,17,18,19,20,21').split(',').map(h => parseInt(String(h).trim())).filter(h => !isNaN(h));\n\nconst rowNo = blog['row_number'];\nconst blogNo = blog['Blog.No.'] || blog['Blog No'] || blog['BlogNo'] || 'MANUAL';\nconst blogUrl = blog['BLog-URL'] || '';\nconst category = blog['Category (name)'] || blog['Category'] || '';\nlet blogTitle = blog['Blog-Article'] || '';\nif (!blogTitle) {\n  const tm = html.match(/<title[^>]*>([^<]*)<\\/title>/i);\n  if (tm) blogTitle = tm[1]\n    .replace(/&ndash;|&mdash;|&#8211;|&#8212;/g, '-')\n    .replace(/&amp;/g, '&').replace(/&quot;|&#34;/g, '\"').replace(/&#39;|&apos;/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .replace(/\\s*-\\s*Marblebee\\s*$/i, '')\n    .trim();\n}\n\nconst CONTENT_MARKERS = ['js-article-content', 'article__content', 'mb-blog-content'];\nconst JUNK_DOMAIN_RE = /review-images\\.judgeme\\.com|cdn\\.judge\\.me|judgeme/i;\n\nfunction findBalancedDivEnd(h, start) {\n  const tagRe = /<\\/?div\\b[^>]*>/gi; tagRe.lastIndex = start;\n  let depth = 0, m, end = null;\n  while ((m = tagRe.exec(h)) !== null) {\n    if (m[0].charAt(1) === '/') { depth--; if (depth === 0) { end = m.index + m[0].length; break; } }\n    else { depth++; }\n  }\n  return end;\n}\n\nfunction findContentRegion(h) {\n  const articleMatch = /<article\\b/i.exec(h);\n  if (!articleMatch) return { ok: false, reason: 'no <article> tag found on page' };\n  const articleStart = articleMatch.index;\n  const searchSpace = h.slice(articleStart);\n  let markerIdx = -1, usedMarker = null;\n  for (const cand of CONTENT_MARKERS) {\n    const idx = searchSpace.indexOf(cand);\n    if (idx >= 0) { markerIdx = idx; usedMarker = cand; break; }\n  }\n  if (markerIdx < 0) return { ok: false, reason: 'none of the known content markers matched (theme may have changed): ' + CONTENT_MARKERS.join(', ') };\n  const absMarker = articleStart + markerIdx;\n  const start = h.lastIndexOf('<div', absMarker);\n  if (start < 0) return { ok: false, reason: 'content marker \"' + usedMarker + '\" found but no enclosing <div>' };\n  const end = findBalancedDivEnd(h, start);\n  if (end === null) return { ok: false, reason: 'div nesting never balanced starting from marker \"' + usedMarker + '\" (malformed HTML)' };\n  return { ok: true, region: h.slice(start, end), marker: usedMarker };\n}\n\nlet images = [];\nlet extractionStatus = 'failed';\nlet statusReason = '';\nlet region = '';\n\ntry {\n  const extraction = findContentRegion(html);\n  if (!extraction.ok) {\n    statusReason = extraction.reason;\n  } else {\n    region = extraction.region;\n    const urls = region.match(/https?:\\/\\/[^\\s\"'<>\\\\)]+/gi) || [];\n    const seen = new Set();\n    for (let raw of urls) {\n      let u = raw.replace(/&amp;/g,'&');\n      u = u.replace(/[.,;:!?]+$/, '');\n      if ((u.match(/https?:\\/\\//gi) || []).length > 1) {\n        const mm = u.match(/[?&]media=(https?:\\/\\/[^&]+)/i);\n        if (mm) { u = decodeURIComponent(mm[1]).replace(/[.,;:!?]+$/, ''); }\n        else continue;\n      }\n      if (JUNK_DOMAIN_RE.test(u)) continue;\n      const qi = u.indexOf('?');\n      if (qi > -1) { const base = u.slice(0, qi); const params = u.slice(qi + 1).split('&').filter(p => !/^(crop|height|width)=/.test(p)); u = base + (params.length ? '?' + params.join('&') : ''); }\n      const isShopify = /cdn\\.shopify\\.com\\/s\\/files\\//i.test(u);\n      const isDrive = /drive\\.google\\.com\\/(thumbnail|uc)/i.test(u) || /drive\\.usercontent\\.google\\.com/i.test(u);\n      const isExt = /\\.(png|jpe?g|webp|gif)(?:\\?|$)/i.test(u);\n      if (!(isShopify || isDrive || isExt)) continue;\n      let key;\n      if (isDrive) { const idm = u.match(/[?&]id=([^&]+)/); key = 'drive:' + (idm ? idm[1] : u); }\n      else key = u.replace(/^https?:\\/\\//i, '').split('?')[0];\n      if (!seen.has(key)) { seen.add(key); images.push(u); }\n    }\n    extractionStatus = images.length > 0 ? 'ok' : 'no_images';\n    if (extractionStatus === 'no_images') statusReason = 'content region found but contained no matching images';\n  }\n} catch (e) {\n  extractionStatus = 'failed';\n  statusReason = 'exception during extraction: ' + (e && e.message ? e.message : String(e));\n}\n\nconst pinterestStatusLabel = extractionStatus === 'ok' ? 'Queued' : (extractionStatus === 'no_images' ? 'No Images Found' : 'Extraction Failed');\n\nconst text = region.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim().slice(0,1200);\n\n// Per-day slot allocator. Every pin gets the first free posting hour on the\n// first day (from tomorrow on) that has fewer than postingHours.length pins,\n// so no day ever goes over the cap (15 with the default 07-21 hours) and no\n// two pins share a slot -- regardless of row order in the sheet.\n// Counts EVERY existing row with a future Scheduled Date, including 'Needs\n// Board' rows: they will be published on that date once a human assigns a\n// board, so ignoring them let fresh pins land on top of them (>15 on a day).\n// Rows are only used for their date, so a stale placeholder date just\n// occupies its own single slot instead of dragging every new pin out to it.\n// Re-seeded from the sheet at the START OF EVERY EXECUTION (keyed by\n// $execution.id) because n8n persists workflow static data across runs.\n// This workflow and pinterest_product_photo_prepare_workflow.json (WF0,\n// 2:3 product-photo pins, its own 10/day cap) post to two different tabs on\n// the SAME Metricool calendar. They are kept on permanently disjoint minutes:\n// blog pins always land on :00, WF0's pins always land on :30. Never change\n// this value without also updating WF0's to match.\nconst scheduleMinute = cfg.scheduleMinute != null ? Number(cfg.scheduleMinute) : 0;\nconst maxPerDay = hours.length;\nconst sd = $getWorkflowStaticData('global');\nif (sd.pinSlotExecId !== $execution.id) {\n  function safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\n  // Tolerant of every format found in this column: this pipeline writes\n  // zero-padded (\"07:00\"), Google Sheets renders a real date/time cell\n  // without the leading zero (\"7:00\"), and WF2's Build Result rewrites a\n  // published row as M/d/yyyy HH:mm:ss. Matches WF2's toSendAt().\n  function parseSheetDate(s) {\n    const str = String(s || '').trim();\n    if (!str) return null;\n    const formats = ['yyyy-LL-dd HH:mm', 'yyyy-LL-dd H:mm', 'M/d/yyyy HH:mm:ss', 'M/d/yyyy H:mm:ss', 'M/d/yyyy H:mm'];\n    for (const f of formats) {\n      const dt = DateTime.fromFormat(str, f);\n      if (dt.isValid) return dt;\n    }\n    const d = new Date(str);\n    if (!isNaN(d.getTime())) return DateTime.fromJSDate(d);\n    return null;\n  }\n  const tomorrowStart = $now.plus({ days: 1 }).startOf('day');\n  const dayHours = {};\n  safe(() => $('Get Existing Pin Rows').all(), []).forEach(i => {\n    const dt = parseSheetDate(i.json['Scheduled Date']);\n    if (!dt || dt < tomorrowStart) return;\n    const key = dt.toFormat('yyyy-LL-dd');\n    (dayHours[key] = dayHours[key] || []).push(dt.hour);\n  });\n  sd.pinDayHours = dayHours;\n  sd.pinSlotExecId = $execution.id;\n}\nfunction nextSlot() {\n  let day = $now.plus({ days: 1 }).startOf('day');\n  for (let guard = 0; guard < 730; guard++, day = day.plus({ days: 1 })) {\n    const key = day.toFormat('yyyy-LL-dd');\n    const taken = sd.pinDayHours[key] || [];\n    if (taken.length >= maxPerDay) continue;\n    const hour = hours.find(h => !taken.includes(h));\n    if (hour === undefined) continue;\n    taken.push(hour);\n    sd.pinDayHours[key] = taken;\n    return day.set({ hour, minute: scheduleMinute, second: 0, millisecond: 0 }).toFormat(\"yyyy-LL-dd HH:mm\");\n  }\n  return '';\n}\nconst pins = images.map((img) => ({ type: 'single', images: [img], scheduledDate: nextSlot() }));\nreturn [{ json: { blogNo, blogTitle, blogUrl, category, text, imageCount: images.length, pins, row_number: rowNo, extractionStatus, statusReason, pinterestStatusLabel } }];\n"
       },
-      "id": "e405cea7-a146-428f-a069-911f64f27643",
+      "id": "f5450fbf-ca4c-43ca-9b07-490d3ac761b9",
       "name": "Extract & Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        45520,
-        13264
+        3264,
+        512
       ]
     },
     {
@@ -372,13 +372,13 @@
         },
         "options": {}
       },
-      "id": "f4f4c776-cc24-48a8-a16f-d72feca84f99",
+      "id": "9fb6f760-6865-4521-ad17-8e4e42b5ebe8",
       "name": "Mark Blog Queued",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        45056,
-        13808
+        2800,
+        1056
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -393,13 +393,13 @@
       "parameters": {
         "jsCode": "const ctx = $('Extract & Plan').item.json;\n\nfunction normCategory(s) { return String(s || '').toLowerCase().replace(/[\\s_-]+/g, '').trim(); }\nconst boardRows = $('🗂️ Get Pinterest Boards').all().map(i => i.json);\nconst targetCategory = normCategory(ctx.category);\nconst candidateBoards = boardRows\n  .filter(row => String(row['Category'] || '').split(/[|,]/).map(normCategory).includes(targetCategory))\n  .map(row => ({ name: String(row['Board Name'] || '').trim(), id: String(row['Board ID'] || '').trim() }))\n  .filter(b => b.name && b.id);\n\n// If this exact blog URL was already pinned before (allowed now for Manual\n// Blogs -- see Check Duplicate Blog), exclude boards already used for this URL\n// so repeats spread across different boards. If every matching board has\n// already been used for this URL, leave the pool empty rather than silently\n// reusing one -- Build Row then leaves Board/Board ID blank and the row goes\n// to Needs Board for a human to assign manually. The pin/row itself is never\n// skipped -- only its board assignment is held for review.\nfunction normUrl(u) { return String(u || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\\/+$/, ''); }\nfunction safe(fn, d) { try { const v = fn(); return v === undefined ? d : v; } catch (e) { return d; } }\nconst existingPinRows = safe(() => $('Get Existing Pin Rows').all().map(i => i.json), []);\nconst usedBoardIdsForThisUrl = new Set(\n  existingPinRows.filter(r => normUrl(r['Blog Link']) === normUrl(ctx.blogUrl)).map(r => String(r['Board ID'] || '').trim()).filter(Boolean)\n);\nconst finalCandidates = candidateBoards.filter(b => !usedBoardIdsForThisUrl.has(b.id));\n\nconst out = [];\n(ctx.pins || []).forEach((p, idx) => {\n  const candidateBoards = finalCandidates; // shadow -- this pin's actual pool after rotation\n  const needsBoardChoice = candidateBoards.length > 1;\n  const boardInstruction = needsBoardChoice\n    ? ('\\nAlso choose the single best-fit Pinterest board for this image from this exact list (return its exact name as \"board\" in the JSON): ' + candidateBoards.map(b => b.name).join(' | '))\n    : '';\n  const jsonKeys = needsBoardChoice ? 'title, description, alt, board' : 'title, description, alt';\n\n  const prompt = 'You are a Pinterest SEO copywriter. Look at the image(s) and the article context, then return ONLY a JSON object with keys: ' + jsonKeys + '. '\n    + 'title: <=100 chars, keyword-rich, compelling. description: <=480 chars, keyword-rich, natural, with a soft call to action. alt: <=120 chars, plainly describe the image. '\n    + 'Do not include any text or markdown outside the JSON.\\n\\n'\n    + 'Blog title: ' + ctx.blogTitle + '\\nCategory: ' + ctx.category + '\\nArticle context: ' + (ctx.text || '')\n    + '\\nThis is ' + (p.type === 'carousel' ? 'a carousel made of these images.' : 'a single image.')\n    + '\\nThe pin links to: ' + ctx.blogUrl\n    + boardInstruction;\n  out.push({ json: {\n    blogNo: ctx.blogNo, blogTitle: ctx.blogTitle, blogUrl: ctx.blogUrl,\n    category: ctx.category, candidateBoards,\n    type: p.type, images: p.images, scheduledDate: p.scheduledDate,\n    pinIndex: idx + 1, promptText: prompt\n  } });\n});\nreturn out;\n"
       },
-      "id": "ff06d436-eefa-4aa2-95a2-315dd41590c2",
+      "id": "e1c62c01-26dc-4bbd-8d7b-512be799f584",
       "name": "Split Pins",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        45328,
-        13648
+        3072,
+        896
       ]
     },
     {
@@ -416,13 +416,13 @@
         "imageUrls": "={{ ($json.images || []).join(',') }}",
         "options": {}
       },
-      "id": "dff5e9ec-21c4-49f5-bcc1-201dca3a5296",
+      "id": "31666311-2de0-44d5-81a0-a7b66d7fdfe8",
       "name": "AI Vision Copy",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        45552,
-        13648
+        3296,
+        896
       ],
       "credentials": {
         "openAiApi": {
@@ -435,13 +435,13 @@
       "parameters": {
         "jsCode": "const aiItems = $input.all();\nconst pins = $('Split Pins').all();\nfunction preview(u){ return u ? '=IMAGE(\"' + u + '\", 4, 90, 90)' : ''; }\nconst out = [];\nfor (let i = 0; i < aiItems.length; i++) {\n  const pin = pins[i].json;\n  let ai = {};\n  const resp = aiItems[i].json;\n  let contentStr = resp.content || resp.text || (resp.message && resp.message.content) || '';\n  if (!contentStr && resp.choices && resp.choices[0] && resp.choices[0].message) contentStr = resp.choices[0].message.content || '';\n  contentStr = String(contentStr).replace(/```json/gi, '').replace(/```/g, '').trim();\n  try { ai = JSON.parse(contentStr); } catch (e) { ai = {}; }\n  const imgs = pin.images || [];\n\n  const candidateBoards = pin.candidateBoards || [];\n  let board = '', boardId = '';\n  if (candidateBoards.length === 1) {\n    board = candidateBoards[0].name;\n    boardId = candidateBoards[0].id;\n  } else if (candidateBoards.length > 1) {\n    const aiChoice = String(ai.board || '').trim().toLowerCase();\n    const matched = candidateBoards.find(b => b.name.trim().toLowerCase() === aiChoice);\n    const chosen = matched || candidateBoards[0];\n    board = chosen.name;\n    boardId = chosen.id;\n  }\n\n  const noBoardMatch = !boardId;\n  out.push({ json: {\n    'Pin ID': pin.blogNo + '-P' + pin.pinIndex,\n    'Blog No.': pin.blogNo,\n    'Blog Title': pin.blogTitle,\n    'Pin Type': pin.type,\n    'Preview 1': preview(imgs[0]),\n    'Preview 2': preview(imgs[1]),\n    'Preview 3': preview(imgs[2]),\n    'Image 1 URL': imgs[0] || '',\n    'Image 2 URL': imgs[1] || '',\n    'Image 3 URL': imgs[2] || '',\n    'Pin Title': ai.title || '',\n    'Pin Description': ai.description || '',\n    'Alt Text': ai.alt || '',\n    'Blog Link': pin.blogUrl,\n    'Board': board,\n    'Board ID': boardId,\n    'Scheduled Date': pin.scheduledDate,\n    // No candidate Pinterest board for this category -- hold for a human to\n    // assign a board manually instead of auto-approving something WF2 can\n    // never publish. 'Needs Board' is never picked up by WF2 (it only reads\n    // Approval=Approved + Status=Review/Error), so it won't loop or 429-retry.\n    'Approval': noBoardMatch ? 'Needs Board' : 'Approved',\n    'Status': noBoardMatch ? 'Needs Board' : 'Review',\n    'Pin URL': '',\n    'Error': '',\n    'Created Time': $now.toISO(),\n    'Pinned Time': ''\n  } });\n}\nreturn out;\n"
       },
-      "id": "dcccc852-8dad-4686-bf3d-c26dc8f17b73",
+      "id": "09013ad5-ad63-4a39-a89c-29db79e3753b",
       "name": "Build Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        45744,
-        13648
+        3488,
+        896
       ]
     },
     {
@@ -710,13 +710,13 @@
           "cellFormat": "USER_ENTERED"
         }
       },
-      "id": "f55f7574-55b0-48d4-b3fa-00c3865f580d",
+      "id": "d6a44a6f-5eda-450d-ab12-ed68e391faa2",
       "name": "Append Pin Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        45952,
-        13648
+        3696,
+        896
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -731,13 +731,13 @@
       "parameters": {
         "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: { ...i.json, _source: 'blogs' } }));"
       },
-      "id": "777bcabc-4265-4342-a2d6-deeb4a94f101",
+      "id": "530f1b58-6d42-48bb-b947-fec4afe5fbd5",
       "name": "Map Regular Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        44176,
-        13216
+        1744,
+        432
       ]
     },
     {
@@ -754,13 +754,13 @@
         },
         "options": {}
       },
-      "id": "07631205-0916-40a3-a33e-3d56ea5c30c3",
+      "id": "3b04351f-8931-4f27-a38f-1c1b8e2947d2",
       "name": "Get Manual Blog Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        43680,
-        13504
+        1200,
+        720
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -807,37 +807,37 @@
         },
         "options": {}
       },
-      "id": "170f4b55-d8e3-475b-b253-ae3ae8b6ebf2",
+      "id": "132c2ad5-ba42-452a-a8c8-57652667b7a0",
       "name": "Filter Manual Eligible",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
       "position": [
-        43952,
-        13504
+        1472,
+        720
       ]
     },
     {
       "parameters": {
         "jsCode": "const items = $input.all();\nreturn items.map(i => ({ json: {\n  row_number: i.json['row_number'],\n  'BLog-URL': i.json['Manual Blog URL'] || '',\n  'Manual Blog URL': i.json['Manual Blog URL'] || '',\n  'Category': i.json['Category'] || '',\n  '_source': 'manual'\n} }));"
       },
-      "id": "573adc1a-4d9d-4e3f-920f-a26aab9c63e0",
+      "id": "56a720ef-5053-4703-b2d0-2ac2af259dd9",
       "name": "Map Manual Blogs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        44144,
-        13504
+        1664,
+        720
       ]
     },
     {
       "parameters": {},
-      "id": "001aaf6d-95a2-40c8-aed3-77e0248d95c4",
+      "id": "aaae07ad-970d-4518-9373-287d50071838",
       "name": "Merge",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
       "position": [
-        44464,
-        13232
+        1984,
+        448
       ]
     },
     {
@@ -864,13 +864,13 @@
         },
         "options": {}
       },
-      "id": "7fc2c77e-a0e9-4d1b-8212-33c1e6929c95",
+      "id": "3257f6ad-6464-4345-95a3-e313ee24b2ba",
       "name": "IF Manual Blog",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        44816,
-        13648
+        2560,
+        896
       ]
     },
     {
@@ -941,13 +941,13 @@
         },
         "options": {}
       },
-      "id": "62a23576-2fc9-4229-9840-0482b4b41b5e",
+      "id": "2bd16777-4a40-42db-82d9-fa1e63a97c43",
       "name": "Update Manual Blog Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        45040,
-        13504
+        2800,
+        768
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -972,13 +972,13 @@
         },
         "options": {}
       },
-      "id": "de2d607c-0f9f-47b8-bd4b-5c38cc847467",
+      "id": "e0493353-9c68-4463-8b59-39a39047b7af",
       "name": "🗂️ Get Pinterest Boards",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        43424,
-        13216
+        944,
+        432
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -995,13 +995,13 @@
       "parameters": {
         "jsCode": "// A blog (regular or manual) counts as already processed if ANY OTHER row for\n// the same normalized URL already has a non-empty Pinterest Status -- this is\n// what actually happened in production: the same Manual Blog URL was entered\n// as two separate sheet rows, and the per-row empty-status check alone can't\n// catch that since each row starts out empty independently.\nconst item = $json;\nfunction normUrl(u) {\n  return String(u || '').trim().toLowerCase().replace(/[?#].*$/, '').replace(/\\/+$/, '');\n}\nconst myUrl = normUrl(item['BLog-URL']);\nconst myRowNumber = item['row_number'];\nconst mySource = item['_source'];\n\nfunction isProcessed(row) {\n  return String(row['Pinterest Status'] || '').trim() !== '';\n}\n\n// Client decision: Manual Blog URLs may legitimately repeat (the same evergreen\n// content re-pinned to a different board later) -- only regular (\"blogs\"-tab,\n// auto-discovered) rows are protected against accidental double-processing.\nlet dup = null;\nif (myUrl && mySource !== 'manual') {\n  const blogRows = $('Get Blog Rows').all().map(i => i.json);\n  for (const row of blogRows) {\n    if (mySource === 'blogs' && row['row_number'] === myRowNumber) continue;\n    if (isProcessed(row) && normUrl(row['BLog-URL']) === myUrl) { dup = row; break; }\n  }\n  if (!dup) {\n    const manualRows = $('Get Manual Blog Rows').all().map(i => i.json);\n    for (const row of manualRows) {\n      if (mySource === 'manual' && row['row_number'] === myRowNumber) continue;\n      if (isProcessed(row) && normUrl(row['Manual Blog URL']) === myUrl) { dup = row; break; }\n    }\n  }\n}\n\n// Same URL twice in this run: only the first occurrence is processed.\n// Rows earlier in the sheet aren't \"processed\" yet, so the status check above misses them.\n// Regular (blogs-tab) rows only -- Manual Blog URLs may legitimately repeat.\nif (!dup && myUrl && mySource !== 'manual') {\n  const runRows = $('Merge').all().map(i => i.json).filter(r => r['_source'] !== 'manual');\n  const first = runRows.find(r => normUrl(r['BLog-URL']) === myUrl);\n  if (first && !(first['_source'] === mySource && first['row_number'] === myRowNumber)) {\n    dup = first;\n  }\n}\n\nreturn [{ json: { ...item, isDuplicate: !!dup, duplicateOfRow: dup ? dup['row_number'] : null } }];\n"
       },
-      "id": "1b73e812-1ae7-48a0-aae3-11980b4df6a0",
+      "id": "3c95e681-6be2-4814-b9e5-66e6c24b25c8",
       "name": "Check Duplicate Blog",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        44912,
-        13248
+        2656,
+        496
       ]
     },
     {
@@ -1029,13 +1029,13 @@
         },
         "options": {}
       },
-      "id": "30056c5a-e072-4069-9993-98cedec69017",
+      "id": "532145cb-4028-4038-b51b-218da3d0d066",
       "name": "Is Duplicate?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        45120,
-        13248
+        2864,
+        496
       ]
     },
     {
@@ -1062,13 +1062,13 @@
         },
         "options": {}
       },
-      "id": "98fe0bea-d9e8-4d4e-829f-9ece74635ca5",
+      "id": "9f4e0cb3-5bd1-4acb-82c6-ac10ae3d8173",
       "name": "IF Manual Blog (Dup)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        45104,
-        13008
+        2656,
+        272
       ]
     },
     {
@@ -1220,13 +1220,13 @@
         },
         "options": {}
       },
-      "id": "f6ef2acd-b38c-4f14-bdcb-dc8a918e2d32",
+      "id": "67ba48e5-cf81-47f2-864e-d54443c238f9",
       "name": "Mark Blog Duplicate",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        45392,
-        13024
+        3024,
+        288
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1305,13 +1305,13 @@
         },
         "options": {}
       },
-      "id": "bfc49702-286e-4d74-9757-7032b559ce20",
+      "id": "71a25e6a-1199-4789-b2ae-e645c8772e18",
       "name": "Mark Manual Blog Duplicate",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        45376,
-        12784
+        3040,
+        16
       ],
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -1338,20 +1338,207 @@
           "dataLocationOnSheet": {
             "values": {
               "rangeDefinition": "specifyRangeA1",
-              "range": "J:O",
-              "headerRow": 1,
-              "firstDataRow": 2
+              "range": "J:O"
             }
           }
         }
       },
-      "id": "ca142857-b64d-4aa6-b5f4-aebd471c3eeb",
+      "id": "f315958e-b640-479d-a72c-0a4a9f222430",
       "name": "Get Existing Pin Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        43616,
-        13216
+        1136,
+        432
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Workflow Lock",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "c10f002e-3427-4f71-9b19-90f9fcdf85fb",
+      "name": "Read Run Lock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1744,
+        144
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Overlap guard. A previous run that started less than 30 minutes ago and has not released the lock\n// is still working (or crashed) -- this run stops here, before it touches any blog, so the same blog can\n// never be turned into pins twice. A lock older than 30 minutes is treated as stale (crashed run) and ignored.\nconst NAME = 'WF1 Prepare Pins';\nconst TTL_MIN = 30;\nconst rows = $input.all().map(i => i.json || {});\nconst row = rows.find(r => String(r['Workflow'] || '').trim() === NAME);\nconst m = /ms:(\\d+)/.exec(String((row && row['Started At']) || ''));\nif (m) {\n  const ageMin = (Date.now() - Number(m[1])) / 60000;\n  if (ageMin >= 0 && ageMin < TTL_MIN) return [];   // another run is in progress -> skip this one\n}\nreturn [{ json: { acquired: true, startedAt: 'ms:' + Date.now() } }];"
+      },
+      "id": "a6e66cd9-55b8-4a9a-823a-1ad3e6542352",
+      "name": "Check Run Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Workflow Lock",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Workflow": "WF1 Prepare Pins",
+            "Started At": "={{ $json.startedAt }}"
+          },
+          "matchingColumns": [
+            "Workflow"
+          ],
+          "schema": [
+            {
+              "id": "Workflow",
+              "displayName": "Workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Started At",
+              "displayName": "Started At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "064ebf19-00c9-4610-9424-1899f2c5474e",
+      "name": "Take Run Lock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2192,
+        144
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hand the blogs found earlier on to the loop (the lock steps in between replaced the items).\n// Manual Blogs links go first, and at most MAX_BLOGS_PER_RUN blogs are taken per run, so a run always\n// finishes well inside the 15-minute schedule. Blogs left over are untouched (still eligible) and are\n// picked up by the next run -- nothing is cut off mid-way, so no OpenAI call is ever repeated.\nconst MAX_BLOGS_PER_RUN = 5;\nconst all = $('Merge').all();\nconst manual = all.filter(i => i.json._source === 'manual');\nconst regular = all.filter(i => i.json._source !== 'manual');\nreturn [...manual, ...regular].slice(0, MAX_BLOGS_PER_RUN);"
+      },
+      "id": "ba64b87c-dcd9-4618-80b1-97b7c82380f6",
+      "name": "Restore Blog Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Workflow Lock",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Workflow": "WF1 Prepare Pins",
+            "Started At": ""
+          },
+          "matchingColumns": [
+            "Workflow"
+          ],
+          "schema": [
+            {
+              "id": "Workflow",
+              "displayName": "Workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Started At",
+              "displayName": "Started At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "f76cfde4-bc7e-47d5-bec4-531a57d0751d",
+      "name": "Release Run Lock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2192,
+        848
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -1447,7 +1634,7 @@
       "main": [
         [
           {
-            "node": "Loop Over Blogs",
+            "node": "Read Run Lock",
             "type": "main",
             "index": 0
           }
@@ -1456,7 +1643,13 @@
     },
     "Loop Over Blogs": {
       "main": [
-        [],
+        [
+          {
+            "node": "Release Run Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Check Duplicate Blog",
@@ -1572,17 +1765,6 @@
         ]
       ]
     },
-    "Daily Trigger": {
-      "main": [
-        [
-          {
-            "node": "Set Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Check Duplicate Blog": {
       "main": [
         [
@@ -1678,6 +1860,61 @@
           }
         ]
       ]
+    },
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Run Lock": {
+      "main": [
+        [
+          {
+            "node": "Check Run Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Run Lock": {
+      "main": [
+        [
+          {
+            "node": "Take Run Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take Run Lock": {
+      "main": [
+        [
+          {
+            "node": "Restore Blog Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Blog Items": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1687,9 +1924,10 @@
     "availableInMCP": false,
     "timeSavedMode": "fixed",
     "errorWorkflow": "nETo8yQdCbRv52pK",
-    "callerPolicy": "workflowsFromSameOwner"
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 1500
   },
-  "versionId": "2d3adf4d-5c0a-40bc-89d7-6857701e3c30",
+  "versionId": "0eb21874-70a6-4b97-983e-ef1108dc4e96",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Pinterest – Workflow 2: Publish approved pins (daily)\n\nReads **both** the **Pinterest Pins** tab (blog-sourced) and the **Pinterest2:3 Pins** tab (product-photo-sourced), takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from the Pinterest Boards tab — board IDs are native to Pinterest, so they still work unchanged), normalizes each pin's image via Metricool, and schedules each pin in **Metricool** at its **Scheduled Date**. Writes back Status / Pin URL / Error / Pinned Time to whichever tab that row came from (tracked internally as `_sourceTab`).\n\n**Setup:** Google Sheets + Metricool (Header Auth, X-Mc-Auth) credentials. Set userId, blogId, pinsTab, and pinsTab2 in Set Config.\n\n**Retry behaviour:** picks up rows with Status = Review OR Error (not just Review), so a failed publish attempt gets retried automatically. Pins whose Scheduled Date has already passed are rescheduled to now+24h (never rejected permanently) to honor the 24h human-approval window. Create Pin is throttled (1 request / 3s) to avoid Metricool 429s on runs with many pins.\n\n**Per-run cap:** at most `maxPublishPerRun` (default 50) pins are actually sent to Create Pin per run, earliest/most-overdue first -- the rest are left untouched for the next run, so a large backlog can't blow past execution limits or flood Metricool. Not-ready pins whose failure reason hasn't changed since the last run are skipped entirely (no sheet write) instead of re-recording the same dead error every day.\n\n**Sheet routing fix:** writing results back used to be a single Update node whose Sheet was chosen by an expression (`_sourceTab`) -- but n8n only evaluates a node's Sheet field once, from the FIRST item, and applies it to the whole batch. Since results are a mix of both tabs, this silently failed to update most rows whenever the batch didn't start with an item from their tab. Fixed by routing through `Route by Sheet` into two separate fixed-sheet update nodes (`Update Pin Row (Pinterest Pins)` / `Update Pin Row (Pinterest2:3 Pins)`), one per tab.\n\n**New-rows-only cutoff:** `newRowsOnlyAfter` (default `2026-09-10T00:00:00-04:00`) means only pins whose `Created Time` is on/after that timestamp are touched at all by this workflow -- the reschedule/retry/dedupe logic above intentionally does NOT apply to the pre-existing backlog. Older rows (or rows with a missing/unparseable Created Time) are skipped entirely: not retried, not rescheduled. If a skipped row's own Scheduled Date has already passed, it gets ONE explanatory note in Error (never rewritten again once present) so it's not left silently unexplained on the sheet -- pre-cutoff rows that aren't yet due get no note at all. That note also names the row's actual underlying problems (missing board, missing image, bad date) when present, not just its age, since fixing the age alone wouldn't make it publishable anyway. Set it blank to disable the cutoff and process everything again.\n\n**Needs Board self-heal:** a row held as 'Needs Board' (no board matched when it was created) is now picked up as soon as a board is filled in (Board ID, or a Board name that resolves) -- Approval may be 'Approved' or still 'Needs Board'. Nobody has to switch Status back to Review. Before, WF2 skipped such rows silently forever (it only reads Review/Error), so their scheduled slots passed with nothing published. The row is scheduled like any other (overdue dates are moved to now+24h and spaced), and its Approval is written back as Approved. A Needs Board row that still has no board is left untouched.",
+        "content": "## Pinterest – Workflow 2: Publish approved pins (every 3 hours)\n\nReads **both** the **Pinterest Pins** tab (blog-sourced) and the **Pinterest2:3 Pins** tab (product-photo-sourced), takes rows where **Approval = Approved** and **Status = Review**, resolves the **Board name -> Board ID** (from the Pinterest Boards tab — board IDs are native to Pinterest, so they still work unchanged), normalizes each pin's image via Metricool, and schedules each pin in **Metricool** at its **Scheduled Date**. Writes back Status / Pin URL / Error / Pinned Time to whichever tab that row came from (tracked internally as `_sourceTab`).\n\n**Setup:** Google Sheets + Metricool (Header Auth, X-Mc-Auth) credentials. Set userId, blogId, pinsTab, and pinsTab2 in Set Config.\n\n**Retry behaviour:** picks up rows with Status = Review OR Error (not just Review), so a failed publish attempt gets retried automatically. Pins whose Scheduled Date has already passed are rescheduled to now+24h (never rejected permanently) to honor the 24h human-approval window. Create Pin is throttled (1 request / 3s) to avoid Metricool 429s on runs with many pins.\n\n**Per-run cap:** at most `maxPublishPerRun` (default 50) pins are actually sent to Create Pin per run, earliest/most-overdue first -- the rest are left untouched for the next run, so a large backlog can't blow past execution limits or flood Metricool. Not-ready pins whose failure reason hasn't changed since the last run are skipped entirely (no sheet write) instead of re-recording the same dead error every day.\n\n**Sheet routing fix:** writing results back used to be a single Update node whose Sheet was chosen by an expression (`_sourceTab`) -- but n8n only evaluates a node's Sheet field once, from the FIRST item, and applies it to the whole batch. Since results are a mix of both tabs, this silently failed to update most rows whenever the batch didn't start with an item from their tab. Fixed by routing through `Route by Sheet` into two separate fixed-sheet update nodes (`Update Pin Row (Pinterest Pins)` / `Update Pin Row (Pinterest2:3 Pins)`), one per tab.\n\n**New-rows-only cutoff:** `newRowsOnlyAfter` (default `2026-09-10T00:00:00-04:00`) means only pins whose `Created Time` is on/after that timestamp are touched at all by this workflow -- the reschedule/retry/dedupe logic above intentionally does NOT apply to the pre-existing backlog. Older rows (or rows with a missing/unparseable Created Time) are skipped entirely: not retried, not rescheduled. If a skipped row's own Scheduled Date has already passed, it gets ONE explanatory note in Error (never rewritten again once present) so it's not left silently unexplained on the sheet -- pre-cutoff rows that aren't yet due get no note at all. That note also names the row's actual underlying problems (missing board, missing image, bad date) when present, not just its age, since fixing the age alone wouldn't make it publishable anyway. Set it blank to disable the cutoff and process everything again.\n\n**Needs Board self-heal:** a row held as 'Needs Board' (no board matched when it was created) is now picked up as soon as a board is filled in (Board ID, or a Board name that resolves) -- Approval may be 'Approved' or still 'Needs Board'. Nobody has to switch Status back to Review. Before, WF2 skipped such rows silently forever (it only reads Review/Error), so their scheduled slots passed with nothing published. The row is scheduled like any other (overdue dates are moved to now+24h and spaced), and its Approval is written back as Approved. A Needs Board row that still has no board is left untouched.\n\n**Schedule:** runs every 3 hours (at :20), so an approved pin is picked up the same day instead of waiting for one daily run. It only sends pins that are Approved and Review/Error and have no Metricool post yet, so running more often cannot create duplicates.",
         "height": 1788,
         "width": 420
       },
@@ -20,12 +20,16 @@
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "field": "hours",
+              "hoursInterval": 3,
+              "triggerAtMinute": 20
+            }
           ]
         }
       },
       "id": "1438ff55-d3e1-468d-a2f2-a9d37f5e925c",
-      "name": "Daily Trigger",
+      "name": "Every 3 Hours",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -1136,17 +1140,6 @@
   ],
   "pinData": {},
   "connections": {
-    "Daily Trigger": {
-      "main": [
-        [
-          {
-            "node": "Set Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Set Config": {
       "main": [
         [
@@ -1309,6 +1302,17 @@
         [
           {
             "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 3 Hours": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
             "type": "main",
             "index": 0
           }

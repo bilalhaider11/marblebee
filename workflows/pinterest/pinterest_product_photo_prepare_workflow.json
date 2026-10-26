@@ -110,19 +110,19 @@
               "id": "c14",
               "name": "pinsPerDay",
               "type": "number",
-              "value": 10
+              "value": 5
             },
             {
               "id": "c15",
               "name": "scheduleHourSpacing",
               "type": "number",
-              "value": 2
+              "value": 3
             },
             {
               "id": "c16",
               "name": "scheduleDayStartHour",
               "type": "number",
-              "value": 4
+              "value": 7
             },
             {
               "id": "c16b",
