@@ -1,0 +1,675 @@
+{
+  "name": "Etsy - Mark existing listings on sheet (dry run first)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1d988702-48a7-4bc6-aed4-9cf7dd62b22e",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        23488,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "apiKey",
+              "type": "string",
+              "value": "PASTE_KEYSTRING:SHARED_SECRET_HERE"
+            },
+            {
+              "id": "k2",
+              "name": "shopId",
+              "type": "string",
+              "value": "64324681"
+            },
+            {
+              "id": "k3",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "k5",
+              "name": "docId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5750fa4-81f8-4386-a880-7283b4eee986",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        23696,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}?fields=sheets(properties(sheetId,title,gridProperties(columnCount)))",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "7afb5734-1401-4f60-8177-e50f76577673",
+      "name": "Sheet Meta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        23888,
+        2656
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const TABS = ['2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst meta = $('Sheet Meta').first().json.sheets || [];\nconst byTitle = {};\nmeta.forEach(s => { byTitle[s.properties.title] = s.properties; });\nreturn TABS.filter(t => byTitle[t]).map(t => ({ json: { sheet_name: t, sheetId: byTitle[t].sheetId, columnCount: (byTitle[t].gridProperties || {}).columnCount || 26 } }));"
+      },
+      "id": "2c396966-e0a6-46d8-a558-a00fe1cce666",
+      "name": "Tabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24096,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $('Config').first().json.docId + '/values/' + encodeURIComponent(\"'\" + String($json.sheet_name).replace(/'/g, \"''\") + \"'!2:2\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "f7b2f9b4-9aa4-406d-807b-6ede7e5e2708",
+      "name": "Read Header",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24288,
+        2656
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const DOC = $('Config').first().json.docId;\nconst tabs = $('Tabs').all().map(i => i.json);\nconst norm = s => String(s == null ? '' : s).toLowerCase().replace(/\\s+/g, ' ').trim();\nconst ETSY = ['Etsy_listing_id', 'Etsy_url', 'Etsy_admin_url', 'Etsy_status', 'Etsy_error', 'Etsy_created_at', 'Etsy_last_modified', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_fields_to_update', 'Etsy_ready_to_post'];\nconst READ = ['Etsy_listing_id', 'Etsy_url', 'Etsy_admin_url', 'Etsy_status', 'Etsy_created_at', 'Etsy_last_modified', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_image_count', 'Etsy_synced_at'];\nconst letters = (n) => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\nreturn $input.all().map((it, i) => {\n  const t = tabs[i];\n  const headers = (it.json.values && it.json.values[0]) || [];\n  const hn = headers.map(norm);\n  const skuIdx = Math.max(hn.lastIndexOf('product no.'), hn.lastIndexOf('product no'));\n  let lastNonEmpty = -1;\n  hn.forEach((h, k) => { if (h) lastNonEmpty = k; });\n  const titleIdx = hn.indexOf('title_etsy');\n  const noHeader = lastNonEmpty < 0, noSku = skuIdx < 0;\n  const cols = {}, newCols = [];\n  let next = lastNonEmpty + 1;\n  for (const name of ETSY) {\n    const k = hn.lastIndexOf(norm(name));\n    if (k >= 0) cols[name] = k; else if (!noHeader && !noSku) { cols[name] = next++; newCols.push(name); }\n  }\n  const maxIdx = Math.max(lastNonEmpty, ...Object.values(cols));\n  const expandBy = (noHeader || noSku) ? 0 : Math.max(0, maxIdx + 1 - t.columnCount);\n  const readKeys = [], ranges = [];\n  if (!noHeader && !noSku) {\n    readKeys.push('sku'); ranges.push(`${q(t.sheet_name)}!${letters(skuIdx)}3:${letters(skuIdx)}`);\n    for (const name of READ) if (!newCols.includes(name)) { readKeys.push(name); ranges.push(`${q(t.sheet_name)}!${letters(cols[name])}3:${letters(cols[name])}`); }\n  } else ranges.push(`${q(t.sheet_name)}!A2:A2`);\n  const url = `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=COLUMNS&valueRenderOption=FORMATTED_VALUE&` + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');\n  return { json: { tab: t.sheet_name, sheetId: t.sheetId, expandBy, skuIdx, titleIdx, cols, newCols, readKeys, url, noHeader, noSku, letters: Object.fromEntries(Object.entries(cols).map(([k, v]) => [k, letters(v)])) } };\n});"
+      },
+      "id": "7a9574c1-f73a-4e20-ba8c-679bd1bd1b92",
+      "name": "Plan Columns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24496,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "c5d12143-ac70-42f8-bfaa-6472a11e8bdd",
+      "name": "Read Columns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24688,
+        2656
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const plans = $('Plan Columns').all().map(i => i.json);\nconst out = [];\n$input.all().forEach((it, i) => {\n  const p = plans[i];\n  const vr = it.json.valueRanges || [];\n  const cols = {};\n  p.readKeys.forEach((k, j) => { cols[k] = (vr[j] && vr[j].values && vr[j].values[0]) || []; });\n  const rows = [];\n  if (p.readKeys.length) {\n    const n = (cols.sku || []).length;\n    for (let r = 0; r < n; r++) {\n      const sku = String(cols.sku[r] == null ? '' : cols.sku[r]).trim().toUpperCase();\n      if (!sku) continue;\n      const g = k => String((cols[k] || [])[r] == null ? '' : cols[k][r]).trim();\n      const cur = {}; p.readKeys.forEach(k => { if (k !== 'sku') cur[k] = g(k); }); rows.push({ row: r + 3, sku, cur });\n    }\n  }\n  out.push({ tab: p.tab, rows });\n});\nreturn [{ json: { tabs: out } }];"
+      },
+      "id": "e54d280e-12d8-4624-bea7-681a8a1e439e",
+      "name": "Sheet State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24896,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pages = [];\nfor (let o = 0; o <= 900; o += 100) pages.push({ state: 'active', offset: o });\nfor (const s of ['draft', 'inactive']) pages.push({ state: s, offset: 0 });\nreturn pages.map(p => ({ json: p }));"
+      },
+      "id": "81b83eb8-71a2-4952-9b40-1c8e0ae70e91",
+      "name": "Plan Pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25088,
+        2656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "={{ $json.state }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "={{ $json.offset }}"
+            },
+            {
+              "name": "sort_on",
+              "value": "created"
+            },
+            {
+              "name": "sort_order",
+              "value": "asc"
+            },
+            {
+              "name": "includes",
+              "value": "Images"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        }
+      },
+      "id": "33a8ee90-8ae9-461a-a841-a3ff0fa19d1d",
+      "name": "List Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23664,
+        2976
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst dryRun = cfg.dryRun !== false;\nconst plans = $('Plan Columns').all().map(i => i.json);\nconst state = $('Sheet State').first().json.tabs;\nconst pages = $('Plan Pages').all().map(i => i.json);\nconst listings = [], etsyErrors = [];\n$('List Page').all().forEach((it, i) => {\n  const r = it.json;\n  if (r.error || !Array.isArray(r.results)) { etsyErrors.push({ page: pages[i], error: r.error || r.message || 'no results' }); return; }\n  for (const l of r.results) listings.push({ id: String(l.listing_id), state: l.state, sku: String((l.skus || [])[0] || '').trim().toUpperCase(), url: l.url || '', created: l.created_timestamp, modified: l.last_modified_timestamp, price: l.price ? String(l.price.amount / l.price.divisor) : '', category: l.taxonomy_id, images: (l.images || []).length });\n});\nconst iso = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 19) + 'Z' : '';\nconst nowIso = new Date().toISOString().slice(0, 19) + 'Z';\nconst STATIC = ['Etsy_listing_id', 'Etsy_url', 'Etsy_created_at', 'Etsy_category_id'];\nconst bySku = {};\nlistings.forEach(l => { if (l.sku) (bySku[l.sku] = bySku[l.sku] || []).push(l); });\nconst sheetSkus = new Set();\nconst tabsOut = [], notes = [], conflicts = [], formatRequests = [], formatSkipped = [];\nconst tot = { rowsMatched: 0, newCells: 0, alreadyCorrect: 0, conflicts: 0, live: 0, duplicate: 0, draft: 0, inactive: 0 };\nplans.forEach((p, i) => {\n  const st = state[i];\n  if (p.noHeader || p.noSku) { notes.push({ tab: p.tab, skipped: p.noHeader ? 'no header row' : 'no Product No. column' }); return; }\n  const writes = {};\n  const put = (col, row, val) => { (writes[col] = writes[col] || []).push({ row, val }); };\n  let matched = 0;\n  st.rows.forEach(r => {\n    sheetSkus.add(r.sku);\n    const m = bySku[r.sku];\n    if (!m) return;\n    matched++;\n    const act = m.filter(l => l.state === 'active');\n    let status, pick, err = '';\n    if (act.length > 1) { status = 'duplicate_on_etsy'; pick = act[0]; err = 'also: ' + act.slice(1).map(l => l.id).join(', '); tot.duplicate++; }\n    else if (act.length === 1) { status = 'live'; pick = act[0]; tot.live++; }\n    else { pick = m[0]; status = pick.state; tot[status] = (tot[status] || 0) + 1; }\n    const want = { Etsy_listing_id: pick.id, Etsy_url: pick.url, Etsy_admin_url: `https://www.etsy.com/your/shops/me/listing-editor/edit/${pick.id}`, Etsy_status: status, Etsy_created_at: iso(pick.created), Etsy_last_modified: iso(pick.modified), Etsy_price_cad: pick.price, Etsy_category_id: String(pick.category || ''), Etsy_image_count: String(pick.images), Etsy_synced_at: nowIso };\n    for (const [col, val] of Object.entries(want)) {\n      const cur = r.cur[col] === undefined ? '' : r.cur[col];\n      if (cur === '') { put(col, r.row, val); tot.newCells++; }\n      else if (cur === val) tot.alreadyCorrect++;\n      else if (!STATIC.includes(col)) { put(col, r.row, val); tot.refreshed = (tot.refreshed || 0) + 1; }\n      else { tot.conflicts++; conflicts.push({ tab: p.tab, row: r.row, sku: r.sku, col, sheet: cur, etsy: val }); }\n    }\n    if (err) put('Etsy_error', r.row, err);\n  });\n  tot.rowsMatched += matched;\n  const data = [];\n  p.newCols.forEach(name => data.push({ range: `'${p.tab.replace(/'/g, \"''\")}'!${p.letters[name]}2`, values: [[name]] }));\n  for (const [col, list] of Object.entries(writes)) {\n    list.sort((a, b) => a.row - b.row);\n    let run = null;\n    const flush = () => { if (run) data.push({ range: `'${p.tab.replace(/'/g, \"''\")}'!${p.letters[col]}${run.start}:${p.letters[col]}${run.end}`, values: run.vals }); };\n    for (const w of list) {\n      if (run && w.row === run.end + 1) { run.end = w.row; run.vals.push([w.val]); }\n      else { flush(); run = { start: w.row, end: w.row, vals: [[w.val]] }; }\n    }\n    flush();\n  }\n  // Header look: every Etsy column copies the format of the sheet's own \"Title_Etsy\" header (green), so the block reads as \"belongs to Etsy\"\n  if (p.titleIdx < 0) formatSkipped.push(p.tab);\n  else {\n    const cell = c => ({ sheetId: p.sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 });\n    Object.values(p.cols).forEach(c => formatRequests.push({ copyPaste: { source: cell(p.titleIdx), destination: cell(c), pasteType: 'PASTE_FORMAT', pasteOrientation: 'NORMAL' } }));\n  }\n  tabsOut.push({ tab: p.tab, sheetId: p.sheetId, expandBy: p.expandBy, newHeaders: p.newCols, rows: st.rows.length, matched, writeRanges: data.length, data });\n});\nconst etsyNotInSheet = listings.filter(l => !sheetSkus.has(l.sku)).map(l => ({ id: l.id, state: l.state, sku: l.sku }));\nreturn [{ json: { dryRun, etsyListingsRead: listings.length, etsyErrors, totals: tot, notes, etsyNotInSheet,\n  conflictSample: conflicts.slice(0, 20),\n  headerColorRequests: formatRequests.length, tabsWithoutTitleEtsyHeader: formatSkipped, formatRequests,\n  perTab: tabsOut.map(t => ({ tab: t.tab, rows: t.rows, matched: t.matched, newHeaders: t.newHeaders, addColumns: t.expandBy, writeRanges: t.writeRanges })),\n  tabs: tabsOut } }];"
+      },
+      "id": "267d4ab5-5c20-4b61-a49e-e1b48344c91f",
+      "name": "Compute Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        23872,
+        2976
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Compute Plan').first().json;\nconst { tabs, formatRequests, ...rest } = p;\nreturn [{ json: { ...rest, message: p.dryRun ? 'DRY RUN: nothing was written. Set dryRun to false in Config to write.' : 'Writing... see Final Report.' } }];"
+      },
+      "id": "afd55140-ad58-4475-aa21-d2a52d49cec8",
+      "name": "Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        23856,
+        3264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Compute Plan').first().json;\nif (p.dryRun) return [];\nreturn p.tabs.filter(t => t.data.length > 0).map(t => ({ json: { tab: t.tab, sheetId: t.sheetId, expandBy: t.expandBy, expandBody: { requests: [{ appendDimension: { sheetId: t.sheetId, dimension: 'COLUMNS', length: t.expandBy } }] }, valuesBody: { valueInputOption: 'RAW', data: t.data } } }));"
+      },
+      "id": "0ed06441-65f0-4f0f-8222-2c6385c4c663",
+      "name": "Split Tabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24112,
+        2976
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.expandBy > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "59408eaa-8e24-4756-951f-15c979f5818f",
+      "name": "Needs more columns?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        24320,
+        2976
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.expandBody) }}"
+      },
+      "id": "3b5004ee-5c9a-433f-a34b-e037a9fa358a",
+      "name": "Expand Grid",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24512,
+        2880
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Split Tabs').item.json.valuesBody) }}"
+      },
+      "id": "88972de7-e7b6-4c93-969d-661c81fa3adf",
+      "name": "Write Values",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24720,
+        2992
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $('Write Values').all();\nconst errs = res.filter(r => r.json.error || r.json.message).map(r => r.json.error || r.json.message);\nconst fmt = $('Format Headers').first().json;\nconst p = $('Compute Plan').first().json;\nreturn [{ json: { tabsWritten: res.length, cellsUpdated: res.reduce((a, r) => a + (r.json.totalUpdatedCells || 0), 0), errors: errs, headerColor: { requestsSent: p.headerColorRequests, repliesReceived: (fmt.replies || []).length, tabsWithoutTitleEtsyHeader: p.tabsWithoutTitleEtsyHeader, error: fmt.error || null }, totals: p.totals } }];"
+      },
+      "id": "36ce094f-9a7e-4e49-9d5f-5b1a583a6e88",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25312,
+        2992
+      ]
+    },
+    {
+      "id": "a24ca21a-e12d-46de-8485-f2445267b120",
+      "name": "Format Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24912,
+        2992
+      ],
+      "parameters": {
+        "jsCode": "// Runs once after all tabs are written: one batchUpdate that paints the Etsy headers green.\nreturn [{ json: { body: { requests: $('Compute Plan').first().json.formatRequests || [] } } }];"
+      }
+    },
+    {
+      "id": "d7fc99ee-a10c-458d-98df-8590e9cec907",
+      "name": "Format Headers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        25120,
+        2992
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Sheet Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheet Meta": {
+      "main": [
+        [
+          {
+            "node": "Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabs": {
+      "main": [
+        [
+          {
+            "node": "Read Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Header": {
+      "main": [
+        [
+          {
+            "node": "Plan Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Columns": {
+      "main": [
+        [
+          {
+            "node": "Read Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Columns": {
+      "main": [
+        [
+          {
+            "node": "Sheet State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheet State": {
+      "main": [
+        [
+          {
+            "node": "Plan Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Pages": {
+      "main": [
+        [
+          {
+            "node": "List Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Page": {
+      "main": [
+        [
+          {
+            "node": "Compute Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Plan": {
+      "main": [
+        [
+          {
+            "node": "Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Tabs": {
+      "main": [
+        [
+          {
+            "node": "Needs more columns?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Grid": {
+      "main": [
+        [
+          {
+            "node": "Write Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Values": {
+      "main": [
+        [
+          {
+            "node": "Format Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs more columns?": {
+      "main": [
+        [
+          {
+            "node": "Expand Grid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Body": {
+      "main": [
+        [
+          {
+            "node": "Format Headers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Headers": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "pinData": {},
+  "active": false,
+  "versionId": "6d270290-91f2-41d2-9455-3a3078b2b22c",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "oMOKv9UthW6jgjmM",
+  "tags": []
+}
