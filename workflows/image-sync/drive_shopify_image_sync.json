@@ -7,13 +7,13 @@
         "height": 984,
         "width": 620
       },
-      "id": "1d1ecd55-3f20-44c8-a04b-87735b02f641",
+      "id": "e74bf716-dad1-4004-be0a-cfff4203ee21",
       "name": "README",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        31376,
-        10080
+        44320,
+        11376
       ]
     },
     {
@@ -21,18 +21,18 @@
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 8
+              "triggerAtHour": 4
             }
           ]
         }
       },
-      "id": "20b12ff9-1256-4718-ad49-0507c8ae70e7",
+      "id": "4c740c0f-374d-458b-b8e7-cfee8707ae39",
       "name": "⏰ Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        32144,
-        10480
+        45088,
+        11776
       ]
     },
     {
@@ -67,39 +67,39 @@
         },
         "options": {}
       },
-      "id": "1a48a7af-58e2-4d79-9b58-8a7fd9f89daa",
+      "id": "3fd3374a-9938-4535-83e1-c94904885037",
       "name": "⚙️ Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        32368,
-        10480
+        45312,
+        11776
       ]
     },
     {
       "parameters": {
         "jsCode": "const SHEETS = [\n  '2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration',\n  'Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab',\n  'Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'\n];\n// Clear any leftover data from a previous run\nconst sd = $getWorkflowStaticData('global');\nsd.allProducts = [];\n\n// Rotate which single sheet gets the expensive dead-image-URL health-check\n// today -- scanning every image across every row in all 30 sheets every\n// single day doesn't scale (confirmed: at only 12/30 categories, the health\n// check alone generated 25,000+ HTTP-check items in one run and crashed the\n// execution). A persistent cursor advances by one sheet per run, so the full\n// catalog gets audited roughly once a month at the current daily schedule\n// instead of every single day. New-product image uploads (the cheap, time-\n// sensitive part) are unaffected and still run for every sheet every day.\nif (typeof sd.healthCheckCursor !== 'number') sd.healthCheckCursor = 0;\nconst healthCheckSheet = SHEETS[sd.healthCheckCursor % SHEETS.length];\nsd.healthCheckCursor = (sd.healthCheckCursor + 1) % SHEETS.length;\n\nreturn SHEETS.map(s => ({ json: { sheet_name: s, run_health_check: s === healthCheckSheet } }));"
       },
-      "id": "1039167c-c691-41b7-bfcb-95b5ebca8092",
+      "id": "b6a3d8d8-c57a-4c16-8e79-3090879df3a4",
       "name": "📋 Load Sheet Names",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        32560,
-        10480
+        45504,
+        11776
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "8b15bbc1-105c-42eb-9456-3160bdb4b988",
+      "id": "c62886eb-f5e3-4cfe-b605-392c6164d108",
       "name": "🔁 Iterate Sheets",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        32800,
-        10480
+        45744,
+        11776
       ]
     },
     {
@@ -126,14 +126,14 @@
           }
         }
       },
-      "id": "81d4f44a-f6d0-42eb-972f-01b6dca9a4fd",
+      "id": "72ee8e6d-81dd-4ed3-b867-cf87f5699b6c",
       "name": "📖 Read Sheet Rows",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "alwaysOutputData": true,
       "position": [
-        32832,
-        10736
+        45776,
+        12032
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -146,26 +146,26 @@
       "parameters": {
         "jsCode": "// Filter rows that need images and store them in workflow static data.\n// Returns a marker item so the Iterate Sheets loop continues.\nconst sheetName = $('🔁 Iterate Sheets').item.json.sheet_name;\nconst hasValue  = v => v !== undefined && v !== null && String(v).trim() !== '';\n\n// Only the columns actually used downstream (Phase 2 lookups + Build Sheet\n// Update) are carried through -- not the whole row. Spreading the FULL row\n// (title/description/SEO/Etsy/pricing/QC columns -- 40+ fields nothing here\n// reads) into this array across all 30 sheets bloated the accumulated\n// static-data payload enough to crash the run: a single-sheet test stayed\n// small enough to succeed, but the full run reliably crashed before\n// \"📊 Get Collected Products\" could ever read it back. Same minimal-row shape\n// already used by \"🩺 Build URL Checks\" for the same reason.\nconst products = items\n  .map(({ json }) => json)\n  .filter(r => hasValue(r['Product No.']) && !hasValue(r['IMAGE URL1']))\n  .map(r => {\n    const row = {\n      'Product No.': r['Product No.'],\n      row_number: r.row_number,\n      sheet_name: sheetName,\n      'Shopify_Product_URL': r['Shopify_Product_URL'],\n      'Shopify_Update_product_URL': r['Shopify_Update_product_URL'],\n      'Fields_to_update': r['Fields_to_update'],\n    };\n    for (let n = 1; n <= 10; n++) row[`IMAGE URL${n}`] = r[`IMAGE URL${n}`];\n    return row;\n  });\n\nconst sd = $getWorkflowStaticData('global');\nif (!Array.isArray(sd.allProducts)) sd.allProducts = [];\nsd.allProducts.push(...products);\n\nreturn [{ json: { _sheetDone: true, sheet: sheetName, added: products.length } }];"
       },
-      "id": "724d8918-c53b-4363-95ae-1d2f1d9b745a",
+      "id": "f6146556-b8c4-42e7-ad11-b43d8e2ac8ad",
       "name": "📥 Collect to Static Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        33008,
-        10736
+        45952,
+        12032
       ]
     },
     {
       "parameters": {
         "jsCode": "// Phase 1 complete. Read the accumulated product list and reset for next run.\nconst sd = $getWorkflowStaticData('global');\nconst products = Array.isArray(sd.allProducts) ? [...sd.allProducts] : [];\nsd.allProducts = [];\nreturn [{ json: { products, total: products.length } }];"
       },
-      "id": "9d40ebbe-3767-47b6-a7e2-976aa29336e5",
+      "id": "7f3236ee-7629-410a-b84c-b0e904cd12c6",
       "name": "📊 Get Collected Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        33216,
-        10464
+        46160,
+        11760
       ]
     },
     {
@@ -192,39 +192,39 @@
         },
         "options": {}
       },
-      "id": "a76f326b-9d9f-4a14-99a2-d3f6a19522ab",
+      "id": "6fec12ee-4cc4-432e-a67c-35265f3ba849",
       "name": "✅ Has Products?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        33440,
-        10464
+        46384,
+        11760
       ]
     },
     {
       "parameters": {
         "jsCode": "// Expand the products array into individual items for the loop\nreturn $json.products.map(p => ({ json: p }));"
       },
-      "id": "6661cd2d-381d-474b-b571-0a9879e1e60b",
+      "id": "b0f32973-a38d-41ef-853b-56acd90867b7",
       "name": "🔀 Split Products",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        33792,
-        10448
+        46688,
+        11744
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "3dd83768-9cb2-4c2f-a1e3-314ee0577f0d",
+      "id": "cf86d315-0fe0-4405-bfbf-7f4da708d4d2",
       "name": "🔁 Iterate Products",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        34080,
-        10448
+        46976,
+        11744
       ]
     },
     {
@@ -241,35 +241,37 @@
         },
         "options": {}
       },
-      "id": "eb337c7b-e02f-4bc2-881d-bfeb8c3a25f9",
+      "id": "21af6393-a264-4171-88f2-18f3910c6bfe",
       "name": "📂 Find Category Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        34336,
-        10464
+        47392,
+        11760
       ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
           "name": "Axe_AI_Google_Drive"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "onError": "continueRegularOutput",
+      "maxTries": 3
     },
     {
       "parameters": {
         "jsCode": "const sheetName = ($('🔁 Iterate Products').item.json.sheet_name || '').toString().trim().toLowerCase();\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === sheetName);\nreturn [exact || { json: { id: '', name: '' } }];"
       },
-      "id": "006e94ff-e9f0-43a2-b5b0-6fe62e65af83",
+      "id": "062b8ed1-9c80-4027-ad45-bb71013b2782",
       "name": "🎯 Pick Exact Category Match",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        34560,
-        10464
+        47584,
+        11760
       ]
     },
     {
@@ -285,35 +287,37 @@
         },
         "options": {}
       },
-      "id": "17987a4e-faa4-47ce-959f-6c5491eece9c",
+      "id": "ec8597f9-291f-40c9-87c7-0fb451a5234c",
       "name": "📁 Find Product Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        34848,
-        10464
+        47824,
+        11760
       ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
           "name": "Axe_AI_Google_Drive"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "onError": "continueRegularOutput",
+      "maxTries": 3
     },
     {
       "parameters": {
         "jsCode": "const productNo = ($('🔁 Iterate Products').item.json['Product No.'] || '').toString().trim().toLowerCase();\nconst exact = $input.all().find(item => (item.json.name || '').toString().trim().toLowerCase() === productNo);\nreturn [exact || { json: { id: '', name: '' } }];"
       },
-      "id": "e8e62a80-3e12-4736-a92b-e350a0c0245c",
+      "id": "b85ab51a-ea0c-4bb9-b418-0b38f20a08cd",
       "name": "🎯 Pick Exact Product Match",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        35072,
-        10464
+        48048,
+        11760
       ]
     },
     {
@@ -330,35 +334,37 @@
         },
         "options": {}
       },
-      "id": "afdd6f7a-4882-4e75-b98d-987d43a9dafc",
+      "id": "573f3ba2-8b1d-4a0d-988b-dc00c7c2bcd1",
       "name": "📁 Find LOGO Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        35360,
-        10464
+        48304,
+        11760
       ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
           "name": "Axe_AI_Google_Drive"
         }
       },
-      "alwaysOutputData": true,
-      "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "onError": "continueRegularOutput",
+      "maxTries": 3
     },
     {
       "parameters": {
         "jsCode": "const items = $input.all();\nconst logoFolder = items.find(\n  item => /logo/i.test(item.json.name || '')\n);\nif (!logoFolder) {\n  throw new Error(`No LOGO subfolder found for product: ${$('🔁 Iterate Products').item.json['Product No.']}`);\n}\nreturn [{ json: { id: logoFolder.json.id, name: logoFolder.json.name } }];"
       },
-      "id": "12efc368-b4b6-4b10-bb90-26bb79494d8a",
+      "id": "afb0e9f5-acf7-429e-bfec-7c22374ebc1e",
       "name": "📂 Get Image Folder",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        35648,
-        10480
+        48592,
+        11776
       ]
     },
     {
@@ -378,33 +384,37 @@
           ]
         }
       },
-      "id": "df7ba16e-daa0-4910-9d22-39118d1295f1",
+      "id": "c18af788-6127-4e11-80f2-b280bbe9f860",
       "name": "🗂️ List Product Files",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        35872,
-        10480
+        48816,
+        11776
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
           "name": "Axe_AI_Google_Drive"
         }
       },
-      "alwaysOutputData": true
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || '',\n  // Drive reports pixel dimensions for images (requires the \"*\" fields option\n  // on the listing node); undefined when Drive could not extract them.\n  width:    item.json.imageMediaMetadata?.width,\n  height:   item.json.imageMediaMetadata?.height\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\n// Deterministic order so re-running against the same Drive contents always\n// assigns the same slot numbers -- Drive's API listing order is not guaranteed\n// stable, which previously made \"other\" slot assignment look arbitrary.\nothers.sort((a, b) => a.name.localeCompare(b.name));\n\nconst ordered = [];\nconst entry = (f, slot, role) => ({ id: f.id, fileName: f.name, mimeType: mime(f.name), width: f.width, height: f.height, slot, role });\nif (primary)   ordered.push(entry(primary, 'IMAGE URL1', 'primary'));\nif (secondary) ordered.push(entry(secondary, 'IMAGE URL2', 'secondary'));\nothers.forEach((f, i) => ordered.push(entry(f, `IMAGE URL${i + 3}`, 'other')));\n\n// A product needs BOTH a primary (-p) and secondary (-s) image to be usable --\n// a folder that only has unlabeled/\"other\" photos (e.g. plain numbered files\n// with no -p or -s suffix) must NOT proceed and fill IMAGE URL3+ while leaving\n// the primary/secondary slots empty. hasImages therefore requires both, not\n// just \"the folder has at least one image of any kind\".\nconst hasImages = Boolean(primary) && Boolean(secondary);\n\nreturn [{ json: { images: ordered, hasImages, missingPrimary: !primary, missingSecondary: !secondary, row_number: rowNumber, sheet_name: sheetName, product_no: productNo } }];"
+        "jsCode": "const productNo = $('🔁 Iterate Products').item.json['Product No.'];\nconst rowNumber  = $('🔁 Iterate Products').item.json.row_number;\nconst sheetName  = $('🔁 Iterate Products').item.json.sheet_name;\n\n// Dedicated Drive node outputs one item per file — collect them all\nconst files = $input.all().map(item => ({\n  id:       item.json.id,\n  name:     item.json.name     || '',\n  mimeType: item.json.mimeType || '',\n  // Drive reports pixel dimensions for images (requires the \"*\" fields option\n  // on the listing node); undefined when Drive could not extract them.\n  width:    item.json.imageMediaMetadata?.width,\n  height:   item.json.imageMediaMetadata?.height,\n  // Short-lived Drive link used to fetch a server-side scaled copy of oversized photos\n  thumbnailLink: item.json.thumbnailLink\n}));\n\nconst mime = name => {\n  const ext = (String(name).split('.').pop() || '').toLowerCase();\n  return ext === 'png'  ? 'image/png'\n       : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'\n       : ext === 'webp' ? 'image/webp'\n       : 'image/jpeg';\n};\n\nconst imageFiles = files.filter(f => /\\.(png|jpe?g|webp)$/i.test(f.name));\n\nlet primary = null, secondary = null, others = [];\nfor (const f of imageFiles) {\n  const stem = f.name.replace(/\\.[^.]+$/, '');\n  if (/-p$/i.test(stem))      primary = f;\n  else if (/-s$/i.test(stem)) secondary = f;\n  else                        others.push(f);\n}\n\n// Deterministic order so re-running against the same Drive contents always\n// assigns the same slot numbers -- Drive's API listing order is not guaranteed\n// stable, which previously made \"other\" slot assignment look arbitrary.\nothers.sort((a, b) => a.name.localeCompare(b.name));\n\nconst ordered = [];\nconst entry = (f, slot, role) => ({ id: f.id, fileName: f.name, mimeType: mime(f.name), width: f.width, height: f.height, thumbnailLink: f.thumbnailLink, slot, role });\nif (primary)   ordered.push(entry(primary, 'IMAGE URL1', 'primary'));\nif (secondary) ordered.push(entry(secondary, 'IMAGE URL2', 'secondary'));\n// Sheet only has IMAGE URL1-10 (URL11 is the CAD mirror column). Anything past slot 10 is ignored\n// instead of making the sheet node create extra IMAGE URL11/12... columns.\nconst MAX_SLOT = 10;\nconst extraFiles = others.slice(MAX_SLOT - 2);\nothers.slice(0, MAX_SLOT - 2).forEach((f, i) => ordered.push(entry(f, `IMAGE URL${i + 3}`, 'other')));\n\n// A product needs BOTH a primary (-p) and secondary (-s) image to be usable --\n// a folder that only has unlabeled/\"other\" photos (e.g. plain numbered files\n// with no -p or -s suffix) must NOT proceed and fill IMAGE URL3+ while leaving\n// the primary/secondary slots empty. hasImages therefore requires both, not\n// just \"the folder has at least one image of any kind\".\nconst hasImages = Boolean(primary) && Boolean(secondary);\n\nreturn [{ json: { images: ordered, hasImages, missingPrimary: !primary, missingSecondary: !secondary, row_number: rowNumber, sheet_name: sheetName, product_no: productNo, skippedExtraImages: extraFiles.map(f => f.name) } }];"
       },
-      "id": "c72bd572-2cee-4493-8667-530152fdef41",
+      "id": "2b161dd1-b621-4942-9756-bc0576a63364",
       "name": "🏷️ Classify Images",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        36096,
-        10480
+        49040,
+        11776
       ]
     },
     {
@@ -431,26 +441,26 @@
         },
         "options": {}
       },
-      "id": "8502fbbf-8afc-4b6a-acf4-9913a34f26e6",
+      "id": "cbbd17fb-5baf-459d-a380-4c922bd7e5a8",
       "name": "🖼️ Has Primary & Secondary?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        36320,
-        10480
+        49264,
+        11776
       ]
     },
     {
       "parameters": {
-        "jsCode": "const { images, row_number, sheet_name, product_no } = $json;\nconst iterJson = $('🔁 Iterate Products').item.json;\nconst isRepair = iterJson._reason === 'dead_image_url';\n\n// Shopify rejects images over 25 megapixels or 5000 px on a side (\"Media\n// processing failed\" / \"Exceeds 25 megapixels\"). Anything over this is\n// downscaled before upload; unknown dimensions are treated as oversized so\n// they still go through the (aspect-preserving, shrink-only) resize.\nconst MAX_SIDE = 4800;\nconst MAX_AREA = 24_000_000;\n\nconst staleFileName = (url) => {\n  if (!url) return '';\n  try { return decodeURIComponent(url.split('?')[0].split('/').pop() || ''); }\n  catch (e) { return ''; }\n};\n\nreturn images.map(img => {\n  const w = Number(img.width), h = Number(img.height);\n  const known = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;\n  const oversized = !known || w > MAX_SIDE || h > MAX_SIDE || (w * h) > MAX_AREA;\n  // Whatever this slot currently holds in the sheet (dead, alive, or empty for a\n  // brand-new product) is what we try to update in place -- this is what lets a\n  // full reclassification avoid creating duplicates for images already fine.\n  const staleUrl = String(iterJson[img.slot] || '').trim();\n  return { json: {\n    photoId:    img.id,\n    fileName:   img.fileName,\n    mimeType:   img.mimeType,\n    slot:       img.slot,\n    role:       img.role,\n    width:      known ? w : null,\n    height:     known ? h : null,\n    oversized,\n    isRepair,\n    staleUrl,\n    staleFileName: staleFileName(staleUrl),\n    row_number,\n    sheet_name,\n    product_no\n  } };\n});"
+        "jsCode": "const { images, row_number, sheet_name, product_no } = $json;\nconst iterJson = $('🔁 Iterate Products').item.json;\nconst isRepair = iterJson._reason === 'dead_image_url';\n\n// Shopify rejects images over 25 megapixels or 5000 px on a side (\"Media\n// processing failed\" / \"Exceeds 25 megapixels\"). Anything over this is\n// downscaled before upload; unknown dimensions are treated as oversized so\n// they still go through the (aspect-preserving, shrink-only) resize.\nconst MAX_SIDE = 4800;\nconst MAX_AREA = 24_000_000;\n\nconst staleFileName = (url) => {\n  if (!url) return '';\n  try { return decodeURIComponent(url.split('?')[0].split('/').pop() || ''); }\n  catch (e) { return ''; }\n};\n\nreturn images.map(img => {\n  const w = Number(img.width), h = Number(img.height);\n  const known = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;\n  const oversized = !known || w > MAX_SIDE || h > MAX_SIDE || (w * h) > MAX_AREA;\n  // Whatever this slot currently holds in the sheet (dead, alive, or empty for a\n  // brand-new product) is what we try to update in place -- this is what lets a\n  // full reclassification avoid creating duplicates for images already fine.\n  const staleUrl = String(iterJson[img.slot] || '').trim();\n  return { json: {\n    photoId:    img.id,\n    fileName:   img.fileName,\n    mimeType:   img.mimeType,\n    slot:       img.slot,\n    role:       img.role,\n    width:      known ? w : null,\n    height:     known ? h : null,\n    oversized,\n    thumbnailLink: img.thumbnailLink,\n    isRepair,\n    staleUrl,\n    staleFileName: staleFileName(staleUrl),\n    row_number,\n    sheet_name,\n    product_no\n  } };\n});"
       },
-      "id": "53b7e17e-c140-4a82-a339-a63faf56b945",
+      "id": "c2f11df6-6d86-471e-b63a-1031a155cb11",
       "name": "🔀 Split Per Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        34128,
-        10752
+        47040,
+        12048
       ]
     },
     {
@@ -464,13 +474,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation stagedUploadsCreate($input: [StagedUploadInput!]!) { stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl parameters { name value } } userErrors { field message } } }', variables: { input: [{ resource: 'IMAGE', filename: $json.fileName, mimeType: $json.mimeType, httpMethod: 'POST' }] } }) }}",
         "options": {}
       },
-      "id": "7b6a561a-030d-4eeb-a556-4694dca14572",
+      "id": "ed39ceab-1f48-4796-a74c-d0cd1f715f88",
       "name": "🎯 Staged Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        34352,
-        10752
+        47232,
+        12048
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -491,22 +501,23 @@
           "fileName": "={{ $('🔀 Split Per Image').item.json.fileName }}"
         }
       },
-      "id": "9ccaa31d-5be2-4f2b-802f-6573d9a13714",
+      "id": "26d18fac-1cad-4a54-aa79-31ee4ef5212e",
       "name": "⬇️ Download from Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        34560,
-        10752
+        47408,
+        12048
       ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "tOQXFHJn56EOZ0gS",
           "name": "Axe_AI_Google_Drive"
         }
       },
-      "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "maxTries": 3
     },
     {
       "parameters": {
@@ -561,13 +572,13 @@
         },
         "options": {}
       },
-      "id": "9606718f-f616-4cb5-ac90-97442614cd1f",
+      "id": "c757a726-f976-4352-92e0-650e2d74aa2f",
       "name": "☁️ Upload to Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        35152,
-        10752
+        48256,
+        12048
       ]
     },
     {
@@ -581,13 +592,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation fileCreate($files: [FileCreateInput!]!) { fileCreate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ alt: $('🔀 Split Per Image').item.json.slot, contentType: 'IMAGE', originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl }] } }) }}",
         "options": {}
       },
-      "id": "5ad08fde-6f59-414a-b520-3a5a6ba1bbbd",
+      "id": "a52e3648-9dde-4897-8beb-32dd9af9a834",
       "name": "📎 File Create",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        35872,
-        10768
+        48896,
+        12064
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -600,13 +611,13 @@
       "parameters": {
         "jsCode": "const allItems   = $input.all();\nconst splitItems = $('🔀 Split Per Image').all();\nconst bySlot = new Map(splitItems.map(item => [item.json.slot, item.json]));\n\nconst uploadedFiles = [];\nconst failures = [];\nfor (const item of allItems) {\n  const res = item.json;\n  const fc  = res?.data?.fileCreate || res?.data?.fileUpdate;\n  const returnedAlt = fc?.files?.[0]?.alt;\n  const meta = bySlot.get(returnedAlt) || {};\n  const slot = meta.slot || returnedAlt;\n\n  // A fileCreate/fileUpdate that \"succeeds\" as an HTTP call can still reject the\n  // file -- previously these were skipped silently, leaving the slot empty and the\n  // failure invisible.\n  if (res?.errors?.length) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): ${JSON.stringify(res.errors)}`);\n    continue;\n  }\n  if (fc?.userErrors?.length) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): ${JSON.stringify(fc.userErrors)}`);\n    continue;\n  }\n  if (!fc?.files?.[0]?.id) {\n    failures.push(`${slot || '?'} (${meta.fileName || '?'}): no file id returned ${JSON.stringify(res)}`);\n    continue;\n  }\n  if (slot) uploadedFiles.push({ id: fc.files[0].id, slot, fileName: meta.fileName });\n}\nconst first = splitItems[0]?.json || {};\nif (failures.length) {\n  throw new Error(`Shopify file ${first.isRepair ? 'update' : 'create'} failed for ${first.product_no} (${first.sheet_name} row ${first.row_number}): ${failures.join(' | ')}`);\n}\nreturn [{ json: { uploadedFiles, row_number: first.row_number, sheet_name: first.sheet_name, product_no: first.product_no, attempts: 0 } }];"
       },
-      "id": "74211aaf-25f3-461c-9a18-29454e0684af",
+      "id": "c9c2c0cc-c2d6-4194-aa7b-e64550673395",
       "name": "📦 Aggregate Files",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        36128,
-        10768
+        49152,
+        12064
       ]
     },
     {
@@ -620,13 +631,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'query getFiles($ids: [ID!]!) { nodes(ids: $ids) { ... on GenericFile { id alt fileStatus url } ... on MediaImage { id alt fileStatus image { url width height } } } }', variables: { ids: ($json.uploadedFiles || []).map(f => f.id) } }) }}",
         "options": {}
       },
-      "id": "056bad36-6339-43f2-bce1-d74bff4754a1",
+      "id": "71a7f9aa-0532-4054-9907-0b1ddbf47c60",
       "name": "🔗 Get CDN URLs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        36608,
-        10768
+        49632,
+        12064
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -639,13 +650,13 @@
       "parameters": {
         "jsCode": "const { nodes = [], uploadedFiles, row_number, sheet_name } = $json;\nconst iterJson = $('🔁 Iterate Products').item.json;\nconst isRepair = iterJson._reason === 'dead_image_url';\n\nconst idToUrl = {};\nfor (const node of nodes) {\n  // GenericFile exposes url directly; MediaImage exposes image.url\n  const url = node?.url || node?.image?.url;\n  if (url) idToUrl[node.id] = url;\n}\n\nconst update = { row_number, sheet_name };\nconst updatedSlots = [];\nconst freshSlots = new Set();\nfor (const { id, slot } of uploadedFiles) {\n  const url = idToUrl[id];\n  if (url) {\n    update[slot] = url;\n    updatedSlots.push(slot);\n    freshSlots.add(slot);\n    if (slot === 'IMAGE URL1') update['Picture'] = '=IMAGE(\"' + url + '\",1)';\n  }\n}\n\n// A repair fully reclassifies the row from Drive -- any slot that was previously\n// populated but Drive no longer has material for (a leftover duplicate slot from\n// the old full-row-reupload bug) is cleared instead of left pointing at a dead URL.\nif (isRepair) {\n  for (let n = 1; n <= 10; n++) {\n    const slot = `IMAGE URL${n}`;\n    const hadValue = String(iterJson[slot] || '').trim() !== '';\n    if (hadValue && !freshSlots.has(slot)) {\n      update[slot] = '';\n      if (slot === 'IMAGE URL1') update['Picture'] = '';\n    }\n  }\n}\n\n// If this product is already live on Shopify, flag the changed image slots so the\n// separate Shopify Merge product sync Pipeline picks the row up and pushes the\n// fresh URLs to the live product -- otherwise the sheet and Shopify silently\n// drift apart (the sheet shows a working image, Shopify still has the dead one).\nconst alreadyOnShopify = String(iterJson['Shopify_Product_URL'] || '').trim() !== '' && String(iterJson['Shopify_Update_product_URL'] || '').trim() !== '';\nif (alreadyOnShopify && updatedSlots.length > 0) {\n  const existing = String(iterJson['Fields_to_update'] || '').split(',').map(f => f.trim()).filter(Boolean);\n  const merged = Array.from(new Set([...existing, ...updatedSlots]));\n  update['Fields_to_update'] = merged.join(',');\n  update['Ready_to_post'] = 'yes';\n}\n\nreturn [{ json: update }];"
       },
-      "id": "5b5404af-dd8a-47a0-b9ee-a9dfe7cdda0a",
+      "id": "ab83d8db-d50c-4086-a637-ad76952cdc7f",
       "name": "🏗️ Build Sheet Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        37056,
-        11040
+        50080,
+        12336
       ]
     },
     {
@@ -837,13 +848,13 @@
           }
         }
       },
-      "id": "ae719b0b-8b20-4a74-83ef-20f037d8ce5a",
+      "id": "a7958056-e91f-4eaa-89dc-f8d89451711c",
       "name": "💾 Update Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        37312,
-        11040
+        50336,
+        12336
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -854,13 +865,13 @@
     },
     {
       "parameters": {},
-      "id": "0207f336-f48c-4033-bcec-c1b57cd91450",
+      "id": "0c8a13c3-321c-4728-97b0-de7b93d57cd1",
       "name": "✅ All Done",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        34016,
-        10208
+        46896,
+        11488
       ]
     },
     {
@@ -889,13 +900,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "d40014c6-50ef-49dc-a882-3855832b6065",
+      "id": "c74b48b0-d3d0-4adc-b0cf-3229fb853fee",
       "name": "If LOGO Folder Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        35328,
-        10240
+        48272,
+        11536
       ]
     },
     {
@@ -933,13 +944,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "ca9dfee1-9003-42a3-b43a-70f8a18dfc36",
+      "id": "91a81af7-5039-4072-9a3e-ed997f1f9dfd",
       "name": "If Category Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        34320,
-        10240
+        47216,
+        11536
       ]
     },
     {
@@ -977,47 +988,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "267945dc-874e-4ff6-9ce2-6526feb7faae",
+      "id": "11b5ec18-7c17-4b6c-ae46-04a76ae40e0d",
       "name": "If Product Found",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        34848,
-        10240
+        47824,
+        11536
       ]
     },
     {
       "parameters": {
-        "operation": "resize",
-        "dataPropertyName": "data",
-        "width": 4800,
-        "height": 4800,
-        "resizeOption": "onlyIfLarger",
-        "options": {
-          "quality": 92
-        }
-      },
-      "type": "n8n-nodes-base.editImage",
-      "typeVersion": 1,
-      "position": [
-        34736,
-        10752
-      ],
-      "id": "744db3fd-ad0e-4804-be95-888e21245c31",
-      "name": "🖼️ Downscale If Oversized",
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Every image goes through the resize node in one pass (branching here would\n// split the per-product item stream and break the index-based aggregation\n// downstream). The resized bytes are only *used* for images Shopify would\n// reject; everything else is uploaded byte-for-byte as it came from Drive so\n// normal photos are never re-encoded.\nconst resized  = $input.all();\nconst originals = $('⬇️ Download from Drive').all();\nconst meta      = $('🔀 Split Per Image').all();\n\nreturn resized.map((item, i) => {\n  const m = meta[i]?.json || {};\n  const original = originals[i]?.binary?.data;\n  const resizedBin = item.binary?.data;\n  const resizable = /^image\\/(jpeg|png)$/i.test(m.mimeType || '');\n  const useResized = m.oversized && resizable && resizedBin && !item.json?.error;\n\n  if (m.oversized && !useResized) {\n    // Oversized but we could not safely resize it (unsupported format or the\n    // resize itself failed) -- fail loudly instead of letting Shopify reject it\n    // later with an opaque \"Media processing failed\".\n    throw new Error(`Cannot downscale oversized image ${m.fileName} (${m.width}x${m.height}, ${m.mimeType}) for ${m.product_no}: ${item.json?.error || 'unsupported format'}`);\n  }\n\n  return {\n    json: m,\n    binary: { data: useResized ? resizedBin : original },\n    pairedItem: { item: i }\n  };\n});"
+        "jsCode": "// Every image goes through the scaled-copy steps in one pass (branching here would\n// split the per-product item stream and break the index-based aggregation\n// downstream); only oversized photos actually get a scaled copy. The scaled bytes are only *used* for images Shopify would\n// reject; everything else is uploaded byte-for-byte as it came from Drive so\n// normal photos are never re-encoded.\nconst resized  = $input.all();\nconst originals = $('⬇️ Download from Drive').all();\nconst meta      = $('🔀 Split Per Image').all();\n\nreturn resized.map((item, i) => {\n  const m = meta[i]?.json || {};\n  const original = originals[i]?.binary?.data;\n  const resizedBin = item.binary?.data;\n  const resizable = /^image\\/(jpeg|png)$/i.test(m.mimeType || '');\n  const useResized = m.oversized && resizable && resizedBin && !item.json?.error;\n\n  if (m.oversized && !useResized) {\n    // Oversized but we could not safely resize it (unsupported format or the\n    // resize itself failed) -- fail loudly instead of letting Shopify reject it\n    // later with an opaque \"Media processing failed\".\n    throw new Error(`Cannot downscale oversized image ${m.fileName} (${m.width}x${m.height}, ${m.mimeType}) for ${m.product_no}: ${item.json?.error || 'unsupported format'}`);\n  }\n\n  return {\n    json: m,\n    binary: { data: useResized ? resizedBin : original },\n    pairedItem: { item: i }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        34944,
-        10752
+        48048,
+        12048
       ],
-      "id": "3b508d63-43b3-4d9d-966c-b6a42edea78b",
+      "id": "b6dd2225-06c1-4801-955d-1333ca5fa2fa",
       "name": "🧩 Pick Final Binary"
     },
     {
@@ -1027,10 +1017,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        36848,
-        10768
+        49872,
+        12064
       ],
-      "id": "706ae481-93d3-4590-a0e7-f89f75f1fd69",
+      "id": "9549e39f-8b07-4b56-b623-55691e556831",
       "name": "🧪 Check File Status"
     },
     {
@@ -1061,10 +1051,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        37088,
-        10768
+        50112,
+        12064
       ],
-      "id": "2181338e-1e26-4962-8950-cc87798e0a9e",
+      "id": "99757740-617f-400e-84e1-c58d31d24a06",
       "name": "⏳ Still Processing?"
     },
     {
@@ -1074,10 +1064,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        36368,
-        10768
+        49392,
+        12064
       ],
-      "id": "1cc379f0-f9a7-43a3-b653-8c62ea97d9f0",
+      "id": "d289b898-0f9d-4a8f-8aed-1e4ad0f53f19",
       "name": "⏳ Wait 15s",
       "webhookId": "3fda4b69-f3b8-4d2d-9ffa-a584be84cc7e"
     },
@@ -1088,26 +1078,16 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        36128,
-        11024
+        49152,
+        12320
       ],
-      "id": "925bccd9-b010-447f-a190-785a070a320c",
+      "id": "c3977c99-cd59-4eaf-bd55-b668f9505782",
       "name": "🩺 Build Upload Verifications"
     },
     {
       "parameters": {
         "method": "HEAD",
         "url": "={{ $json.url }}",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true,
-              "responseFormat": "text"
-            }
-          },
-          "timeout": 15000
-        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1120,15 +1100,25 @@
               "value": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
             }
           ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        36368,
-        11024
+        49392,
+        12320
       ],
-      "id": "8cb74cb1-fb29-44bf-a5a1-4df6b1e4b8bb",
+      "id": "b51719b9-6ae2-48bb-b358-cdd1044e7ca9",
       "name": "🩺 Verify Final URL (HEAD)",
       "onError": "continueRegularOutput"
     },
@@ -1139,10 +1129,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        36608,
-        11024
+        49632,
+        12320
       ],
-      "id": "f4946cf5-ccdb-4009-b68e-72d2f129ec7e",
+      "id": "bc8f322a-76aa-44d4-ade4-96b54ea6a85d",
       "name": "🧪 Check URL Availability"
     },
     {
@@ -1173,10 +1163,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        36848,
-        11024
+        49872,
+        12320
       ],
-      "id": "ae25a963-f2d5-4928-a32e-c0e8f21e3e80",
+      "id": "2c439f9a-3669-42ef-8467-31bc6580ec92",
       "name": "⏳ URL Not Live Yet?"
     },
     {
@@ -1190,13 +1180,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'query findFile($q: String!) { files(first: 1, query: $q) { edges { node { id alt fileStatus } } } }', variables: { q: $json.staleFileName ? ('filename:' + $json.staleFileName) : 'id:0' } }) }}",
         "options": {}
       },
-      "id": "ff9b3659-4115-46ed-bcc0-6da88e959689",
+      "id": "e4d64913-6a51-42b6-b30e-353649269555",
       "name": "🔍 Find Existing File By Filename",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        35344,
-        10752
+        48464,
+        12048
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -1233,10 +1223,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        35584,
-        10752
+        48704,
+        12048
       ],
-      "id": "8e33aabb-6a07-481c-801b-c1c651d54d38",
+      "id": "78bef34d-7b37-483e-a267-5491e8d8a327",
       "name": "🔀 Existing File Found?"
     },
     {
@@ -1250,13 +1240,13 @@
         "jsonBody": "={{ JSON.stringify({ query: 'mutation fileUpdate($files: [FileUpdateInput!]!) { fileUpdate(files: $files) { files { id alt fileStatus } userErrors { field message } } }', variables: { files: [{ id: $json.data.files.edges[0].node.id, originalSource: $('🎯 Staged Create').item.json.data.stagedUploadsCreate.stagedTargets[0].resourceUrl, alt: $('🔀 Split Per Image').item.json.slot }] } }) }}",
         "options": {}
       },
-      "id": "bb166ae2-8b1f-4163-902f-e6be9130b9d1",
+      "id": "8b7fc363-9057-429b-8f5f-0788424bd5b4",
       "name": "📝 File Update",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        35664,
-        11056
+        48688,
+        12352
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -1264,6 +1254,54 @@
           "name": "Shopify account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Memory fix: the Edit Image resize node decodes the whole photo in n8n's memory and crashed the run\n// (\"Node crashed, possible out-of-memory\") on oversized images. Oversized photos are now shrunk by Google\n// Drive itself: the thumbnailLink from the folder listing (no extra Drive API call, which hit the per-minute quota) serves a copy scaled to the size we ask for (max 4800 px on the long side,\n// which keeps it under Shopify's 25 MP limit). Normal photos skip this and are uploaded as downloaded.\nconst meta = $('\\ud83d\\udd00 Split Per Image').all();\nreturn $input.all().map((item, i) => {\n  const m = meta[i]?.json || {};\n  if (!m.oversized) return { json: { thumbUrl: '' }, pairedItem: { item: i } };\n  const link = m.thumbnailLink;\n  if (!link) return { json: { thumbUrl: '', error: 'Drive returned no thumbnailLink for ' + m.fileName }, pairedItem: { item: i } };\n  const longSide = Math.max(Number(m.width) || 0, Number(m.height) || 0);\n  const size = longSide > 0 ? Math.min(4800, longSide) : 4800;\n  return { json: { thumbUrl: link.replace(/=[sw]\\d+.*$/, '') + '=s' + size }, pairedItem: { item: i } };\n});"
+      },
+      "id": "2a8a2d6b-155a-49fb-87f6-77d974dbc961",
+      "name": "🧮 Build Thumbnail URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        47648,
+        12048
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.thumbUrl || 'https://www.gstatic.com/generate_204' }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "cc06a007-420d-4939-b3ac-d3e5358c9c60",
+      "name": "🖼️ Download Scaled Copy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        47840,
+        12048
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        47200,
+        11760
+      ],
+      "id": "9e37743e-701d-4051-bcfb-958740ac3b5e",
+      "name": "⏱️ Pace Drive Lookups",
+      "webhookId": "33009aa1-3920-4d0b-b860-cdc9280ea069"
     }
   ],
   "pinData": {},
@@ -1392,7 +1430,7 @@
         ],
         [
           {
-            "node": "📂 Find Category Folder",
+            "node": "⏱️ Pace Drive Lookups",
             "type": "main",
             "index": 0
           }
@@ -1568,7 +1606,7 @@
       "main": [
         [
           {
-            "node": "🖼️ Downscale If Oversized",
+            "node": "🧮 Build Thumbnail URL",
             "type": "main",
             "index": 0
           }
@@ -1616,17 +1654,6 @@
         [
           {
             "node": "📁 Find LOGO Folder",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "🖼️ Downscale If Oversized": {
-      "main": [
-        [
-          {
-            "node": "🧩 Pick Final Binary",
             "type": "main",
             "index": 0
           }
@@ -1810,6 +1837,39 @@
           }
         ]
       ]
+    },
+    "🧮 Build Thumbnail URL": {
+      "main": [
+        [
+          {
+            "node": "🖼️ Download Scaled Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🖼️ Download Scaled Copy": {
+      "main": [
+        [
+          {
+            "node": "🧩 Pick Final Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏱️ Pace Drive Lookups": {
+      "main": [
+        [
+          {
+            "node": "📂 Find Category Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1821,7 +1881,7 @@
     "errorWorkflow": "nETo8yQdCbRv52pK",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "4d248912-136b-413c-8107-304f3e0bfa03",
+  "versionId": "f6ed7170-e435-4666-b48e-5ebe54e0c9a0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
