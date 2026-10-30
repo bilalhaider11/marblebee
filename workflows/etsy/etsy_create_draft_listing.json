@@ -1,0 +1,949 @@
+{
+  "name": "Etsy - Create one draft listing from a sheet row (dry run first)",
+  "nodes": [
+    {
+      "id": "9817814b-7bd9-446d-bb06-7f194d8c00ea",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        5072,
+        352
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "de566193-b076-4b72-90be-db18ceed460c",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5280,
+        352
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "apiKey",
+              "type": "string",
+              "value": "PASTE_KEYSTRING:SHARED_SECRET_HERE"
+            },
+            {
+              "id": "k2",
+              "name": "shopId",
+              "type": "string",
+              "value": "64324681"
+            },
+            {
+              "id": "k3",
+              "name": "docId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            },
+            {
+              "id": "k4",
+              "name": "tab",
+              "type": "string",
+              "value": "Bathtub"
+            },
+            {
+              "id": "k5",
+              "name": "sku",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "k6",
+              "name": "shippingProfileId",
+              "type": "string",
+              "value": "305991461140"
+            },
+            {
+              "id": "k7",
+              "name": "readinessStateId",
+              "type": "string",
+              "value": "1485857866342"
+            },
+            {
+              "id": "k8",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0c1e000f-79aa-42f2-aff2-d622b68464a8",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5472,
+        352
+      ],
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values/{{ encodeURIComponent(\"'\" + $('Config').first().json.tab + \"'!2:1500\") }}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d961faa0-8fe5-4fb7-83c6-79f56794f338",
+      "name": "Pick Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5680,
+        352
+      ],
+      "parameters": {
+        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Only categories that were checked against Etsy are allowed. Other tabs wait until their category is confirmed.\nconst TAX = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219 };\nconst MATERIAL_PROP = { 11353: 570246212865, 12219: 148789511893 };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037 };\nconst problems = [], warnings = [];\nconst tax = TAX[cfg.tab];\nif (!tax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no confirmed Etsy category yet (allowed: ' + Object.keys(TAX).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nconst WRITE = ['Etsy_listing_id', 'Etsy_url', 'Etsy_admin_url', 'Etsy_status', 'Etsy_error', 'Etsy_created_at', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_image_count', 'Etsy_synced_at'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nif (str(r, 'Etsy_listing_id')) problems.push('row already has Etsy_listing_id ' + str(r, 'Etsy_listing_id'));\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\nif (!description) problems.push('no Description_Etsy');\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) { const u = str(r, 'IMAGE URL' + k); if (/^https?:/i.test(u) && !seen.has(u)) { seen.add(u); imgs.push({ url: u, label: 'IMAGE URL' + k }); } }\nconst cad = str(r, 'IMAGE URL11');\nif (/^https?:/i.test(cad) && !seen.has(cad)) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) warnings.push('only ' + tags.length + ' tags (Etsy allows 13); AI tag step not built yet');\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false, sku: [sku] };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst properties = [{ id: MATERIAL_PROP[tax], name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nconst dims = { width: num(get(r, 'Width Inch')), height: num(get(r, 'Height Inch')), depth: num(get(r, 'Depth Inch')) || num(get(r, 'Length Inch')) };\nObject.entries(dims).forEach(([k, v]) => { if (v > 0) properties.push({ id: PROP[k], name: k, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + k + ' (inches)'); });\nreturn out({ ok: problems.length === 0, problems, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
+      }
+    },
+    {
+      "id": "7aac41db-f460-4189-96a0-30834fc9a4df",
+      "name": "Can create?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5872,
+        352
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.ok === true && $('Config').first().json.dryRun !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "cd022e85-3d40-45f9-9803-229945daa164",
+      "name": "Report (no write)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5872,
+        144
+      ],
+      "parameters": {
+        "jsCode": "const p = $input.first().json;\nconst cfg = $('Config').first().json;\nconst { listing, ...rest } = p;\nconst preview = listing ? { ...listing, description: String(listing.description || '').slice(0, 300) + (String(listing.description || '').length > 300 ? ' ...' : '') } : null;\nreturn [{ json: { dryRun: cfg.dryRun !== false, message: !p.ok ? 'NOT READY: fix the problems below. Nothing was sent to Etsy.' : (cfg.dryRun !== false ? 'DRY RUN: nothing was sent to Etsy. Set dryRun to false in Config to create this draft.' : ''), ...rest, listingPreview: preview } }];"
+      }
+    },
+    {
+      "id": "02bcbbcc-2646-40ff-9ea8-dd0653229d6d",
+      "name": "Create Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6112,
+        336
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "POST",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.listing) }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b8fc56d5-231e-4782-87d3-86cf58c3934e",
+      "name": "Created OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6304,
+        336
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ !!$json.listing_id }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "fc2e0956-e272-438a-a931-456abbaebdeb",
+      "name": "Prep Properties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6528,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Pick Row').first().json;\nconst c = $input.first().json;\nreturn p.properties.map(x => ({ json: { listing_id: c.listing_id, property_id: x.id, name: x.name, body: x.body } }));"
+      }
+    },
+    {
+      "id": "da8825d8-8a9b-405e-8b95-c423ba8163bd",
+      "name": "Set Property",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6720,
+        320
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "PUT",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $json.listing_id }}/properties/{{ $json.property_id }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d00a0506-b8ac-49c6-bd52-acbb2703cfa2",
+      "name": "Prep Images",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6928,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Pick Row').first().json;\nconst lid = $('Prep Properties').first().json.listing_id;\nconst names = $('Prep Properties').all().map(i => i.json.name);\nconst propErrors = $input.all().map((i, k) => i.json.error ? names[k] + ': ' + (typeof i.json.error === 'string' ? i.json.error : JSON.stringify(i.json.error)).slice(0, 200) : null).filter(Boolean);\nreturn p.images.map(x => ({ json: { listing_id: lid, url: x.url, rank: x.rank, label: x.label, propErrors } }));"
+      }
+    },
+    {
+      "id": "78ab0642-61aa-4f13-ab31-9c7dbfb0939a",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6128,
+        640
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "1f6101b8-c8f2-4c7e-94e5-2129d337910b",
+      "name": "Upload Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6336,
+        640
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "POST",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Prep Properties').first().json.listing_id }}/images",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "rank",
+              "value": "={{ $('Prep Images').all()[$itemIndex].json.rank }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "1281ca3b-6b8d-43d1-ba5e-40a22ae8728d",
+      "name": "Collect Uploads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6528,
+        640
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst prep = $('Prep Images').all().map(i => i.json);\nconst uploaded = items.filter(x => x.listing_image_id).length;\nconst bad = items.map((x, k) => x.error ? { label: prep[k].label, rank: prep[k].rank, url: prep[k].url, error: (typeof x.error === 'string' ? x.error : JSON.stringify(x.error)).slice(0, 200) } : null).filter(Boolean);\nreturn [{ json: { listing_id: prep[0].listing_id, uploaded, failedItems: bad, failed: bad.map(b => b.label + ': ' + b.error), propErrors: prep[0].propErrors } }];"
+      }
+    },
+    {
+      "id": "3724cfbf-919a-48f9-a36a-3bd172bab5ce",
+      "name": "Verify Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7280,
+        880
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "GET",
+        "url": "=https://openapi.etsy.com/v3/application/listings/{{ $json.listing_id }}/images",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f3613ad9-590e-43a6-afe8-3345d0e883af",
+      "name": "Build Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7488,
+        880
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Pick Row').first().json;\nconst created = $('Create Draft').first().json;\nconst coll = $('Collect Uploads').first().json;\nlet retry = null; try { retry = $('Collect Retry').first().json; } catch (e) { retry = null; }\nconst failedFinal = retry ? retry.failedAfterRetry : coll.failed;\nconst v = $input.first().json;\nconst results = (v.results || []).slice().sort((a, b) => a.rank - b.rank);\nconst errors = [];\nif (coll.propErrors.length) errors.push('properties: ' + coll.propErrors.join('; '));\nconst notes = retry && retry.retried ? ['retried ' + retry.retried + ' image(s) in a second pass'] : [];\nif (failedFinal.length) errors.push('images: ' + failedFinal.join('; '));\nif (results.length !== p.expectedImages) errors.push('images on Etsy ' + results.length + ' of ' + p.expectedImages);\nconst ranksOk = results.every((x, i) => x.rank === i + 1);\nif (!ranksOk) errors.push('image ranks are not 1..n');\nconst iso = ts => ts ? new Date(ts * 1000).toISOString() : '';\nconst vals = { etsylistingid: created.listing_id, etsyurl: created.url || '', etsyadminurl: 'https://www.etsy.com/your/shops/me/listing-editor/edit/' + created.listing_id, etsystatus: errors.length ? 'draft_with_errors' : 'draft', etsyerror: errors.join(' | '), etsycreatedat: iso(created.creation_timestamp || created.created_timestamp), etsypricecad: p.priceCad, etsycategoryid: p.taxonomyId, etsyimagecount: results.length, etsysyncedat: new Date().toISOString() };\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { sku: p.sku, tab: p.tab, row: p.row, listingId: created.listing_id, adminUrl: vals.etsyadminurl, status: vals.etsystatus, imagesOnEtsy: results.length, imagesExpected: p.expectedImages, errors, notes } } }];"
+      }
+    },
+    {
+      "id": "77f56ffd-c7ec-49d7-9593-57034ee60ebe",
+      "name": "Create Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6288,
+        144
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Pick Row').first().json;\nconst c = $input.first().json;\nconst msg = (c.error ? (typeof c.error === 'string' ? c.error : JSON.stringify(c.error)) : JSON.stringify(c)).slice(0, 500);\nconst vals = { etsystatus: 'create_failed', etsyerror: msg, etsysyncedat: new Date().toISOString() };\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { sku: p.sku, tab: p.tab, row: p.row, status: 'create_failed', errors: [msg] } } }];"
+      }
+    },
+    {
+      "id": "96562e6b-c238-489d-bc76-cc26c30c9c6d",
+      "name": "Write Back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6720,
+        144
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "id": "14369013-08b2-4800-844f-8c2d1232c94d",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7024,
+        144
+      ],
+      "parameters": {
+        "jsCode": "const w = $input.first().json;\nlet s;\ntry { s = $('Build Write').first().json.summary; } catch (e) { s = $('Create Failed').first().json.summary; }\nreturn [{ json: { dryRun: false, ...s, sheetCellsUpdated: w.totalUpdatedCells || 0, sheetError: w.error || null } }];"
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c9",
+              "leftValue": "={{ ($json.failedItems || []).length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3627bc5f-984d-4762-8923-a4b5a144a835",
+      "name": "Need retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6784,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\nreturn c.failedItems.map(x => ({ json: { listing_id: c.listing_id, url: x.url, rank: x.rank, label: x.label } }));"
+      },
+      "id": "d7249082-1060-4efc-9c02-f86a72f06e9f",
+      "name": "Prep Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7040,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "da7c7be3-570a-4481-aba4-e48f1a98a556",
+      "name": "Wait Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        7232,
+        624
+      ],
+      "webhookId": "6a7921b9-5abd-4376-9a94-66418f945526"
+    },
+    {
+      "id": "f6e9d80e-53ce-4b1c-a884-0af42886e542",
+      "name": "Download Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7424,
+        624
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e49f319e-665d-4e85-8d0f-ab7f2dfb983c",
+      "name": "Upload Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7632,
+        624
+      ],
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "POST",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Prep Properties').first().json.listing_id }}/images",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "rank",
+              "value": "={{ $('Prep Retry').all()[$itemIndex].json.rank }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst prep = $('Prep Retry').all().map(i => i.json);\nconst base = $('Collect Uploads').first().json;\nconst failedAfterRetry = items.map((x, k) => x.error ? prep[k].label + ': ' + (typeof x.error === 'string' ? x.error : JSON.stringify(x.error)).slice(0, 200) : null).filter(Boolean);\nreturn [{ json: { listing_id: base.listing_id, retried: prep.length, failedAfterRetry, propErrors: base.propErrors } }];"
+      },
+      "id": "0450e13c-04bd-434f-8440-e96f0d446df6",
+      "name": "Collect Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7840,
+        624
+      ]
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Pick Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Row": {
+      "main": [
+        [
+          {
+            "node": "Can create?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can create?": {
+      "main": [
+        [
+          {
+            "node": "Create Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report (no write)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Draft": {
+      "main": [
+        [
+          {
+            "node": "Created OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Created OK?": {
+      "main": [
+        [
+          {
+            "node": "Prep Properties",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Properties": {
+      "main": [
+        [
+          {
+            "node": "Set Property",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Property": {
+      "main": [
+        [
+          {
+            "node": "Prep Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Images": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image": {
+      "main": [
+        [
+          {
+            "node": "Collect Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Uploads": {
+      "main": [
+        [
+          {
+            "node": "Need retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Images": {
+      "main": [
+        [
+          {
+            "node": "Build Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Write": {
+      "main": [
+        [
+          {
+            "node": "Write Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Failed": {
+      "main": [
+        [
+          {
+            "node": "Write Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Need retry?": {
+      "main": [
+        [
+          {
+            "node": "Prep Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verify Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Download Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Retry": {
+      "main": [
+        [
+          {
+            "node": "Upload Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Retry": {
+      "main": [
+        [
+          {
+            "node": "Collect Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Retry": {
+      "main": [
+        [
+          {
+            "node": "Verify Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "pinData": {},
+  "active": false,
+  "versionId": "49a584dd-ac18-4aaa-bc99-4fe1bc244b07",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": [],
+  "id": "zfNRbD21BsfrTEpg",
+  "tags": []
+}
