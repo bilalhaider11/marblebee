@@ -1,0 +1,454 @@
+{
+  "name": "Etsy - Create draft listings in batches",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5912596f-73a9-440d-8497-0464a5bfc329",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "9ef4f0ef-1494-4b7c-9b9b-a4d432eb5219",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        3632,
+        560
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "apiKey",
+              "type": "string",
+              "value": "PASTE_KEYSTRING:SHARED_SECRET_HERE"
+            },
+            {
+              "id": "k2",
+              "name": "shopId",
+              "type": "string",
+              "value": "64324681"
+            },
+            {
+              "id": "k3",
+              "name": "docId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            },
+            {
+              "id": "k4",
+              "name": "tabs",
+              "type": "string",
+              "value": "ALL"
+            },
+            {
+              "id": "k5",
+              "name": "perTab",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "k6",
+              "name": "shippingProfileId",
+              "type": "string",
+              "value": "305991461140"
+            },
+            {
+              "id": "k7",
+              "name": "readinessStateId",
+              "type": "string",
+              "value": "1485857866342"
+            },
+            {
+              "id": "k8",
+              "name": "requireFullTags",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "k9",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6aee6a7c-1773-4daf-afcd-7c43a3391467",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3856,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One run at a time. The lock expires after 90 minutes so a crashed run cannot block the next ones.\nconst cfg = $('Config').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst now = Date.now();\nif (sd.lockUntil && sd.lockUntil > now) return [{ json: { locked: true, until: new Date(sd.lockUntil).toISOString() } }];\nsd.lockUntil = now + 90 * 60 * 1000;\nreturn [{ json: { locked: false } }];"
+      },
+      "id": "f9bbfd00-5d17-4a8b-8d00-54fe8b247f29",
+      "name": "Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4064,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b1",
+              "leftValue": "={{ $json.locked !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "6b267023-b77d-42b9-b0be-a707be107310",
+      "name": "Free to run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4272,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { skipped: true, message: 'Another run is in progress; this one did nothing.', until: $input.first().json.until } }];"
+      },
+      "id": "22aab398-68a8-4fe6-a38c-d56f3688a1e1",
+      "name": "Already Running",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\n// ALL = every tab that has an Etsy category set up (2026Instock has none, so it is left out)\nconst ALL = ['Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst raw = String(cfg.tabs || '').trim();\nconst tabs = raw.toUpperCase() === 'ALL' ? ALL : raw.split(',').map(s => s.trim()).filter(Boolean);\nreturn tabs.map(t => ({ json: { tab: t, url: 'https://sheets.googleapis.com/v4/spreadsheets/' + cfg.docId + '/values/' + encodeURIComponent(\"'\" + t.replace(/'/g, \"''\") + \"'!2:1500\") + '?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE' } }));"
+      },
+      "id": "9f346448-ac35-45b8-89f3-d4ab7480b725",
+      "name": "Tabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "7220944d-db5b-47d1-aa26-fc31a743f70b",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4704,
+        448
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chooses up to perTab rows for each tab. The create workflow checks every row again before it sends anything to Etsy.\nconst cfg = $('Config').first().json;\nconst tabItems = $('Tabs').all().map(i => i.json);\nconst results = $input.all().map(i => i.json);\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst cap = Number(cfg.perTab) || 3;\nconst out = [], skipped = [];\ntabItems.forEach((t, k) => {\n  const res = results[k] || {};\n  if (res.error || !res.values) { skipped.push({ tab: t.tab, reason: 'could not read the tab' }); return; }\n  const rows = res.values;\n  const hk = (rows[0] || []).map(nk);\n  const ix = n => hk.indexOf(nk(n));\n  const skuCol = hk.lastIndexOf('productno');\n  const c = { title: ix('Title_Etsy'), desc: ix('Description_Etsy'), tags: ix('Tags_Etsy'), price: ix('Price In CAD'), img1: ix('IMAGE URL1'), img2: ix('IMAGE URL2'), ready: ix('Etsy_ready_to_post'), listing: ix('Etsy_listing_id'), status: ix('Etsy_status') };\n  if (skuCol < 0 || Object.values(c).some(v => v < 0)) { skipped.push({ tab: t.tab, reason: 'missing column(s)' }); return; }\n  const cell = (r, i) => (r[i] == null ? '' : String(r[i]).trim());\n  const count = {};\n  for (let i = 1; i < rows.length; i++) { const s = cell(rows[i] || [], skuCol).toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\n  const validTags = s => { const seen = new Set(); s.split(/[,;\\n|]+/).forEach(x => { x = x.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (x && x.length <= 20) seen.add(x.toLowerCase()); }); return seen.size; };\n  let n = 0;\n  for (let i = 1; i < rows.length && n < cap; i++) {\n    const r = rows[i] || [];\n    const sku = cell(r, skuCol);\n    if (!sku || count[sku.toUpperCase()] > 1) continue;\n    if (!yes(cell(r, c.ready)) || cell(r, c.listing) || cell(r, c.status)) continue;\n    if (!cell(r, c.title) || !cell(r, c.desc) || !(parseFloat(cell(r, c.price)) > 0)) continue;\n    if (!/^https?:/i.test(cell(r, c.img1)) && !/^https?:/i.test(cell(r, c.img2))) continue;\n    if (cfg.requireFullTags !== false && validTags(cell(r, c.tags)) < 13) continue;\n    out.push({ json: { tab: t.tab, sku, apiKey: cfg.apiKey, shopId: cfg.shopId, docId: cfg.docId, shippingProfileId: cfg.shippingProfileId, readinessStateId: cfg.readinessStateId, dryRun: cfg.dryRun !== false, requireFullTags: cfg.requireFullTags !== false } });\n    n++;\n  }\n});\nif (!out.length) return [{ json: { noRows: true, skipped } }];\nreturn out;"
+      },
+      "id": "46133cc3-c129-4eee-90e5-0e23e235717d",
+      "name": "Pick Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4896,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b2",
+              "leftValue": "={{ $json.noRows !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "2131d984-1740-4b62-970f-b55eda620bef",
+      "name": "Any rows?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5104,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst j = $input.first().json;\nreturn [{ json: { done: true, message: 'No rows to create (flagged, 13 tags, no listing yet).', skipped: j.skipped || [] } }];"
+      },
+      "id": "7be39c24-fc8a-4cb5-a2a8-ab50cc396ac8",
+      "name": "Nothing To Do",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5312,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "zfNRbD21BsfrTEpg",
+          "mode": "list",
+          "cachedResultName": "Etsy - Create draft listing (one row, called by the batch)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "6dc20867-061a-4d4e-845d-bd96a7476fd2",
+      "name": "Create Each",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5360,
+        432
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst rows = items.map(j => ({ tab: j.tab, sku: j.sku, row: j.row, status: j.status || (j.ok === false ? 'not_ready' : (j.dryRun ? 'dry_run_ok' : 'unknown')), listingId: j.listingId || null, adminUrl: j.adminUrl || null, images: j.imagesOnEtsy != null ? j.imagesOnEtsy + ' of ' + j.imagesExpected : undefined, problems: j.errors && j.errors.length ? j.errors : (j.problems && j.problems.length ? j.problems : []), notes: j.notes || [] }));\nconst by = {}; rows.forEach(r => { by[r.status] = (by[r.status] || 0) + 1; });\nreturn [{ json: { dryRun: $('Config').first().json.dryRun !== false, processed: rows.length, byStatus: by, rows } }];"
+      },
+      "id": "967ad5c8-ff8a-4e87-9322-2cf179f1417b",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5584,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lock": {
+      "main": [
+        [
+          {
+            "node": "Free to run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free to run?": {
+      "main": [
+        [
+          {
+            "node": "Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already Running",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabs": {
+      "main": [
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Pick Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Rows": {
+      "main": [
+        [
+          {
+            "node": "Any rows?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any rows?": {
+      "main": [
+        [
+          {
+            "node": "Create Each",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nothing To Do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Each": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "id": "6IHA1QKM8vBSAqHf",
+  "versionId": "7d9b4a5b-8cfa-4f46-b15f-bc4352b8937c",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "active": false,
+  "pinData": {},
+  "nodeGroups": [],
+  "tags": []
+}

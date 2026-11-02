@@ -303,8 +303,12 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 30
+              "field": "cronExpression",
+              "expression": "0,30 1-6 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
             }
           ]
         }
@@ -567,7 +571,7 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "a16d638b-c034-4b9c-82a3-52a20c26c9ff",
+  "versionId": "1959ae8a-c16f-47fe-aa9e-2d856ce79e79",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
