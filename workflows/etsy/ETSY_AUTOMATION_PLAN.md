@@ -171,6 +171,27 @@ Etsy only has Length, Width and Height (or Depth). The Shopify pipeline uses mor
 
 Rule for every product: units in inches in Etsy's fields. The description line carries the full specification in cm and inches. Weight in kg and packed size in cm go in the shipping section.
 
+### Category check results (read-only API check, 2026-11)
+
+Every candidate category below is a leaf and offers marble (value id 171). Property ids are the same in every category: Width 47626759898, Height 47626759834, Depth 54142602037, Length 47626759838 (Flooring only), Craft type 47626759760 (value 560 = Home improvement). All sizes are sent in inches (scale_id 5). Material property id: 148789511893 (Materials) in most categories, 570246212865 (Material) in 11353, 570246213483 (Medium) in 129, 99837394284 (Stone type) in 6651.
+
+| Tabs | Category id and path | Fields sent |
+|---|---|---|
+| Bathtub, Sink, Marble+ Basin | 11353 Plumbing > Sinks & Basins | material, width, height, depth |
+| Fireplace | 12219 Home Decor > Fireplace Screens | material, width, height, depth |
+| Vanity | 903 Bathroom > Bathroom Vanities | material, width, height, depth |
+| Marble+ ConsoleTable | 11355 Console & Sofa Tables | material, width, height, depth |
+| Bench | 12369 Benches | material, width, height, depth |
+| Lamppost | 12410 Garden Lights | material, width, height, depth |
+| Statue, Animal | 2869 Home Accents > Statues (2867 Outdoor Statues has no size fields) | material, width, height, depth |
+| Carving | 129 Art Objects | material (Medium), width, height, depth |
+| Table | 12371 Coffee Tables, 12372 End Tables or 977 Kitchen & Dining Tables, chosen from the title | material, width, height, depth |
+| Moulding, DoorSurround, WindowSurround, OutdoorCornice, Columns, Balustrade, Stairs, Wainscoting, Wall-Coverings, MarbleRangeHood | 784 Moldings & Trim | material, Craft type, width, height, depth |
+| StoneMosaicTile, MarbleMedallion, MarbleSlab, BookMatchedSlabs | 781 Flooring (6651 Stones & Pebbles needs the supply flag and has no size fields) | material, Craft type, width, length |
+| Fountain, Planter, Exterior-Wall-Decoration | 12240, 6061, 2784 | material only; the size goes into a Dimensions line in the description |
+
+2026Instock is not a product type and has no category. Other facts learned while building: the draft-creation call ignores `sku`, so the SKU is set with a separate inventory call (this is what the existing 853 listings carry); new drafts default to manual renewal; Etsy tags are limited to 20 characters.
+
 ## 8. Implementation plan
 
 **Phase 0: access and groundwork**
