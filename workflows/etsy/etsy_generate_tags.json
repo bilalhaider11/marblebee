@@ -1,0 +1,579 @@
+{
+  "name": "Etsy - Generate tags into Tags_Etsy",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a85f49b8-2c3a-4278-9958-53669e536edd",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        10080,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "docId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            },
+            {
+              "id": "k2",
+              "name": "tabs",
+              "type": "string",
+              "value": "ALL"
+            },
+            {
+              "id": "k3",
+              "name": "sku",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "k4",
+              "name": "perTab",
+              "type": "number",
+              "value": 20
+            },
+            {
+              "id": "k5",
+              "name": "onlyFlagged",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "k6",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "k7",
+              "name": "maxRows",
+              "type": "number",
+              "value": 60
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b939bc0-b07c-4f48-9c68-99116e577744",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        10288,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "bda68e39-5460-4b30-9a77-edcead359f96",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        11248,
+        432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds rows that need tags in every listed tab and builds one prompt per row. Nothing is written here.\nconst cfg = $('Config').first().json;\nconst tabItems = $('Tabs').all().map(i => i.json);\nconst results = $input.all().map(i => i.json);\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst cell = (r, i) => (i < 0 || r[i] == null ? '' : String(r[i]).trim());\nconst clean = t => String(t).replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim();\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst capTab = Number(cfg.perTab) || 20, maxRows = Number(cfg.maxRows) || 40;\nconst out = [], skipped = [];\ntabItems.forEach((t, k) => {\n  if (out.length >= maxRows) return;\n  const res = results[k] || {};\n  if (res.error || !res.values) { skipped.push({ tab: t.tab, reason: 'could not read the tab' }); return; }\n  const rows = res.values;\n  const hk = (rows[0] || []).map(nk);\n  const ix = name => hk.indexOf(nk(name));\n  const skuCol = hk.lastIndexOf('productno'), titleCol = ix('Title_Etsy'), tagCol = ix('Tags_Etsy');\n  if (skuCol < 0 || titleCol < 0 || tagCol < 0) { skipped.push({ tab: t.tab, reason: 'missing Product No., Title_Etsy or Tags_Etsy column' }); return; }\n  const kwCol = ix('Keywords (Luna)'), readyCol = ix('Etsy_ready_to_post'), listCol = ix('Etsy_listing_id'), statCol = ix('Etsy_status');\n  let n = 0;\n  for (let i = 1; i < rows.length && n < capTab && out.length < maxRows; i++) {\n    const r = rows[i] || [];\n    const sku = cell(r, skuCol);\n    if (!sku || !cell(r, titleCol)) continue;\n    if (want && sku.toUpperCase() !== want) continue;\n    if (!want) {\n      if (cfg.onlyFlagged !== false && !yes(cell(r, readyCol))) continue;\n      if (cell(r, listCol) || cell(r, statCol)) continue;\n    }\n    const existing = [];\n    cell(r, tagCol).split(/[,;\\n|]+/).forEach(x => { x = clean(x); if (x && x.length <= 20 && !existing.some(y => y.toLowerCase() === x.toLowerCase())) existing.push(x); });\n    if (existing.length >= 13) continue;\n    const prompt = [\n      'You write Etsy search tags for a handmade natural stone product listing.',\n      'Return ONLY a JSON array of ' + (13 - existing.length + 20) + ' candidate tags as strings. No explanation, no markdown.',\n      'Rules: each tag is 2 to 20 characters including spaces; use only letters, numbers, spaces, hyphens and apostrophes; no duplicates; no brand names; no words like \"cheap\" or \"sale\".',\n      'Tags are short phrases a buyer would type into Etsy: material, stone name, product type, style, room, use. Mix 2 and 3 word phrases.',\n      'Every tag must add a NEW idea (stone colour, stone name, shape, style, room, use, gift). Never give two tags that only swap words for the same product (for example bath, bathtub, tub, sink, basin, fireplace, mantel).',\n      'ACCURACY: only use a stone name, colour, finish or shape that is written in the product title or the owner keyword. Never guess or invent one. If the title does not say it, do not use it.',\n      'SEARCHABLE: prefer tags that name the product itself together with one specific attribute from the title. Avoid vague tags like statement piece, design, feature or silhouette.',\n      'STONE NAME LIMIT: use any one stone name (for example Crema Marfil) in at most 3 tags. The other tags must be about the product type, style, room or use.',\n      'NO NUMBERS: never put sizes, measurements or digits in a tag (no \"59 inch\", no \"47 inch height\").',\n      'SPELLING: if the title and the owner keyword spell a stone name differently (for example Lepanto and Levanto), use ONLY the spelling in the product title. Never mix two spellings.',\n      'Do not repeat or closely copy these existing tags: ' + (existing.length ? existing.join(', ') : '(none)'),\n      'Product title: ' + cell(r, titleCol),\n      'Product type (sheet tab): ' + t.tab,\n      'Main keyword from the owner: ' + (cell(r, kwCol) || '(none)')\n    ].join('\\n');\n    out.push({ json: { row: i + 2, sku, title: cell(r, titleCol), existing, prompt, tab: t.tab, tagCol: letters(tagCol) } });\n    n++;\n  }\n});\nif (!out.length) return [{ json: { noRows: true, skipped, message: 'no rows need tags in: ' + tabItems.map(t => t.tab).join(', ') } }];\nreturn out;"
+      },
+      "id": "2fc284d5-3340-4cff-867f-c1db059ef3f7",
+      "name": "Pick Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11456,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1",
+              "leftValue": "={{ $json.noRows !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b1fac33b-538c-45b6-87e7-d73701a19f7e",
+      "name": "Any rows?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        11664,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst j = $input.first().json;\nreturn [{ json: { done: true, message: j.problem || j.message || 'nothing to do' } }];"
+      },
+      "id": "c4d6dc56-f2fa-46c1-8c9d-739a79d346b5",
+      "name": "Nothing To Do",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11872,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.6-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.6-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "bc812b5a-7cfe-4700-9fe1-c4d3423f245a",
+      "name": "Generate Tags (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        11872,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YLL6T5HbTFpyXNbx",
+          "name": "Google Gemini"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Pick Rows').all().map(i => i.json);\nconst outs = $input.all().map(i => i.json);\nconst clean = t => String(t).replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim();\nconst results = rows.map((r, i) => {\n  const g = outs[i] || {};\n  if (g.error) return { row: r.row, sku: r.sku, tab: r.tab, tagCol: r.tagCol, added: 0, tags: r.existing, note: 'Gemini error: ' + (typeof g.error === 'string' ? g.error : JSON.stringify(g.error)).slice(0, 120) };\n  const text = g.content && g.content.parts ? g.content.parts.map(x => x.text || '').join('') : String(g.text || g.output || '');\n  let cand = [];\n  const m = text.match(/\\[[\\s\\S]*\\]/);\n  if (m) { try { cand = JSON.parse(m[0]); } catch (e) { cand = []; } }\n  if (!Array.isArray(cand)) cand = [];\n  const SYN = { Bathtub: ['bath','baths','bathtub','bathtubs','tub','tubs','bathing'], Sink: ['sink','sinks','basin','basins','washbasin','bowl','vessel'], 'Marble+ Basin': ['sink','sinks','basin','basins','washbasin','bowl','vessel'], Fireplace: ['fireplace','fireplaces','mantel','mantle','surround','hearth'], Vanity: ['vanity','vanities','sink','cabinet','basin'], Table: ['table','tables','tabletop','top'], 'Marble+ ConsoleTable': ['table','tables','console','consoles'], Bench: ['bench','benches','seat','seating'], Fountain: ['fountain','fountains','waterfall'], Planter: ['planter','planters','pot','pots','flowerpot'], Lamppost: ['lamp','lampost','lamppost','post','light'], Statue: ['statue','statues','sculpture','sculptures','figure','figurine'], Animal: ['statue','statues','sculpture','sculptures','animal','figure'], Carving: ['carving','carvings','carved','relief','sculpture'], Moulding: ['moulding','molding','mouldings','moldings','trim','baseboard','cornice','skirting'], OutdoorCornice: ['cornice','moulding','molding','trim'], DoorSurround: ['door','surround','frame','trim','doorway'], WindowSurround: ['window','surround','frame','trim','sill'], Columns: ['column','columns','pillar','pillars'], Balustrade: ['balustrade','balustrades','baluster','balusters','railing','railings','rail','rails','handrail','handrails','spindle','spindles','post','posts','banister','banisters','stair','stairs','staircase'], Stairs: ['stair','stairs','staircase','steps','step'], MarbleRangeHood: ['hood','hoods','range','rangehood','vent'], MarbleSlab: ['slab','slabs'], BookMatchedSlabs: ['slab','slabs','bookmatched','book','matched'], StoneMosaicTile: ['mosaic','mosaics','tile','tiles'], MarbleMedallion: ['medallion','medallions','inlay'], 'Wall-Coverings': ['wall','walls','panel','panels','cladding','covering','coverings'], Wainscoting: ['wainscoting','wainscot','wall','panel','panels'], 'Exterior-Wall-Decoration': ['wall','walls','exterior','decoration','relief'], '2026Instock': [] };\n  const syn = new Set(SYN[r.tab] || []);\n  const GEN = new Set(['bathroom', 'master', 'fixture', 'home', 'house', 'decor', 'design', 'piece', 'feature', 'room']);\n  const meaningful = t => t.toLowerCase().split(/[\\s-]+/).some(w => w && !syn.has(w) && !GEN.has(w));\n  const sig = t => t.toLowerCase().split(/[\\s-]+/).filter(w => w && !syn.has(w)).join(' ') || t.toLowerCase();\n  const tags = r.existing.slice();\n  const have = new Set(tags.map(x => x.toLowerCase()));\n  const sigs = new Set(tags.map(sig));\n  const STOPW = new Set(['marble', 'stone', 'natural', 'carved', 'luxury', 'custom', 'solid', 'handmade', 'hand', 'handcrafted', 'modern', 'classic', 'premium', 'large', 'outdoor', 'indoor', 'the', 'and', 'for', 'with', 'of', 'a', 'in']);\n  const dist = t => t.toLowerCase().split(/[\\s-]+/).filter(w => w && !syn.has(w) && !GEN.has(w) && !STOPW.has(w));\n  const wc = {}; tags.forEach(t => dist(t).forEach(w => { wc[w] = (wc[w] || 0) + 1; }));\n  let added = 0;\n  for (const c of cand) { if (tags.length >= 13) break; const t = clean(c); if (t.length < 2 || t.length > 20 || have.has(t.toLowerCase()) || /\\d/.test(t) || !meaningful(t) || sigs.has(sig(t)) || dist(t).some(w => (wc[w] || 0) >= 3)) continue; tags.push(t); have.add(t.toLowerCase()); sigs.add(sig(t)); dist(t).forEach(w => { wc[w] = (wc[w] || 0) + 1; }); added++; }\n  return { row: r.row, sku: r.sku, tab: r.tab, tagCol: r.tagCol, added, tags, note: tags.length < 13 ? 'only ' + tags.length + ' tags' : '' };\n});\nconst cfg = $('Config').first().json;\nconst data = results.filter(x => x.added > 0).map(x => ({ range: \"'\" + String(x.tab).replace(/'/g, \"''\") + \"'!\" + x.tagCol + x.row, values: [[x.tags.join(', ')]] }));\nconst byTab = {}; results.forEach(x => { byTab[x.tab] = (byTab[x.tab] || 0) + 1; });\nreturn [{ json: { dryRun: cfg.dryRun !== false, byTab, rows: results.length, withTags13: results.filter(x => x.tags.length === 13).length, needReview: results.filter(x => x.tags.length < 13).length, results, body: { valueInputOption: 'RAW', data } } }];"
+      },
+      "id": "22b1945e-d84a-44df-8193-42d6ee6c2c81",
+      "name": "Validate Tags",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12192,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2",
+              "leftValue": "={{ $json.dryRun === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9ee0a042-c2c9-4bfb-8304-776947b6cd33",
+      "name": "Dry run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        12400,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst { body, ...rest } = $input.first().json;\nreturn [{ json: { message: 'DRY RUN: nothing was written to the sheet. Set dryRun to false in Config to save these tags into Tags_Etsy.', ...rest, cellsToWrite: (body.data || []).length } }];"
+      },
+      "id": "048dd0c7-bb5d-43cf-b532-108244372714",
+      "name": "Dry Run Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12592,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Validate Tags').first().json.body) }}",
+        "options": {}
+      },
+      "id": "edfbb724-6ea4-4fe2-a036-c76e618c4c13",
+      "name": "Write Tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        12592,
+        432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst w = $input.first().json;\nconst v = $('Validate Tags').first().json;\nconst { body, ...rest } = v;\nreturn [{ json: { ...rest, dryRun: false, cellsUpdated: w.totalUpdatedCells || 0, sheetError: w.error || null } }];"
+      },
+      "id": "f307594a-ec26-4b5f-b1b5-01df41538d7d",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12800,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "0dd60f98-2ebf-4caf-958e-c1ae8b8398c0",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        10080,
+        672
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// One run at a time. The lock expires after 45 minutes so a crashed run cannot block the next ones.\nconst sd = $getWorkflowStaticData('global');\nconst now = Date.now();\nif (sd.lockUntil && sd.lockUntil > now) return [{ json: { locked: true, until: new Date(sd.lockUntil).toISOString() } }];\nsd.lockUntil = now + 45 * 60 * 1000;\nreturn [{ json: { locked: false } }];"
+      },
+      "id": "d44f18f7-d245-4773-9b91-25a575844ae5",
+      "name": "Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10512,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1",
+              "leftValue": "={{ $json.locked !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f2289d81-9a10-427b-8e05-28431c5d9aca",
+      "name": "Free to run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        10736,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { skipped: true, message: 'Another run is still in progress; this one did nothing.', until: $input.first().json.until } }];"
+      },
+      "id": "b87deb7c-cf7e-4420-b2af-50db8eed60a0",
+      "name": "Already Running",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11024,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst ALL = ['2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst raw = String(cfg.tabs || '').trim();\nconst tabs = raw.toUpperCase() === 'ALL' ? ALL : raw.split(',').map(s => s.trim()).filter(Boolean);\nreturn tabs.map(t => ({ json: { tab: t, url: 'https://sheets.googleapis.com/v4/spreadsheets/' + cfg.docId + '/values/' + encodeURIComponent(\"'\" + t.replace(/'/g, \"''\") + \"'!2:1500\") + '?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE' } }));"
+      },
+      "id": "50c13f4a-d103-49c7-9531-845aa1795ae8",
+      "name": "Tabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11024,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Pick Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Rows": {
+      "main": [
+        [
+          {
+            "node": "Any rows?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any rows?": {
+      "main": [
+        [
+          {
+            "node": "Generate Tags (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nothing To Do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Tags (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Validate Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Tags": {
+      "main": [
+        [
+          {
+            "node": "Dry run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry run?": {
+      "main": [
+        [
+          {
+            "node": "Dry Run Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Tags": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lock": {
+      "main": [
+        [
+          {
+            "node": "Free to run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free to run?": {
+      "main": [
+        [
+          {
+            "node": "Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already Running",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabs": {
+      "main": [
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "a16d638b-c034-4b9c-82a3-52a20c26c9ff",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "id": "HM6yJZIlIUqQkdKV",
+  "active": false,
+  "pinData": {},
+  "nodeGroups": [],
+  "tags": []
+}
