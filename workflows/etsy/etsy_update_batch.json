@@ -1,0 +1,436 @@
+{
+  "name": "Etsy - Update listings in batches (rows flagged in Etsy_fields_to_update)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "471101ea-f963-42c6-ab51-ac275d2660da",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "566e36a7-eea4-40b2-8a62-2a5edde49c01",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        3632,
+        560
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "apiKey",
+              "type": "string",
+              "value": "PASTE_KEYSTRING:SHARED_SECRET_HERE"
+            },
+            {
+              "id": "k2",
+              "name": "shopId",
+              "type": "string",
+              "value": "64324681"
+            },
+            {
+              "id": "k3",
+              "name": "docId",
+              "type": "string",
+              "value": "1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI"
+            },
+            {
+              "id": "k4",
+              "name": "tabs",
+              "type": "string",
+              "value": "ALL"
+            },
+            {
+              "id": "k5",
+              "name": "perTab",
+              "type": "number",
+              "value": 5
+            },
+            {
+              "id": "k6",
+              "name": "minHours",
+              "type": "number",
+              "value": 1
+            },
+            {
+              "id": "k7",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "32da4daa-68b8-4d65-89da-497d4b27f386",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3856,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One run at a time. The lock expires after 90 minutes so a crashed run cannot block the next ones.\nconst cfg = $('Config').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst now = Date.now();\nif (sd.lockUntil && sd.lockUntil > now) return [{ json: { locked: true, until: new Date(sd.lockUntil).toISOString() } }];\nsd.lockUntil = now + 90 * 60 * 1000;\nreturn [{ json: { locked: false } }];"
+      },
+      "id": "25ba00c5-db94-4828-9b4d-85a2aeea4add",
+      "name": "Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4064,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b1",
+              "leftValue": "={{ $json.locked !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b09ee8b1-8751-44af-8c9a-4c617d7661ea",
+      "name": "Free to run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4272,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { skipped: true, message: 'Another run is in progress; this one did nothing.', until: $input.first().json.until } }];"
+      },
+      "id": "cf3ea8c9-c288-4ec8-85ce-8ff760be0e34",
+      "name": "Already Running",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\n// ALL = every tab that has an Etsy category set up (2026Instock has none, so it is left out)\nconst ALL = ['Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst raw = String(cfg.tabs || '').trim();\nconst tabs = raw.toUpperCase() === 'ALL' ? ALL : raw.split(',').map(s => s.trim()).filter(Boolean);\nreturn tabs.map(t => ({ json: { tab: t, url: 'https://sheets.googleapis.com/v4/spreadsheets/' + cfg.docId + '/values/' + encodeURIComponent(\"'\" + t.replace(/'/g, \"''\") + \"'!2:1500\") + '?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE' } }));"
+      },
+      "id": "44d32450-4ac1-4f03-81df-211753a65cac",
+      "name": "Tabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "c6c4ece2-0b11-4777-9b11-7e9849750114",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4704,
+        448
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chooses up to perTab rows per tab that a person flagged in Etsy_fields_to_update. Any status is fine: filling that cell is the request to update.\n// The update workflow checks every row again and, in a dry run, only reports what would change.\nconst cfg = $('Config').first().json;\nconst tabItems = $('Tabs').all().map(i => i.json);\nconst results = $input.all().map(i => i.json);\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst cap = Number(cfg.perTab) || 5;\nconst minMs = (cfg.minHours === undefined ? 1 : Number(cfg.minHours)) * 3600 * 1000;\nconst dry = cfg.dryRun !== false;\nconst now = Date.now();\nconst out = [], skipped = [];\ntabItems.forEach((t, k) => {\n  const res = results[k] || {};\n  if (res.error || !res.values) { skipped.push({ tab: t.tab, reason: 'could not read the tab' }); return; }\n  const rows = res.values;\n  const hk = (rows[0] || []).map(nk);\n  const ix = n => hk.indexOf(nk(n));\n  const skuCol = hk.lastIndexOf('productno');\n  const c = { listing: ix('Etsy_listing_id'), fields: ix('Etsy_fields_to_update'), synced: ix('Etsy_synced_at') };\n  if (skuCol < 0 || Object.values(c).some(v => v < 0)) { skipped.push({ tab: t.tab, reason: 'missing column(s)' }); return; }\n  const cell = (r, i) => (r[i] == null ? '' : String(r[i]).trim());\n  const count = {};\n  for (let i = 1; i < rows.length; i++) { const s = cell(rows[i] || [], skuCol).toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\n  const cand = [];\n  for (let i = 1; i < rows.length; i++) {\n    const r = rows[i] || [];\n    const sku = cell(r, skuCol);\n    if (!sku || count[sku.toUpperCase()] > 1) continue;\n    if (!/^\\d+$/.test(cell(r, c.listing))) continue;\n    if (!cell(r, c.fields)) continue;\n    const t0 = Date.parse(cell(r, c.synced)) || 0;\n    if (!dry && now - t0 < minMs) continue;\n    cand.push({ sku, t0 });\n  }\n  cand.sort((a, b) => a.t0 - b.t0);\n  cand.slice(0, cap).forEach(x => out.push({ json: { tab: t.tab, sku: x.sku, apiKey: cfg.apiKey, shopId: cfg.shopId, docId: cfg.docId, dryRun: dry } }));\n});\nif (!out.length) return [{ json: { noRows: true, skipped } }];\nreturn out;"
+      },
+      "id": "66cb079e-5a13-4158-a490-843c43f14648",
+      "name": "Pick Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4896,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b2",
+              "leftValue": "={{ $json.noRows !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "19b19a97-07b5-42f4-8171-75e0116b7d62",
+      "name": "Any rows?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5104,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst j = $input.first().json;\nreturn [{ json: { done: true, message: 'No rows to update (a row needs an Etsy_listing_id and a filled Etsy_fields_to_update).', skipped: j.skipped || [] } }];"
+      },
+      "id": "7efbaefb-f80c-494a-87c3-60af41957cdb",
+      "name": "Nothing To Do",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5312,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yKcukUhxxiWPlUQx",
+          "mode": "list",
+          "cachedResultName": "Etsy - Update one listing (called by the batch)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "91793412-ca81-4d3f-90da-578042db0092",
+      "name": "Update Each",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5360,
+        432
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst sd = $getWorkflowStaticData('global'); sd.lockUntil = 0;\nconst rows = items.map(j => ({ tab: j.tab, sku: j.sku, row: j.row, listingId: j.listingId, status: j.ok === false ? 'not_updated' : (j.dryRun ? 'would_update' : (j.published ? 'published' : 'updated')), fields: j.fields, changes: (j.changes || []).map(c => c.field + ': ' + c.from + ' -> ' + c.to), problems: (j.errors && j.errors.length) ? j.errors : (j.problems || []), warnings: j.warnings || [] }));\nconst by = {}; rows.forEach(r => { by[r.status] = (by[r.status] || 0) + 1; });\nreturn [{ json: { dryRun: $('Config').first().json.dryRun !== false, processed: rows.length, byStatus: by, rows } }];"
+      },
+      "id": "238358f5-2bd1-41b6-af9d-6bd70a252bf4",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5584,
+        432
+      ]
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lock": {
+      "main": [
+        [
+          {
+            "node": "Free to run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free to run?": {
+      "main": [
+        [
+          {
+            "node": "Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already Running",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tabs": {
+      "main": [
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Pick Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Rows": {
+      "main": [
+        [
+          {
+            "node": "Any rows?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any rows?": {
+      "main": [
+        [
+          {
+            "node": "Update Each",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nothing To Do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Each": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "nodeGroups": [],
+  "tags": []
+}

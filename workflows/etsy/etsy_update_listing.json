@@ -1,0 +1,1551 @@
+{
+  "name": "Etsy - Update one listing (called by the batch)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "76f7c9d9-6577-49bc-917b-c51c55c130a6",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        32,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "efa18a9f-627e-4e8e-a792-383c2a35c04f",
+      "name": "Called by batch",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "k1",
+              "name": "apiKey",
+              "type": "string",
+              "value": "={{ $json.apiKey || 'PASTE_KEYSTRING:SHARED_SECRET_HERE' }}"
+            },
+            {
+              "id": "k2",
+              "name": "shopId",
+              "type": "string",
+              "value": "={{ $json.shopId || '64324681' }}"
+            },
+            {
+              "id": "k3",
+              "name": "docId",
+              "type": "string",
+              "value": "={{ $json.docId || '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI' }}"
+            },
+            {
+              "id": "k4",
+              "name": "tab",
+              "type": "string",
+              "value": "={{ $json.tab || 'Statue' }}"
+            },
+            {
+              "id": "k5",
+              "name": "sku",
+              "type": "string",
+              "value": "={{ $json.sku || '' }}"
+            },
+            {
+              "id": "k6",
+              "name": "fields",
+              "type": "string",
+              "value": "={{ $json.fields || '' }}"
+            },
+            {
+              "id": "k7",
+              "name": "shippingProfileId",
+              "type": "string",
+              "value": "={{ $json.shippingProfileId || '305991461140' }}"
+            },
+            {
+              "id": "k8",
+              "name": "readinessStateId",
+              "type": "string",
+              "value": "={{ $json.readinessStateId || '1485857866342' }}"
+            },
+            {
+              "id": "k9",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": "={{ $json.dryRun === undefined ? true : $json.dryRun }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4b488b1b-1725-45e0-ad50-6d7462ef3c36",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        256,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values/{{ encodeURIComponent(\"'\" + $('Config').first().json.tab + \"'!2:1500\") }}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "36b192fb-7e6f-4dbc-a9d1-cbe0bb9ca5b7",
+      "name": "Read Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        480,
+        656
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nconst apiKey = String(cfg.apiKey || '').trim();\nif (!/^[^\\s:]+:[^\\s:]+$/.test(apiKey) || /PASTE|SHARED_SECRET_HERE/i.test(apiKey)) return out({ ok: false, problems: ['Config apiKey is not set: it must be keystring:shared_secret (paste it in n8n only, never in the repo)'], warnings: [] });\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Etsy category per tab, confirmed with the read-only category check (2026-11). 'table' = chosen from the title.\nconst TAB_CAT = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219, Vanity: 903, 'Marble+ ConsoleTable': 11355, Bench: 12369, Lamppost: 12410, Statue: 2869, Animal: 2869, Carving: 129, Table: 'table',\n  Moulding: 784, DoorSurround: 784, WindowSurround: 784, OutdoorCornice: 784, Columns: 784, Balustrade: 784, Stairs: 784, Wainscoting: 784, 'Wall-Coverings': 784, MarbleRangeHood: 784,\n  StoneMosaicTile: 781, MarbleMedallion: 781, MarbleSlab: 781, BookMatchedSlabs: 781, Fountain: 12240, Planter: 6061, 'Exterior-Wall-Decoration': 2784 };\n// mat = material property id (marble is value 171 in every list). dims: 'whd' = Width/Height/Depth, 'wl' = Width/Length, '' = none (size goes in the description). craft = required Craft type value.\nconst M1 = 148789511893;\nconst CAT = { 11353: { mat: 570246212865, dims: 'whd' }, 12219: { mat: M1, dims: 'whd' }, 903: { mat: M1, dims: 'whd' }, 11355: { mat: M1, dims: 'whd' }, 12369: { mat: M1, dims: 'whd' }, 12410: { mat: M1, dims: 'whd' }, 2869: { mat: M1, dims: 'whd' },\n  129: { mat: 570246213483, dims: 'whd' }, 977: { mat: M1, dims: 'whd' }, 12371: { mat: M1, dims: 'whd' }, 12372: { mat: M1, dims: 'whd' },\n  784: { mat: M1, dims: 'whd', craft: 560 }, 781: { mat: M1, dims: 'wl', craft: 560 },\n  12240: { mat: M1, dims: '' }, 6061: { mat: M1, dims: '' }, 2784: { mat: M1, dims: '' } };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037, length: 47626759838, craft: 47626759760 };\nconst problems = [], warnings = [];\nconst baseTax = TAB_CAT[cfg.tab];\nif (!baseTax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no Etsy category set up (set up: ' + Object.keys(TAB_CAT).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nlet tax = baseTax;\nif (tax === 'table') { const tt = (str(r, 'Title_Etsy') + ' ' + str(r, 'Title_Shopify')).toLowerCase(); if (/coffee|cocktail/.test(tt)) tax = 12371; else if (/end table|side table|accent table|bedside|nightstand/.test(tt)) tax = 12372; else { tax = 977; if (!/dining|kitchen|dinner|conference/.test(tt)) warnings.push('table type not clear from the title: used Kitchen & Dining Tables'); } }\nconst cat = CAT[tax];\n// Which sheet size fills which Etsy field (first one with a value wins). Anything else goes into a line in the description.\nconst SRC = { Moulding: { width: ['Length'], height: ['Height'], depth: ['Thickness'] }, OutdoorCornice: { width: ['Length'], height: ['Height'], depth: ['Projection'] },\n  Wainscoting: { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] }, 'Wall-Coverings': { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] },\n  Balustrade: { width: ['Width', 'Handrail Width', 'Base/Plinth Width'], height: ['Overall Height', 'Height'], depth: ['Depth', 'Baluster Diameter'] }, Stairs: { width: ['Width'], height: ['Height'] } };\nconst DEFAULT_SRC = cat.dims === 'wl' ? { width: ['Width'], length: ['Length', 'Depth'] } : { width: ['Width'], height: ['Height'], depth: ['Depth', 'Length'] };\nconst src = cat.dims === '' ? {} : (cat.dims === 'whd' && SRC[cfg.tab] ? SRC[cfg.tab] : DEFAULT_SRC);\nconst usedFields = new Set(), mapped = {};\nObject.entries(src).forEach(([k, fields]) => { mapped[k] = 0; for (const fl of fields) { const v = num(get(r, fl + ' Inch')); if (v > 0) { mapped[k] = v; usedFields.add(fl); break; } } });\nconst MEAS = ['Length', 'Width', 'Height', 'Depth', 'Thickness', 'Projection', 'Diameter', 'Inner Opening Diameter', 'Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'];\nconst measParts = skipUsed => { const parts = []; MEAS.forEach(L => { if (skipUsed && usedFields.has(L)) return; const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); if (cm > 0 || inch > 0) parts.push(L.toLowerCase() + ' ' + (cm > 0 ? Math.round(cm * 10) / 10 + ' cm' : '') + (cm > 0 && inch > 0 ? ' / ' : '') + (inch > 0 ? Math.round(inch * 100) / 100 + ' in' : '')); }); return parts; };\nconst WRITE = ['Etsy_status', 'Etsy_error', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_fields_to_update', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_ready_to_post'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nconst listingId = str(r, 'Etsy_listing_id'), sheetStatus = str(r, 'Etsy_status');\nif (!/^\\d+$/.test(listingId)) problems.push('row has no Etsy_listing_id');\nconst ALLF = ['title', 'description', 'tags', 'price', 'category', 'properties', 'sku', 'images', 'publish'].concat(Array.from({ length: 11 }, (_, i) => 'image url' + (i + 1)));\nconst rawFields = String(cfg.fields || '').trim() || str(r, 'Etsy_fields_to_update');\nlet fields = rawFields.split(/[,;\\n|]+/).map(x => x.trim().toLowerCase()).filter(Boolean);\nif (fields.includes('all')) fields = ALLF.filter(x => x !== 'publish' && !x.startsWith('image url')).concat(fields.includes('publish') ? ['publish'] : []);\nconst unknownFields = fields.filter(x => !ALLF.includes(x));\nif (unknownFields.length) problems.push('unknown field(s) in Etsy_fields_to_update: ' + unknownFields.join(', ') + ' (use: title, description, tags, price, category, properties, sku, images, IMAGE URL1 to IMAGE URL11, publish, all)');\nif (!fields.length) problems.push('Etsy_fields_to_update is empty: nothing to update');\nconst need = t => fields.includes(t);\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\ndescription = description.replace(/\\*\\*|__/g, '').replace(/^#{1,6}\\s+/gm, '');\nif (description) {\n  const parts = measParts(cat.dims !== '');\n  if (parts.length) description += '\\n\\n' + (cat.dims === '' ? 'Dimensions: ' : 'Additional dimensions: ') + parts.join(', ') + '.';\n  else if (cat.dims === '') warnings.push('no sizes for the Dimensions line');\n}\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\n// Same rule as the Shopify sync: two photos are the same only when the URLs are identical after removing Shopify's v= cache-buster. No filename guessing.\nconst normUrl = u => { const s = String(u || ''); const q = s.indexOf('?'); if (q === -1) return s; const base = s.slice(0, q); const kept = s.slice(q + 1).split('&').filter(p => p && !/^v=/.test(p)).join('&'); return kept ? base + '?' + kept : base; };\nconst cad = str(r, 'IMAGE URL11');\nconst cadKey = /^https?:/i.test(cad) ? normUrl(cad) : '';\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) {\n  const u = str(r, 'IMAGE URL' + k);\n  if (!/^https?:/i.test(u)) continue;\n  const key = normUrl(u);\n  if (cadKey && key === cadKey) { warnings.push('IMAGE URL' + k + ' is the same file as the CAD drawing: kept once, at the end'); continue; }\n  if (seen.has(key)) { warnings.push('IMAGE URL' + k + ' repeats an earlier photo: skipped'); continue; }\n  seen.add(key); imgs.push({ url: u, label: 'IMAGE URL' + k });\n}\nif (cadKey) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) { const msg = 'only ' + tags.length + ' tags (Etsy allows 13); run the tag generator first'; if (cfg.requireFullTags === true) problems.push(msg); else warnings.push(msg); }\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst properties = [{ id: cat.mat, name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nif (cat.craft) properties.push({ id: PROP.craft, name: 'craft type', body: { value_ids: [cat.craft], values: [] } });\nconst dv = (v, name) => { if (v > 0) properties.push({ id: PROP[name], name, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + name + ' (inches)'); };\nif (cat.dims === 'whd') { dv(mapped.width, 'width'); dv(mapped.height, 'height'); dv(mapped.depth, 'depth'); }\nif (cat.dims === 'wl') { dv(mapped.width, 'width'); dv(mapped.length, 'length'); }\nconst rel = m => { if (/Title_Etsy|^title is/.test(m)) return need('title'); if (/Price/.test(m)) return need('price') || need('sku'); if (/photos/.test(m)) return need('images') || fields.some(x => x.startsWith('image url')); return true; };\nconst relevant = problems.filter(rel);\nreturn out({ listingId, sheetStatus, fields, ok: relevant.length === 0, problems: relevant, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
+      },
+      "id": "9b43d676-334a-40d6-a9da-9597157621b2",
+      "name": "Pick Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "422111a1-b675-4d52-9b30-2f34913af6b6",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c98950f6-2fdd-4af7-bbfc-abc18f825502",
+      "name": "Can update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { ok: false, tab: $('Config').first().json.tab, sku: $('Config').first().json.sku, problems: j.problems || [] } }];"
+      },
+      "id": "b386c8d7-ec25-4253-aed0-db1d77b15285",
+      "name": "Report (no write)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/listings/{{ $json.listingId }}?includes=Images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "56ba128c-c914-4d6a-853c-59bf598797b4",
+      "name": "Get Listing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        640
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/listings/{{ $('Pick Row').first().json.listingId }}/inventory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "724e0e1c-c82f-47c1-aa35-7a76096b13f9",
+      "name": "Get Inventory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        640
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Pick Row').first().json.listingId }}/properties",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f41c07e0-a630-463c-93cb-5044e3acbdea",
+      "name": "Get Properties",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        640
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compares the sheet with what is on Etsy for every field named in Etsy_fields_to_update and lists each change (old -> new).\nconst cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst L = $('Get Listing').first().json;\nconst INV = $('Get Inventory').first().json;\nconst PR = $('Get Properties').first().json;\nconst err = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nif (L.error || !L.listing_id) return [{ json: { ok: false, problems: ['could not read the listing on Etsy: ' + err(L.error || L)] } }];\nconst problems = [], warnings = [];\nconst state = L.state;\nif (!['draft', 'active'].includes(state)) problems.push('listing state is \"' + state + '\": only draft and active listings are updated');\nconst has = t => p.fields.includes(t);\nconst changes = [];\nconst norm = s => String(s == null ? '' : s).replace(/\\r\\n/g, '\\n').trim();\nconst sh = s => { s = String(s == null ? '' : s); return s.length > 70 ? s.slice(0, 70) + '...' : s; };\nconst patch = {};\nif (has('title') && p.title && norm(L.title) !== norm(p.title)) { patch.title = p.title; changes.push({ field: 'title', from: sh(L.title), to: sh(p.title) }); }\nif (has('description') && p.listing.description && norm(L.description) !== norm(p.listing.description)) { patch.description = p.listing.description; changes.push({ field: 'description', from: (L.description || '').length + ' chars', to: p.listing.description.length + ' chars' }); }\nif (has('tags')) {\n  if (!p.tags.length) problems.push('tags requested but the sheet has none');\n  else {\n    const e = (L.tags || []).map(t => String(t).toLowerCase()), s = p.tags.map(t => t.toLowerCase());\n    if (!(e.length === s.length && s.every(t => e.includes(t)))) { patch.tags = p.tags; changes.push({ field: 'tags', from: (L.tags || []).join(', ') || '(none)', to: p.tags.join(', ') }); }\n  }\n}\nif (has('category') && Number(L.taxonomy_id) !== Number(p.taxonomyId)) { patch.taxonomy_id = Number(p.taxonomyId); changes.push({ field: 'category', from: String(L.taxonomy_id), to: String(p.taxonomyId) }); }\n// inventory: price and SKU (listings with variations are not touched)\nconst prods = INV.products || [];\nlet invBody = null;\nif (has('price') || has('sku')) {\n  if (INV.error || !prods.length) problems.push('could not read the inventory: ' + err(INV.error || INV));\n  else if (prods.length !== 1 || (prods[0].offerings || []).length !== 1) problems.push('listing has variations: price/sku not updated');\n  else {\n    const pr = prods[0], off = pr.offerings[0];\n    const curPrice = off.price ? off.price.amount / off.price.divisor : NaN;\n    const priceChange = has('price') && Math.abs(curPrice - p.priceCad) > 0.004;\n    const skuChange = has('sku') && String(pr.sku || '').trim().toUpperCase() !== p.sku;\n    if (priceChange) changes.push({ field: 'price', from: String(curPrice), to: String(p.priceCad) });\n    if (skuChange) changes.push({ field: 'sku', from: pr.sku || '(none)', to: p.sku });\n    if (priceChange || skuChange) invBody = { products: [{ sku: skuChange ? p.sku : (pr.sku || ''), property_values: pr.property_values || [], offerings: [{ price: priceChange ? p.priceCad : curPrice, quantity: off.quantity, is_enabled: off.is_enabled, readiness_state_id: off.readiness_state_id || Number(cfg.readinessStateId) }] }], price_on_property: INV.price_on_property || [], quantity_on_property: INV.quantity_on_property || [], sku_on_property: INV.sku_on_property || [] };\n  }\n}\n// properties (sizes, material, craft type): only the ones that differ\nconst propsToSet = [];\nif (has('properties')) {\n  const cur = {}; (PR.results || []).forEach(x => { cur[x.property_id] = x; });\n  p.properties.forEach(x => {\n    const c = cur[x.id];\n    let same = false;\n    if (c) {\n      if (x.body.value_ids && x.body.value_ids.length) same = x.body.value_ids.every(v => (c.value_ids || []).includes(v));\n      else same = (c.values || []).map(String).includes(String(x.body.values[0]));\n    }\n    if (!same) { propsToSet.push(x); changes.push({ field: 'property ' + x.name, from: c ? (c.values || []).join('/') : '(none)', to: (x.body.values && x.body.values[0]) || (x.body.value_ids || []).join('/') }); }\n  });\n}\n// images: add the missing ones at the end; nothing is ever removed\nconst images = (L.images || []).slice().sort((a, b) => a.rank - b.rank);\nconst have = images.length;\nconst uploads = has('images') && have < p.expectedImages ? p.images.slice(have).map(x => ({ listing_id: L.listing_id, url: x.url, rank: x.rank, label: x.label })) : [];\nif (uploads.length) changes.push({ field: 'images', from: have + ' on Etsy', to: 'add ' + uploads.length + ': ' + uploads.map(u => u.label).join(', ') });\n// replace single photos: token \"IMAGE URL3\" replaces the photo at that column's position (Etsy keeps no file names, so the position is the only link)\nconst fileName = u => { const l = String(u || '').split('?')[0].split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst replaces = [];\np.fields.filter(t => /^image url\\d+$/.test(t)).forEach(t => {\n  const n = Number(t.slice(9));\n  const e = p.images.find(x => x.label === 'IMAGE URL' + n || x.label.startsWith('IMAGE URL' + n + ' '));\n  if (!e) { warnings.push('IMAGE URL' + n + ' has no photo to use (empty cell or a duplicate): skipped'); return; }\n  if (have !== p.expectedImages) { problems.push('cannot replace IMAGE URL' + n + ': Etsy has ' + have + ' photos but the sheet has ' + p.expectedImages + ', so positions would not match (use \"images\" to add the missing ones first)'); return; }\n  const old = images[e.rank - 1];\n  if (!old || !old.listing_image_id) { problems.push('cannot find the photo at position ' + e.rank + ' on Etsy'); return; }\n  replaces.push({ listing_id: L.listing_id, url: e.url, rank: e.rank, label: e.label, old_image_id: old.listing_image_id });\n  changes.push({ field: 'photo ' + e.rank + ' (' + e.label + ')', from: 'photo now at position ' + e.rank, to: 'replace with ' + fileName(e.url) });\n});\nif (has('images') && have > p.expectedImages) warnings.push('Etsy has ' + have + ' images, the sheet has ' + p.expectedImages + ': nothing removed');\nconst dry = cfg.dryRun !== false;\nconst doUpdate = problems.length === 0 && !dry;\nreturn [{ json: { ok: problems.length === 0, problems, warnings, state, changes, patch, needPatch: Object.keys(patch).length > 0, invBody, propsToSet, uploads, replaces, imagesOnEtsy: have, wantPublish: has('publish'), doUpdate, dry } }];"
+      },
+      "id": "af91a0e8-0c6d-428d-a889-1af614a3acd6",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "18aa3d33-6a18-43c1-a377-54c7f8f1c116",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "228976ca-eb35-4064-84f3-402a14560570",
+      "name": "Plan ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { ok: false, tab: $('Config').first().json.tab, sku: $('Config').first().json.sku, problems: j.problems || [] } }];"
+      },
+      "id": "32c36797-d599-43cd-bca0-1ac7a6b38f6d",
+      "name": "Report Plan Problem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b275a5de-0a9a-4a7c-9952-1aa93296caae",
+              "leftValue": "={{ $json.needPatch === true && $json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c60c5e27-8665-4f41-a21c-00ba677f4ede",
+      "name": "Listing fields to change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Pick Row').first().json.listingId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {},
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Plan').first().json.patch) }}"
+      },
+      "id": "7f4b6e02-d239-47b1-9530-ce2a47e73369",
+      "name": "Update Listing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        160
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "039263e0-5bb4-457c-8ceb-e4b4fe3fa1ad",
+              "leftValue": "={{ $('Plan').first().json.propsToSet.length > 0 && $('Plan').first().json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f5b759e7-0d26-4e27-b8c6-aff75298ee2c",
+      "name": "Properties to set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nreturn plan.propsToSet.map(x => ({ json: { listing_id: p.listingId, property_id: x.id, name: x.name, body: x.body } }));"
+      },
+      "id": "ae6571a5-4744-471e-9991-db97891cdb58",
+      "name": "Prep Properties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $json.listing_id }}/properties/{{ $json.property_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        },
+        "method": "PUT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "480799fd-7f7a-4201-b742-bd0154428de5",
+      "name": "Set Property",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        112
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 160);\nconst names = $('Prep Properties').all().map(i => i.json.name);\nconst errors = $input.all().map((i, k) => i.json.error ? names[k] + ': ' + err(i.json.error) : null).filter(Boolean);\nreturn [{ json: { propErrors: errors, propsSet: names.length - errors.length } }];"
+      },
+      "id": "63c2f79b-b4c7-42ea-920e-64c8ad181cc8",
+      "name": "Collect Props",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d342d023-f588-4a26-8da3-11b6092d17a2",
+              "leftValue": "={{ $('Plan').first().json.invBody !== null && $('Plan').first().json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5ace2239-f9ec-4fb1-939f-e9df6b44d477",
+      "name": "Price or SKU to set?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1088,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/listings/{{ $('Pick Row').first().json.listingId }}/inventory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {},
+        "method": "PUT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Plan').first().json.invBody) }}"
+      },
+      "id": "476a2308-06b9-4237-9a8f-55647ea263a9",
+      "name": "Update Inventory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1488,
+        112
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c53d216f-37e6-4359-9028-5bcd0dd45093",
+              "leftValue": "={{ $('Plan').first().json.uploads.length > 0 && $('Plan').first().json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8e6152aa-9b2f-4d1f-8c1c-1395bb721b6d",
+      "name": "Images to add?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1440,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Plan').first().json.uploads.map(x => ({ json: x }));"
+      },
+      "id": "3b73f5ff-44b3-4742-a14a-3091e3876e7c",
+      "name": "Prep Images",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      },
+      "id": "3b8e12b6-d8b8-406b-a91f-cc40e0fc81c8",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1984,
+        128
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "POST",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Pick Row').first().json.listingId }}/images",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "rank",
+              "value": "={{ $('Prep Images').all()[$itemIndex].json.rank }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "id": "e2dfca3f-dd0d-4f9d-be63-eae7bd1615c1",
+      "name": "Upload Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2208,
+        128
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst prep = $('Prep Images').all().map(i => i.json);\nconst failed = [];\n$input.all().forEach((i, k) => { const j = i.json; if (j.error || !j.listing_image_id) failed.push(prep[k].label + ': ' + friendly(j.error || j)); });\nreturn [{ json: { uploaded: prep.length - failed.length, failed } }];"
+      },
+      "id": "0ab70e76-51e5-4dc1-aab0-48338f1d6410",
+      "name": "Collect Uploads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/listings/{{ $('Pick Row').first().json.listingId }}/images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8947c310-e4df-433a-bf00-0ae8512c0b88",
+      "name": "Verify Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1968,
+        416
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nconst f = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nconst tryGet = n => { try { return $(n).first().json; } catch (e) { return null; } };\nconst patchRes = tryGet('Update Listing'), invRes = tryGet('Update Inventory'), props = tryGet('Collect Props'), up = tryGet('Collect Uploads'), rep = tryGet('Collect Replace');\nconst v = $input.first().json;\nconst errors = [];\nif (patchRes && patchRes.error) errors.push('listing: ' + f(patchRes.error));\nif (invRes && invRes.error) errors.push('price/sku: ' + f(invRes.error));\nif (props && props.propErrors.length) errors.push('properties: ' + props.propErrors.join('; '));\nif (up && up.failed.length) errors.push('images: ' + up.failed.join('; '));\nif (rep && rep.failed.length) errors.push('photo replace: ' + rep.failed.join('; '));\nlet onEtsy = plan.imagesOnEtsy;\nif (!cfg.dryRun) { if (v.error) errors.push('could not re-count images: ' + f(v.error)); else if (Array.isArray(v.results)) onEtsy = v.results.length; }\nif (!cfg.dryRun && (p.fields.includes('images') || plan.replaces.length) && onEtsy !== p.expectedImages) errors.push('images on Etsy ' + onEtsy + ' of ' + p.expectedImages);\nconst tagsNow = patchRes && !patchRes.error && Array.isArray(patchRes.tags) ? patchRes.tags.length : (plan.needPatch && plan.patch.tags ? 0 : null);\nconst tagsOk = plan.patch.tags ? (patchRes && !patchRes.error && p.tags.length === 13) : p.tags.length === 13;\nconst publishNow = !cfg.dryRun && plan.wantPublish && plan.state === 'draft' && p.tags.length === 13 && (!p.fields.includes('images') || onEtsy === p.expectedImages) && onEtsy > 0 && errors.length === 0;\nif (plan.wantPublish && plan.state !== 'draft') plan.warnings.push('publish requested but the listing is already ' + plan.state);\nif (plan.wantPublish && !cfg.dryRun && !publishNow && plan.state === 'draft') errors.push('not published: needs 13 tags, all photos and no errors');\nreturn [{ json: { publishNow, errors, imagesOnEtsy: onEtsy } }];"
+      },
+      "id": "71a24000-f1ae-4400-97cb-461060fa14f9",
+      "name": "Finish",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c91a82fe-d79a-4227-ac32-3ba4c0945532",
+              "leftValue": "={{ $json.publishNow === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "737967a9-976f-4c33-be2c-a551e730ad52",
+      "name": "Publish?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2368,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Pick Row').first().json.listingId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {},
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ state: 'active' }) }}"
+      },
+      "id": "351a0d20-9966-40d9-81e5-2e4ac6e21bcd",
+      "name": "Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        128
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nconst f = $('Finish').first().json;\nconst tryGet = n => { try { return $(n).first().json; } catch (e) { return null; } };\nconst pub = tryGet('Publish');\nconst errors = f.errors.slice();\nconst published = !!(f.publishNow && pub && !pub.error && pub.state === 'active');\nif (f.publishNow && !published) errors.push('publish: ' + (pub && pub.error ? JSON.stringify(pub.error).slice(0, 200) : 'did not become active'));\n// the status word follows the real state: a draft is draft (or draft_with_errors while there are errors), our listings that are live are published, old listings keep their word (live)\nlet status = p.sheetStatus;\nif (published) status = 'published';\nelse if (plan.state === 'draft') status = errors.length ? 'draft_with_errors' : 'draft';\nelse if (plan.state === 'active' && (!status || status === 'draft' || status === 'draft_with_errors')) status = 'published';\nconst vals = { etsystatus: status, etsyerror: errors.join(' | '), etsyimagecount: f.imagesOnEtsy, etsysyncedat: new Date().toISOString(), etsyfieldstoupdate: errors.length ? p.fields.join(', ') : '', etsyreadytopost: 'no' };\nif (!errors.length) { vals.etsypricecad = p.priceCad; vals.etsycategoryid = p.taxonomyId; }\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { tab: p.tab, sku: p.sku, row: p.row, listingId: p.listingId, fields: p.fields, changes: plan.changes, dryRun: !!cfg.dryRun, published, status, errors, warnings: plan.warnings || [] }, doWrite: cfg.dryRun !== true } }];"
+      },
+      "id": "3870fcd5-abb2-4498-85df-449803c37fb6",
+      "name": "Build Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4d7d715d-4a75-4af0-b174-159463a31696",
+              "leftValue": "={{ $json.doWrite === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "130770ab-7d59-4dab-a111-94f32ced3ad0",
+      "name": "Write to sheet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2912,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "7588f533-d340-4288-8c88-07b30ccbdda5",
+      "name": "Write Back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2848,
+        672
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $('Build Write').first().json.summary;\nreturn [{ json: { ok: s.errors.length === 0, ...s } }];"
+      },
+      "id": "be6aad66-d292-492e-aae3-03527d1f3a4f",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3376,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fff6ef3e-484a-4240-aed7-2fe103726009",
+              "leftValue": "={{ $('Plan').first().json.replaces.length > 0 && $('Plan').first().json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5af3d42b-25e7-497a-8866-f272035bb2e9",
+      "name": "Photos to replace?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1632,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Plan').first().json.replaces.map(x => ({ json: x }));"
+      },
+      "id": "bae329f5-15aa-4ef5-b32a-85f5eac4f4df",
+      "name": "Prep Replace",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 300
+            }
+          }
+        }
+      },
+      "id": "2fa7c206-6bc8-4a48-88b7-e668daeb2875",
+      "name": "Download Replacement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1744,
+        976
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "method": "POST",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $('Pick Row').first().json.listingId }}/images",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "rank",
+              "value": "={{ $('Prep Replace').all()[$itemIndex].json.rank }}"
+            },
+            {
+              "name": "overwrite",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 4000
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        }
+      },
+      "id": "a7fe4aa7-77f4-40a8-b8ff-66754524f0dd",
+      "name": "Replace Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        976
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst prep = $('Prep Replace').all().map(i => i.json);\nconst failed = [];\n$input.all().forEach((i, k) => { const j = i.json; if (j.error || !j.listing_image_id) failed.push(prep[k].label + ': ' + friendly(j.error || j)); });\nreturn [{ json: { replaced: prep.length - failed.length, failed } }];"
+      },
+      "id": "3362c2d3-8f5c-4f8b-a95e-cf9e20f23376",
+      "name": "Collect Replace",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        976
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by batch": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tab": {
+      "main": [
+        [
+          {
+            "node": "Pick Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Row": {
+      "main": [
+        [
+          {
+            "node": "Can update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can update?": {
+      "main": [
+        [
+          {
+            "node": "Get Listing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report (no write)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Listing": {
+      "main": [
+        [
+          {
+            "node": "Get Inventory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Inventory": {
+      "main": [
+        [
+          {
+            "node": "Get Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Properties": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Plan ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan ok?": {
+      "main": [
+        [
+          {
+            "node": "Listing fields to change?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Plan Problem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listing fields to change?": {
+      "main": [
+        [
+          {
+            "node": "Update Listing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Properties to set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Listing": {
+      "main": [
+        [
+          {
+            "node": "Properties to set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Properties to set?": {
+      "main": [
+        [
+          {
+            "node": "Prep Properties",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Price or SKU to set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Properties": {
+      "main": [
+        [
+          {
+            "node": "Set Property",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Property": {
+      "main": [
+        [
+          {
+            "node": "Collect Props",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Props": {
+      "main": [
+        [
+          {
+            "node": "Price or SKU to set?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Price or SKU to set?": {
+      "main": [
+        [
+          {
+            "node": "Update Inventory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Images to add?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inventory": {
+      "main": [
+        [
+          {
+            "node": "Images to add?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Images to add?": {
+      "main": [
+        [
+          {
+            "node": "Prep Images",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Photos to replace?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Images": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image": {
+      "main": [
+        [
+          {
+            "node": "Collect Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Uploads": {
+      "main": [
+        [
+          {
+            "node": "Photos to replace?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Images": {
+      "main": [
+        [
+          {
+            "node": "Finish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish": {
+      "main": [
+        [
+          {
+            "node": "Publish?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish?": {
+      "main": [
+        [
+          {
+            "node": "Publish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish": {
+      "main": [
+        [
+          {
+            "node": "Build Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Write": {
+      "main": [
+        [
+          {
+            "node": "Write to sheet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to sheet?": {
+      "main": [
+        [
+          {
+            "node": "Write Back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Photos to replace?": {
+      "main": [
+        [
+          {
+            "node": "Prep Replace",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verify Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Replace": {
+      "main": [
+        [
+          {
+            "node": "Download Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Replacement": {
+      "main": [
+        [
+          {
+            "node": "Replace Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Photo": {
+      "main": [
+        [
+          {
+            "node": "Collect Replace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Replace": {
+      "main": [
+        [
+          {
+            "node": "Verify Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [],
+  "id": "yKcukUhxxiWPlUQx",
+  "versionId": "c301f798-8172-477a-8f5c-c5ae70f94e2a",
+  "meta": {
+    "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
+  },
+  "nodeGroups": []
+}
