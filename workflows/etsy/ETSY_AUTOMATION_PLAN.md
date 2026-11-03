@@ -1,11 +1,17 @@
 # Etsy listing automation: discussion, decisions and plan
 
-Status as of 2026-10-30: **planning done, building has started.** Built so far:
+Status as of 2026-11-03: **create, tags and update are built and tested on real listings.** Workflows (all in this folder, real Etsy key only in n8n, the files hold a placeholder):
 
-- `etsy_mark_existing_listings.json`: adds the 13 green Etsy columns to every tab and marks the 853 listings already on Etsy (run for real on the original sheet).
+- `etsy_mark_existing_listings.json`: adds the 13 green Etsy columns to every tab and marks the 853 listings already on Etsy (status `live`, `inactive`, ...).
+- `etsy_create_draft_listing.json` + `etsy_create_batch.json`: create a draft from a row flagged `Etsy_ready_to_post = yes` (all categories, sizes, craft type, SKU, photos with the CAD drawing once at the end, duplicate photos skipped). Afterwards the row gets its listing id and status and `Etsy_ready_to_post` is set to `no`. Batch: `tabs` = `ALL` or a list, `perTab` rows per run, dry run first.
+- `etsy_generate_tags.json`: AI tags (13, validated) written to `Tags_Etsy`; also fills rows that are still drafts, never live listings.
+- `etsy_update_listing.json` + `etsy_update_batch.json`: update an existing listing. A row is updated only when **`Etsy_fields_to_update`** is filled (any status, no mode switch). Tokens, comma separated: `title`, `description`, `tags`, `price`, `category`, `properties` (sizes, craft type, material), `sku`, `images` (adds missing photos at the end, never deletes), `IMAGE URL1` to `IMAGE URL11` (replaces the photo at that position; blocked when the photo count on Etsy differs from the sheet), `publish` (draft only, needs 13 tags, all photos, no errors), `all` (everything except publish and photo replacement). Dry run (the default) lists each product and every change as old -> new. A real run clears the flag when it succeeds, sets `Etsy_ready_to_post` to `no`, and keeps the status word true to the real state (`draft`, `draft_with_errors`, `published`; old listings keep `live`). Listings with variations are never touched for price or SKU.
+- Tested live: tags on a live listing (Statue XHRW186), photo replace and adding a missing CAD drawing on drafts (Moulding LSDJX006, Vanity LSYSG44). Publishing by workflow is not tested yet.
 - `Price In CAD` is an ARRAYFORMULA at rate 1.39 on all 30 tabs (Bilal set the rate and owns the QA).
-- 2,618 rows were flagged `Etsy_ready_to_post = yes` (title, description, CAD price and photos present, on Shopify, not a duplicate SKU). Later products are flagged by hand by the team.
-- `etsy_create_draft_listing.json`: creates one draft listing from a flagged row (dry run first, draft only, Bathtub, Sink, Marble+ Basin and Fireplace only). First live test on LSYP271 created the draft and all properties; photo uploads needed pacing and a second pass (added). Tags AI step and batches are not built yet.
+- 2,618 rows were flagged `Etsy_ready_to_post = yes` on 2026-10-30. Six drafts were created on 2026-11-02 (Moulding, StoneMosaicTile, Vanity, Table, Fountain, Statue); the Statue was published by hand.
+- Renewal: drafts default to Manual, existing listings auto-renew; decision for now is to keep Manual.
+
+Still to do: tags for the other five drafts and their publish test; first real update batch; schedules (tags 1 to 7 am, create batch, update batch); weekly store check; 2026Instock needs a title-based category rule. Parked: owner tab for the 29 duplicate SKUs, the 16 price differences and the LSYP349 draft price, the Etsy-only listings LSBLD586 and LSBLD475, Fountain's missing USD prices, dead CAD and photo links in the sheet that block image uploads (Fountain CADs, Stairs LSLT046 to 054, DoorSurround LSMT317, Moulding LSDJX178, StoneMosaicTile LSMSK125 and 128).
 
 The sections below are the original plan and decisions.
 
@@ -292,7 +298,7 @@ Read 855 Etsy listings (852 active, 1 draft, 2 inactive) against 8,770 sheet row
 3. **Photos:** check on a few products that the sheet's image links point to the logo versions.
 4. **Description dimensions line:** confirmed as both cm and inches; confirm the exact wording with the person who lists.
 5. **Categories:** the Low-confidence rows in section 7 need research.
-6. **Weekly price check:** decide who acts when the exchange rate drifts (the sheet's formula uses 1.4 now).
+6. **Weekly price check:** decide who acts when the exchange rate drifts (the sheet's formula uses 1.39 now).
 7. **Etsy status columns in the sheet:** propose adding Etsy_ready, Etsy_listing_id, Etsy_url, Etsy_status and Etsy_error to each tab (sheet changes need confirmation first). Ready_to_post cannot be reused, because the Shopify run resets it.
 8. **Scale:** the sheet has about 8,770 rows against 852 listings on Etsy. Decide which rows go first (for example Ready_to_post rows, about 1,139) before any bulk create; every listing costs an Etsy fee.
 9. **Bench tab and duplicate SKUs:** ask Luna's team why Bench holds medallion SKUs, and decide which tab owns each of the 29 duplicated SKUs.
