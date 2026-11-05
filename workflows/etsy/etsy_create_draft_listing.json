@@ -2,24 +2,24 @@
   "name": "Etsy - Create draft listing (one row, called by the batch)",
   "nodes": [
     {
-      "id": "ef672561-1eb8-4f4c-8d04-cab70d365934",
+      "id": "d2014556-976a-4ca6-b895-bce59c8d525b",
       "name": "Run",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        9296,
-        768
+        22816,
+        -16
       ],
       "parameters": {}
     },
     {
-      "id": "8fb6756c-a638-42d9-8169-6003702e65c6",
+      "id": "424ab8c6-b9b8-4442-85b0-7b2c68144c61",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        9504,
-        768
+        23024,
+        -16
       ],
       "parameters": {
         "assignments": {
@@ -77,6 +77,12 @@
               "name": "requireFullTags",
               "type": "boolean",
               "value": "={{ $json.requireFullTags === undefined ? false : $json.requireFullTags }}"
+            },
+            {
+              "id": "k_rp",
+              "name": "returnPolicyId",
+              "type": "string",
+              "value": "={{ $json.returnPolicyId || '' }}"
             }
           ]
         },
@@ -84,13 +90,13 @@
       }
     },
     {
-      "id": "29c5dc42-ad3d-4f2a-b337-20bdd9ab72f1",
+      "id": "1e558379-934d-47e6-87c1-95176466daeb",
       "name": "Read Tab",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        9696,
-        768
+        23216,
+        -16
       ],
       "parameters": {
         "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.docId }}/values/{{ encodeURIComponent(\"'\" + $('Config').first().json.tab + \"'!2:1500\") }}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE",
@@ -107,26 +113,26 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "395e4762-0a6d-4818-8c5c-698fa6621cae",
+      "id": "5a2dfceb-2d14-470c-baa4-39fe92257bb3",
       "name": "Pick Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        9904,
-        768
+        23696,
+        -16
       ],
       "parameters": {
-        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nconst apiKey = String(cfg.apiKey || '').trim();\nif (!/^[^\\s:]+:[^\\s:]+$/.test(apiKey) || /PASTE|SHARED_SECRET_HERE/i.test(apiKey)) return out({ ok: false, problems: ['Config apiKey is not set: it must be keystring:shared_secret (paste it in n8n only, never in the repo)'], warnings: [] });\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Etsy category per tab, confirmed with the read-only category check (2026-11). 'table' = chosen from the title.\nconst TAB_CAT = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219, Vanity: 903, 'Marble+ ConsoleTable': 11355, Bench: 12369, Lamppost: 12410, Statue: 2869, Animal: 2869, Carving: 129, Table: 'table',\n  Moulding: 784, DoorSurround: 784, WindowSurround: 784, OutdoorCornice: 784, Columns: 784, Balustrade: 784, Stairs: 784, Wainscoting: 784, 'Wall-Coverings': 784, MarbleRangeHood: 784,\n  StoneMosaicTile: 781, MarbleMedallion: 781, MarbleSlab: 781, BookMatchedSlabs: 781, Fountain: 12240, Planter: 6061, 'Exterior-Wall-Decoration': 2784 };\n// mat = material property id (marble is value 171 in every list). dims: 'whd' = Width/Height/Depth, 'wl' = Width/Length, '' = none (size goes in the description). craft = required Craft type value.\nconst M1 = 148789511893;\nconst CAT = { 11353: { mat: 570246212865, dims: 'whd' }, 12219: { mat: M1, dims: 'whd' }, 903: { mat: M1, dims: 'whd' }, 11355: { mat: M1, dims: 'whd' }, 12369: { mat: M1, dims: 'whd' }, 12410: { mat: M1, dims: 'whd' }, 2869: { mat: M1, dims: 'whd' },\n  129: { mat: 570246213483, dims: 'whd' }, 977: { mat: M1, dims: 'whd' }, 12371: { mat: M1, dims: 'whd' }, 12372: { mat: M1, dims: 'whd' },\n  784: { mat: M1, dims: 'whd', craft: 560 }, 781: { mat: M1, dims: 'wl', craft: 560 },\n  12240: { mat: M1, dims: '' }, 6061: { mat: M1, dims: '' }, 2784: { mat: M1, dims: '' } };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037, length: 47626759838, craft: 47626759760 };\nconst problems = [], warnings = [];\nconst baseTax = TAB_CAT[cfg.tab];\nif (!baseTax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no Etsy category set up (set up: ' + Object.keys(TAB_CAT).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nlet tax = baseTax;\nif (tax === 'table') { const tt = (str(r, 'Title_Etsy') + ' ' + str(r, 'Title_Shopify')).toLowerCase(); if (/coffee|cocktail/.test(tt)) tax = 12371; else if (/end table|side table|accent table|bedside|nightstand/.test(tt)) tax = 12372; else { tax = 977; if (!/dining|kitchen|dinner|conference/.test(tt)) warnings.push('table type not clear from the title: used Kitchen & Dining Tables'); } }\nconst cat = CAT[tax];\n// Which sheet size fills which Etsy field (first one with a value wins). Anything else goes into a line in the description.\nconst SRC = { Moulding: { width: ['Length'], height: ['Height'], depth: ['Thickness'] }, OutdoorCornice: { width: ['Length'], height: ['Height'], depth: ['Projection'] },\n  Wainscoting: { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] }, 'Wall-Coverings': { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] },\n  Balustrade: { width: ['Width', 'Handrail Width', 'Base/Plinth Width'], height: ['Overall Height', 'Height'], depth: ['Depth', 'Baluster Diameter'] }, Stairs: { width: ['Width'], height: ['Height'] } };\nconst DEFAULT_SRC = cat.dims === 'wl' ? { width: ['Width'], length: ['Length', 'Depth'] } : { width: ['Width'], height: ['Height'], depth: ['Depth', 'Length'] };\nconst src = cat.dims === '' ? {} : (cat.dims === 'whd' && SRC[cfg.tab] ? SRC[cfg.tab] : DEFAULT_SRC);\nconst usedFields = new Set(), mapped = {};\nObject.entries(src).forEach(([k, fields]) => { mapped[k] = 0; for (const fl of fields) { const v = num(get(r, fl + ' Inch')); if (v > 0) { mapped[k] = v; usedFields.add(fl); break; } } });\nconst MEAS = ['Length', 'Width', 'Height', 'Depth', 'Thickness', 'Projection', 'Diameter', 'Inner Opening Diameter', 'Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'];\nconst measParts = skipUsed => { const parts = []; MEAS.forEach(L => { if (skipUsed && usedFields.has(L)) return; const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); if (cm > 0 || inch > 0) parts.push(L.toLowerCase() + ' ' + (cm > 0 ? Math.round(cm * 10) / 10 + ' cm' : '') + (cm > 0 && inch > 0 ? ' / ' : '') + (inch > 0 ? Math.round(inch * 100) / 100 + ' in' : '')); }); return parts; };\nconst WRITE = ['Etsy_listing_id', 'Etsy_url', 'Etsy_admin_url', 'Etsy_status', 'Etsy_error', 'Etsy_created_at', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_ready_to_post'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nif (str(r, 'Etsy_listing_id')) problems.push('row already has Etsy_listing_id ' + str(r, 'Etsy_listing_id'));\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\ndescription = description.replace(/\\*\\*|__/g, '').replace(/^#{1,6}\\s+/gm, '');\n// Dimensions block (cm / inch) on top, only for categories where Etsy has no size fields (as in the client's video); then the text, then the product number.\nif (description && cat.dims === '' && !/^\\s*dimensions/i.test(description)) {\n  const WHD = ['Width', 'Height', 'Depth'], LWT = ['Length', 'Width', 'Thickness'];\n  const DIM_LABELS = { Fireplace: WHD, MarbleRangeHood: WHD, Carving: WHD, WindowSurround: WHD, Moulding: ['Length', 'Height', 'Thickness'], OutdoorCornice: ['Length', 'Height', 'Projection'],\n    Stairs: ['Width', 'Height', 'Diameter', 'Inner Opening Diameter'], Balustrade: ['Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'],\n    BookMatchedSlabs: ['Length', 'Width'], MarbleSlab: LWT, 'Wall-Coverings': LWT, StoneMosaicTile: LWT, MarbleMedallion: LWT, 'Exterior-Wall-Decoration': LWT, Wainscoting: LWT };\n  const labels = DIM_LABELS[cfg.tab] || ['Length', 'Width', 'Height'];\n  const lines = [];\n  labels.forEach(L => { const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); const bits = []; if (cm > 0) bits.push(String(Math.round(cm * 10) / 10)); if (inch > 0) bits.push((Math.round(inch * 100) / 100).toFixed(2)); if (bits.length) lines.push(L + ': ' + bits.join(' / ')); });\n  if (lines.length) description = 'Dimensions (cm/Inch)\\n' + lines.join('\\n') + '\\n\\n' + description; else warnings.push('no sizes for the Dimensions block');\n}\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\n// Same rule as the Shopify sync: two photos are the same only when the URLs are identical after removing Shopify's v= cache-buster. No filename guessing.\nconst normUrl = u => { const s = String(u || ''); const q = s.indexOf('?'); if (q === -1) return s; const base = s.slice(0, q); const kept = s.slice(q + 1).split('&').filter(p => p && !/^v=/.test(p)).join('&'); return kept ? base + '?' + kept : base; };\nconst cad = str(r, 'IMAGE URL11');\nconst cadKey = /^https?:/i.test(cad) ? normUrl(cad) : '';\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) {\n  const u = str(r, 'IMAGE URL' + k);\n  if (!/^https?:/i.test(u)) continue;\n  const key = normUrl(u);\n  if (cadKey && key === cadKey) { warnings.push('IMAGE URL' + k + ' is the same file as the CAD drawing: kept once, at the end'); continue; }\n  if (seen.has(key)) { warnings.push('IMAGE URL' + k + ' repeats an earlier photo: skipped'); continue; }\n  seen.add(key); imgs.push({ url: u, label: 'IMAGE URL' + k });\n}\nif (cadKey) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) { const msg = 'only ' + tags.length + ' tags (Etsy allows 13); run the tag generator first'; if (cfg.requireFullTags === true) problems.push(msg); else warnings.push(msg); }\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst properties = [{ id: cat.mat, name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nif (cat.craft) properties.push({ id: PROP.craft, name: 'craft type', body: { value_ids: [cat.craft], values: [] } });\nconst dv = (v, name) => { if (v > 0) properties.push({ id: PROP[name], name, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + name + ' (inches)'); };\nif (cat.dims === 'whd') { dv(mapped.width, 'width'); dv(mapped.height, 'height'); dv(mapped.depth, 'depth'); }\nif (cat.dims === 'wl') { dv(mapped.width, 'width'); dv(mapped.length, 'length'); }\nreturn out({ ok: problems.length === 0, problems, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
+        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $('Read Tab').first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nconst apiKey = String(cfg.apiKey || '').trim();\nif (!/^[^\\s:]+:[^\\s:]+$/.test(apiKey) || /PASTE|SHARED_SECRET_HERE/i.test(apiKey)) return out({ ok: false, problems: ['Config apiKey is not set: it must be keystring:shared_secret (paste it in n8n only, never in the repo)'], warnings: [] });\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Etsy category per tab, confirmed with the read-only category check (2026-11). 'table' = chosen from the title.\nconst TAB_CAT = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219, Vanity: 903, 'Marble+ ConsoleTable': 11355, Bench: 12369, Lamppost: 12410, Statue: 2869, Animal: 2869, Carving: 129, Table: 'table',\n  Moulding: 784, DoorSurround: 784, WindowSurround: 784, OutdoorCornice: 784, Columns: 784, Balustrade: 784, Stairs: 784, Wainscoting: 784, 'Wall-Coverings': 784, MarbleRangeHood: 784,\n  StoneMosaicTile: 781, MarbleMedallion: 781, MarbleSlab: 781, BookMatchedSlabs: 781, Fountain: 12240, Planter: 6061, 'Exterior-Wall-Decoration': 2784 };\n// mat = material property id (marble is value 171 in every list). dims: 'whd' = Width/Height/Depth, 'wl' = Width/Length, '' = none (size goes in the description). craft = required Craft type value.\nconst M1 = 148789511893;\nconst CAT = { 11353: { mat: 570246212865, dims: 'whd' }, 12219: { mat: M1, dims: 'whd' }, 903: { mat: M1, dims: 'whd' }, 11355: { mat: M1, dims: 'whd' }, 12369: { mat: M1, dims: 'whd' }, 12410: { mat: M1, dims: 'whd' }, 2869: { mat: M1, dims: 'whd' },\n  129: { mat: 570246213483, dims: 'whd' }, 977: { mat: M1, dims: 'whd' }, 12371: { mat: M1, dims: 'whd' }, 12372: { mat: M1, dims: 'whd' },\n  784: { mat: M1, dims: 'whd', craft: 560 }, 781: { mat: M1, dims: 'wl', craft: 560 },\n  12240: { mat: M1, dims: '' }, 6061: { mat: M1, dims: '' }, 2784: { mat: M1, dims: '' } };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037, length: 47626759838, craft: 47626759760 };\nconst problems = [], warnings = [];\nconst baseTax = TAB_CAT[cfg.tab];\nif (!baseTax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no Etsy category set up (set up: ' + Object.keys(TAB_CAT).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nlet tax = baseTax;\nif (tax === 'table') { const tt = (str(r, 'Title_Etsy') + ' ' + str(r, 'Title_Shopify')).toLowerCase(); if (/coffee|cocktail/.test(tt)) tax = 12371; else if (/end table|side table|accent table|bedside|nightstand/.test(tt)) tax = 12372; else { tax = 977; if (!/dining|kitchen|dinner|conference/.test(tt)) warnings.push('table type not clear from the title: used Kitchen & Dining Tables'); } }\nconst cat = CAT[tax];\n// Which sheet size fills which Etsy field (first one with a value wins). Anything else goes into a line in the description.\nconst SRC = { Moulding: { width: ['Length'], height: ['Height'], depth: ['Thickness'] }, OutdoorCornice: { width: ['Length'], height: ['Height'], depth: ['Projection'] },\n  Wainscoting: { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] }, 'Wall-Coverings': { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] },\n  Balustrade: { width: ['Width', 'Handrail Width', 'Base/Plinth Width'], height: ['Overall Height', 'Height'], depth: ['Depth', 'Baluster Diameter'] }, Stairs: { width: ['Width'], height: ['Height'] } };\nconst DEFAULT_SRC = cat.dims === 'wl' ? { width: ['Width'], length: ['Length', 'Depth'] } : { width: ['Width'], height: ['Height'], depth: ['Depth', 'Length'] };\nconst src = cat.dims === '' ? {} : (cat.dims === 'whd' && SRC[cfg.tab] ? SRC[cfg.tab] : DEFAULT_SRC);\nconst usedFields = new Set(), mapped = {};\nObject.entries(src).forEach(([k, fields]) => { mapped[k] = 0; for (const fl of fields) { const v = num(get(r, fl + ' Inch')); if (v > 0) { mapped[k] = v; usedFields.add(fl); break; } } });\nconst MEAS = ['Length', 'Width', 'Height', 'Depth', 'Thickness', 'Projection', 'Diameter', 'Inner Opening Diameter', 'Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'];\nconst measParts = skipUsed => { const parts = []; MEAS.forEach(L => { if (skipUsed && usedFields.has(L)) return; const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); if (cm > 0 || inch > 0) parts.push(L.toLowerCase() + ' ' + (cm > 0 ? Math.round(cm * 10) / 10 + ' cm' : '') + (cm > 0 && inch > 0 ? ' / ' : '') + (inch > 0 ? Math.round(inch * 100) / 100 + ' in' : '')); }); return parts; };\nconst WRITE = ['Etsy_listing_id', 'Etsy_url', 'Etsy_admin_url', 'Etsy_status', 'Etsy_error', 'Etsy_created_at', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_ready_to_post'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nif (str(r, 'Etsy_listing_id')) problems.push('row already has Etsy_listing_id ' + str(r, 'Etsy_listing_id'));\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\ndescription = description.replace(/\\*\\*|__/g, '').replace(/^#{1,6}\\s+/gm, '');\n// Dimensions block (cm / inch) on top, only for categories where Etsy has no size fields (as in the client's video); then the text, then the product number.\nif (description && cat.dims === '' && !/^\\s*dimensions/i.test(description)) {\n  const WHD = ['Width', 'Height', 'Depth'], LWT = ['Length', 'Width', 'Thickness'];\n  const DIM_LABELS = { Fireplace: WHD, MarbleRangeHood: WHD, Carving: WHD, WindowSurround: WHD, Moulding: ['Length', 'Height', 'Thickness'], OutdoorCornice: ['Length', 'Height', 'Projection'],\n    Stairs: ['Width', 'Height', 'Diameter', 'Inner Opening Diameter'], Balustrade: ['Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'],\n    BookMatchedSlabs: ['Length', 'Width'], MarbleSlab: LWT, 'Wall-Coverings': LWT, StoneMosaicTile: LWT, MarbleMedallion: LWT, 'Exterior-Wall-Decoration': LWT, Wainscoting: LWT };\n  const labels = DIM_LABELS[cfg.tab] || ['Length', 'Width', 'Height'];\n  const lines = [];\n  labels.forEach(L => { const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); const bits = []; if (cm > 0) bits.push(String(Math.round(cm * 10) / 10)); if (inch > 0) bits.push((Math.round(inch * 100) / 100).toFixed(2)); if (bits.length) lines.push(L + ': ' + bits.join(' / ')); });\n  if (lines.length) description = 'Dimensions (cm/Inch)\\n' + lines.join('\\n') + '\\n\\n' + description; else warnings.push('no sizes for the Dimensions block');\n}\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\n// Same rule as the Shopify sync: two photos are the same only when the URLs are identical after removing Shopify's v= cache-buster. No filename guessing.\nconst normUrl = u => { const s = String(u || ''); const q = s.indexOf('?'); if (q === -1) return s; const base = s.slice(0, q); const kept = s.slice(q + 1).split('&').filter(p => p && !/^v=/.test(p)).join('&'); return kept ? base + '?' + kept : base; };\nconst cad = str(r, 'IMAGE URL11');\nconst cadKey = /^https?:/i.test(cad) ? normUrl(cad) : '';\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) {\n  const u = str(r, 'IMAGE URL' + k);\n  if (!/^https?:/i.test(u)) continue;\n  const key = normUrl(u);\n  if (cadKey && key === cadKey) { warnings.push('IMAGE URL' + k + ' is the same file as the CAD drawing: kept once, at the end'); continue; }\n  if (seen.has(key)) { warnings.push('IMAGE URL' + k + ' repeats an earlier photo: skipped'); continue; }\n  seen.add(key); imgs.push({ url: u, label: 'IMAGE URL' + k });\n}\nif (cadKey) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) { const msg = 'only ' + tags.length + ' tags (Etsy allows 13); run the tag generator first'; if (cfg.requireFullTags === true) problems.push(msg); else warnings.push(msg); }\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst pickPolicy = (cfgId, RP) => { const id = String(cfgId || '').trim(); if (/^\\d+$/.test(id)) return { id: Number(id) }; const list = RP && Array.isArray(RP.results) ? RP.results : []; const ok = list.filter(x => x.accepts_returns === true && Number(x.return_deadline) === 30); if (ok.length === 1) return { id: Number(ok[0].return_policy_id) }; return { error: RP && RP.error ? 'could not read the shop return policies (' + JSON.stringify(RP.error).slice(0, 120) + ')' : ok.length + ' return policies with returns accepted and 30 days found (need exactly 1); set returnPolicyId in Config' }; };\n{ let RP = null; try { RP = $('Get Return Policies').first().json; } catch (e) { RP = null; } const pol = pickPolicy(cfg.returnPolicyId, RP); if (pol.id) listing.return_policy_id = pol.id; else warnings.push('no return policy set (' + pol.error + '): the listing is created without one'); }\n\nconst properties = [{ id: cat.mat, name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nif (cat.craft) properties.push({ id: PROP.craft, name: 'craft type', body: { value_ids: [cat.craft], values: [] } });\nconst dv = (v, name) => { if (v > 0) properties.push({ id: PROP[name], name, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + name + ' (inches)'); };\nif (cat.dims === 'whd') { dv(mapped.width, 'width'); dv(mapped.height, 'height'); dv(mapped.depth, 'depth'); }\nif (cat.dims === 'wl') { dv(mapped.width, 'width'); dv(mapped.length, 'length'); }\nreturn out({ ok: problems.length === 0, problems, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
       }
     },
     {
-      "id": "080267e6-59a7-4d18-b8e2-3f2814b28842",
+      "id": "da43c559-2489-43a3-bb98-0b83c578d3fd",
       "name": "Can create?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        10096,
-        768
+        23888,
+        -16
       ],
       "parameters": {
         "conditions": {
@@ -154,26 +160,26 @@
       }
     },
     {
-      "id": "4a8a06ff-d431-409c-88b2-f2463cf7b550",
+      "id": "2201f8fa-c595-47e1-8404-f29f5067e41a",
       "name": "Report (no write)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        10096,
-        560
+        23888,
+        -224
       ],
       "parameters": {
         "jsCode": "const p = $input.first().json;\nconst cfg = $('Config').first().json;\nconst { listing, ...rest } = p;\nconst preview = listing ? { ...listing, description: String(listing.description || '').slice(0, 300) + (String(listing.description || '').length > 300 ? ' ...' : '') } : null;\nreturn [{ json: { dryRun: cfg.dryRun !== false, message: !p.ok ? 'NOT READY: fix the problems below. Nothing was sent to Etsy.' : (cfg.dryRun !== false ? 'DRY RUN: nothing was sent to Etsy. Set dryRun to false in Config to create this draft.' : ''), ...rest, listingPreview: preview } }];"
       }
     },
     {
-      "id": "c196c82e-5990-4ec1-8edb-6a800c7ac54c",
+      "id": "c3fd1a35-4b84-4b14-b5e6-684fa82db959",
       "name": "Create Draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10336,
-        752
+        24128,
+        -32
       ],
       "parameters": {
         "authentication": "genericCredentialType",
@@ -203,13 +209,13 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "ea85aa9d-aa80-4a5b-96a8-c4634f7b71ca",
+      "id": "3efe713f-ced6-4510-9da1-8101e753e5ea",
       "name": "Created OK?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        10528,
-        752
+        24320,
+        -32
       ],
       "parameters": {
         "conditions": {
@@ -237,26 +243,26 @@
       }
     },
     {
-      "id": "580a76e1-0005-416a-9865-bb4af75726a2",
+      "id": "94178ea3-502d-4ab4-9a85-e5dcc2d3bbfa",
       "name": "Prep Properties",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        10752,
-        736
+        24544,
+        -48
       ],
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst c = $input.first().json;\nreturn p.properties.map(x => ({ json: { listing_id: c.listing_id, property_id: x.id, name: x.name, body: x.body } }));"
       }
     },
     {
-      "id": "908eee01-90f8-415f-9282-f84d9b8a824b",
+      "id": "6c2edb9a-c6bd-4c8d-b9ce-732f351e0ded",
       "name": "Set Property",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10944,
-        736
+        24736,
+        -48
       ],
       "parameters": {
         "authentication": "genericCredentialType",
@@ -293,26 +299,26 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "ab2b20b7-61aa-41d2-a847-4de5417f6335",
+      "id": "da97d34c-60f8-482f-94b1-8ce7642a82bc",
       "name": "Prep Images",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11552,
-        736
+        25344,
+        -48
       ],
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst lid = $('Prep Properties').first().json.listing_id;\nconst names = $('Prep Properties').all().map(i => i.json.name);\nconst errText = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nconst propErrors = $('Set Property').all().map((i, k) => i.json.error ? names[k] + ': ' + errText(i.json.error) : null).filter(Boolean);\nconst skuRes = $input.first().json;\nif (skuRes.error) propErrors.push('sku: ' + errText(skuRes.error));\nreturn p.images.map(x => ({ json: { listing_id: lid, url: x.url, rank: x.rank, label: x.label, propErrors } }));"
       }
     },
     {
-      "id": "cf30fb06-eaec-41f4-b0d2-ed425c3a3f09",
+      "id": "942052de-225c-4ecd-9c80-7211b5e852f2",
       "name": "Download Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10352,
-        1056
+        24144,
+        272
       ],
       "parameters": {
         "url": "={{ $json.url }}",
@@ -334,13 +340,13 @@
       "alwaysOutputData": true
     },
     {
-      "id": "851dae88-afef-4ae9-9e94-45c4621de665",
+      "id": "05640245-5f20-4736-9b71-475389439cb8",
       "name": "Upload Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        10560,
-        1056
+        24352,
+        272
       ],
       "parameters": {
         "authentication": "genericCredentialType",
@@ -392,26 +398,26 @@
       "waitBetweenTries": 5000
     },
     {
-      "id": "697ecf63-665b-428d-b4da-f120ee5cc9e5",
+      "id": "99dc66c0-62f2-4aff-a698-1a04b25779d5",
       "name": "Collect Uploads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        10752,
-        1056
+        24544,
+        272
       ],
       "parameters": {
         "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst items = $input.all().map(i => i.json);\nconst prep = $('Prep Images').all().map(i => i.json);\nconst uploaded = items.filter(x => x.listing_image_id).length;\nconst bad = items.map((x, k) => x.error ? { label: prep[k].label, rank: prep[k].rank, url: prep[k].url, error: friendly(x.error) } : null).filter(Boolean);\nreturn [{ json: { listing_id: prep[0].listing_id, uploaded, failedItems: bad, failed: bad.map(b => b.label + ': ' + b.error), propErrors: prep[0].propErrors } }];"
       }
     },
     {
-      "id": "55ff32fc-e8b6-4762-8803-a46c1016e624",
+      "id": "05adcf3c-3ae6-4cd5-8bb5-f8da171d7589",
       "name": "Verify Images",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        11504,
-        1296
+        25296,
+        512
       ],
       "parameters": {
         "url": "=https://openapi.etsy.com/v3/application/listings/{{ $json.listing_id }}/images",
@@ -437,39 +443,39 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "57618303-6ba6-4b39-93ed-9bed1d5b8411",
+      "id": "30232888-b07d-48fe-9b76-aa1fc83c9d84",
       "name": "Build Write",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11712,
-        1296
+        25504,
+        512
       ],
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst created = $('Create Draft').first().json;\nconst coll = $('Collect Uploads').first().json;\nlet retry = null; try { retry = $('Collect Retry').first().json; } catch (e) { retry = null; }\nconst failedFinal = retry ? retry.failedAfterRetry : coll.failed;\nconst v = $input.first().json;\nconst results = (v.results || []).slice().sort((a, b) => a.rank - b.rank);\nconst errors = [];\nif (coll.propErrors.length) errors.push('properties: ' + coll.propErrors.join('; '));\nconst notes = retry && retry.retried ? ['retried ' + retry.retried + ' image(s) in a second pass'] : [];\nif (failedFinal.length) errors.push('images: ' + failedFinal.join('; '));\nif (results.length !== p.expectedImages) errors.push('images on Etsy ' + results.length + ' of ' + p.expectedImages);\nconst ranksOk = results.every((x, i) => x.rank === i + 1);\nif (!ranksOk) errors.push('image ranks are not 1..n');\nconst iso = ts => ts ? new Date(ts * 1000).toISOString() : '';\nconst vals = { etsylistingid: created.listing_id, etsyurl: created.url || '', etsyadminurl: 'https://www.etsy.com/your/shops/me/listing-editor/edit/' + created.listing_id, etsystatus: errors.length ? 'draft_with_errors' : 'draft', etsyerror: errors.join(' | '), etsycreatedat: iso(created.creation_timestamp || created.created_timestamp), etsypricecad: p.priceCad, etsycategoryid: p.taxonomyId, etsyimagecount: results.length, etsysyncedat: new Date().toISOString(), etsyreadytopost: 'no' };\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { sku: p.sku, tab: p.tab, row: p.row, listingId: created.listing_id, adminUrl: vals.etsyadminurl, status: vals.etsystatus, imagesOnEtsy: results.length, imagesExpected: p.expectedImages, errors, notes } } }];"
       }
     },
     {
-      "id": "2db3dfce-51e7-417d-ab43-77f7c3e30afa",
+      "id": "c4758bc8-6852-4e0d-aafc-d36597fde781",
       "name": "Create Failed",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        10512,
-        560
+        24304,
+        -224
       ],
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst c = $input.first().json;\nconst msg = (c.error ? (typeof c.error === 'string' ? c.error : JSON.stringify(c.error)) : JSON.stringify(c)).slice(0, 500);\nconst vals = { etsystatus: 'create_failed', etsyerror: msg, etsysyncedat: new Date().toISOString() };\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { sku: p.sku, tab: p.tab, row: p.row, status: 'create_failed', errors: [msg] } } }];"
       }
     },
     {
-      "id": "ab9b6619-be49-4c12-a01b-f7e7ca6ad088",
+      "id": "1875d79f-76f8-4d13-9f3f-562a8d8cddf9",
       "name": "Write Back",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        10944,
-        560
+        24736,
+        -224
       ],
       "parameters": {
         "method": "POST",
@@ -489,13 +495,13 @@
       }
     },
     {
-      "id": "2b3ffff1-ba62-4352-9994-d17678887ce1",
+      "id": "31415595-469d-42fd-a685-7bfc71acd7df",
       "name": "Final Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11248,
-        560
+        25040,
+        -224
       ],
       "parameters": {
         "jsCode": "const w = $input.first().json;\nlet s;\ntry { s = $('Build Write').first().json.summary; } catch (e) { s = $('Create Failed').first().json.summary; }\nreturn [{ json: { dryRun: false, ...s, sheetCellsUpdated: w.totalUpdatedCells || 0, sheetError: w.error || null } }];"
@@ -526,50 +532,50 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "4a9d3d7c-54de-4e05-8264-cc94100b8d13",
+      "id": "af16477c-7484-4bf2-a485-4bc0bf28a2eb",
       "name": "Need retry?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        11008,
-        1056
+        24800,
+        272
       ]
     },
     {
       "parameters": {
         "jsCode": "const c = $input.first().json;\nreturn c.failedItems.map(x => ({ json: { listing_id: c.listing_id, url: x.url, rank: x.rank, label: x.label } }));"
       },
-      "id": "290916eb-bdc7-4d82-9085-baafd82051b0",
+      "id": "680af505-8d75-4e8f-88f6-c01c7e57b197",
       "name": "Prep Retry",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11264,
-        1040
+        25056,
+        256
       ]
     },
     {
       "parameters": {
         "amount": 10
       },
-      "id": "43809587-ab0f-4447-a7c5-563e40558d9f",
+      "id": "adde2c97-d2ae-4a4e-8520-7cde78b598e3",
       "name": "Wait Before Retry",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        11456,
-        1040
+        25248,
+        256
       ],
       "webhookId": "6a7921b9-5abd-4376-9a94-66418f945526"
     },
     {
-      "id": "38cc427c-a154-434f-ab2f-a24315d06fee",
+      "id": "cfad5b71-2767-41d4-9937-a552318f5609",
       "name": "Download Retry",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        11648,
-        1040
+        25440,
+        256
       ],
       "parameters": {
         "url": "={{ $json.url }}",
@@ -591,13 +597,13 @@
       "alwaysOutputData": true
     },
     {
-      "id": "26a8059c-3610-4a6a-9b2c-2a6922272b2e",
+      "id": "00cc4f53-be3d-4e95-9ae1-00d9da64b06a",
       "name": "Upload Retry",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        11856,
-        1040
+        25648,
+        256
       ],
       "parameters": {
         "authentication": "genericCredentialType",
@@ -652,49 +658,49 @@
       "parameters": {
         "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst items = $input.all().map(i => i.json);\nconst prep = $('Prep Retry').all().map(i => i.json);\nconst base = $('Collect Uploads').first().json;\nconst failedAfterRetry = items.map((x, k) => x.error ? prep[k].label + ': ' + friendly(x.error) : null).filter(Boolean);\nreturn [{ json: { listing_id: base.listing_id, retried: prep.length, failedAfterRetry, propErrors: base.propErrors } }];"
       },
-      "id": "6a05d365-4069-4489-b354-998a3d02418e",
+      "id": "fe1950b8-6a4b-410c-8111-871e6b758140",
       "name": "Collect Retry",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        12064,
-        1040
+        25856,
+        256
       ]
     },
     {
       "parameters": {
         "inputSource": "passthrough"
       },
-      "id": "7ce3fc16-f36f-44c9-8ddb-d44b225cae95",
+      "id": "2ec6780b-9cd0-4585-8d52-5658d79155b4",
       "name": "Called by batch",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        9296,
-        576
+        22816,
+        -208
       ]
     },
     {
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst cfg = $('Config').first().json;\nconst lid = $('Prep Properties').first().json.listing_id;\nconst body = { products: [{ sku: p.sku, property_values: [], offerings: [{ price: p.priceCad, quantity: 1, is_enabled: true, readiness_state_id: Number(cfg.readinessStateId) }] }], price_on_property: [], quantity_on_property: [], sku_on_property: [] };\nreturn [{ json: { listing_id: lid, body } }];"
       },
-      "id": "80dcfbce-1d64-43ad-8f4d-2896d50ac0a0",
+      "id": "30cbe8b3-8a3d-4067-b1cc-105910ac8b1b",
       "name": "Prep SKU",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        11136,
-        736
+        24928,
+        -48
       ]
     },
     {
-      "id": "18a748e6-6cbe-4a85-a030-41480ee1aefd",
+      "id": "30bdf8c2-58f7-466d-b8d8-14671e5ac9dc",
       "name": "Set SKU",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        11344,
-        736
+        25136,
+        -48
       ],
       "parameters": {
         "authentication": "genericCredentialType",
@@ -715,6 +721,38 @@
           ]
         }
       },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/policies/return",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4fe9accd-874e-4b7e-bf28-d1050e740cec",
+      "name": "Get Return Policies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        23472,
+        -16
+      ],
       "credentials": {
         "oAuth2Api": {
           "id": "rMYED9sGlRCBOoEN",
@@ -751,7 +789,7 @@
       "main": [
         [
           {
-            "node": "Pick Row",
+            "node": "Get Return Policies",
             "type": "main",
             "index": 0
           }
@@ -1031,6 +1069,17 @@
           }
         ]
       ]
+    },
+    "Get Return Policies": {
+      "main": [
+        [
+          {
+            "node": "Pick Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1039,7 +1088,7 @@
   },
   "pinData": {},
   "active": false,
-  "versionId": "711965cf-0204-4652-aeac-0af9711a0cec",
+  "versionId": "be3fab23-e0d9-4134-b648-7836ad1192dd",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
