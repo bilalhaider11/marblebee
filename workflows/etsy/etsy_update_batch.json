@@ -259,7 +259,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "yKcukUhxxiWPlUQx",
+          "value": "NHkOg7jbEoDuJ9Ym",
           "mode": "list",
           "cachedResultName": "Etsy - Update one listing (called by the batch)"
         },
@@ -432,5 +432,6 @@
   "active": false,
   "pinData": {},
   "nodeGroups": [],
-  "tags": []
+  "tags": [],
+  "id": "yKcukUhxxiWPlUQx"
 }

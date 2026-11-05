@@ -1,5 +1,5 @@
 {
-  "name": "Etsy - Mark existing listings on sheet",
+  "name": "Etsy - Mark existing listings (one-off)",
   "nodes": [
     {
       "parameters": {},

@@ -3,26 +3,26 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "76f7c9d9-6577-49bc-917b-c51c55c130a6",
+      "id": "36049fac-3d04-4660-99a4-5eaeccd4daf5",
       "name": "Run",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        32,
-        576
+        0,
+        464
       ]
     },
     {
       "parameters": {
         "inputSource": "passthrough"
       },
-      "id": "efa18a9f-627e-4e8e-a792-383c2a35c04f",
+      "id": "2a01a250-0807-4564-8bf7-7c6e73a26532",
       "name": "Called by batch",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        32,
-        768
+        0,
+        656
       ]
     },
     {
@@ -87,13 +87,13 @@
         },
         "options": {}
       },
-      "id": "4b488b1b-1725-45e0-ad50-6d7462ef3c36",
+      "id": "cffa9c12-789c-417a-808b-a967300c7548",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        256,
-        656
+        224,
+        544
       ]
     },
     {
@@ -103,13 +103,13 @@
         "nodeCredentialType": "googleSheetsOAuth2Api",
         "options": {}
       },
-      "id": "36b192fb-7e6f-4dbc-a9d1-cbe0bb9ca5b7",
+      "id": "c5124bd4-e4c1-4b16-bd6f-b5c0dfa324e9",
       "name": "Read Tab",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        480,
-        656
+        448,
+        544
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -121,15 +121,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nconst apiKey = String(cfg.apiKey || '').trim();\nif (!/^[^\\s:]+:[^\\s:]+$/.test(apiKey) || /PASTE|SHARED_SECRET_HERE/i.test(apiKey)) return out({ ok: false, problems: ['Config apiKey is not set: it must be keystring:shared_secret (paste it in n8n only, never in the repo)'], warnings: [] });\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Etsy category per tab, confirmed with the read-only category check (2026-11). 'table' = chosen from the title.\nconst TAB_CAT = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219, Vanity: 903, 'Marble+ ConsoleTable': 11355, Bench: 12369, Lamppost: 12410, Statue: 2869, Animal: 2869, Carving: 129, Table: 'table',\n  Moulding: 784, DoorSurround: 784, WindowSurround: 784, OutdoorCornice: 784, Columns: 784, Balustrade: 784, Stairs: 784, Wainscoting: 784, 'Wall-Coverings': 784, MarbleRangeHood: 784,\n  StoneMosaicTile: 781, MarbleMedallion: 781, MarbleSlab: 781, BookMatchedSlabs: 781, Fountain: 12240, Planter: 6061, 'Exterior-Wall-Decoration': 2784 };\n// mat = material property id (marble is value 171 in every list). dims: 'whd' = Width/Height/Depth, 'wl' = Width/Length, '' = none (size goes in the description). craft = required Craft type value.\nconst M1 = 148789511893;\nconst CAT = { 11353: { mat: 570246212865, dims: 'whd' }, 12219: { mat: M1, dims: 'whd' }, 903: { mat: M1, dims: 'whd' }, 11355: { mat: M1, dims: 'whd' }, 12369: { mat: M1, dims: 'whd' }, 12410: { mat: M1, dims: 'whd' }, 2869: { mat: M1, dims: 'whd' },\n  129: { mat: 570246213483, dims: 'whd' }, 977: { mat: M1, dims: 'whd' }, 12371: { mat: M1, dims: 'whd' }, 12372: { mat: M1, dims: 'whd' },\n  784: { mat: M1, dims: 'whd', craft: 560 }, 781: { mat: M1, dims: 'wl', craft: 560 },\n  12240: { mat: M1, dims: '' }, 6061: { mat: M1, dims: '' }, 2784: { mat: M1, dims: '' } };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037, length: 47626759838, craft: 47626759760 };\nconst problems = [], warnings = [];\nconst baseTax = TAB_CAT[cfg.tab];\nif (!baseTax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no Etsy category set up (set up: ' + Object.keys(TAB_CAT).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nlet tax = baseTax;\nif (tax === 'table') { const tt = (str(r, 'Title_Etsy') + ' ' + str(r, 'Title_Shopify')).toLowerCase(); if (/coffee|cocktail/.test(tt)) tax = 12371; else if (/end table|side table|accent table|bedside|nightstand/.test(tt)) tax = 12372; else { tax = 977; if (!/dining|kitchen|dinner|conference/.test(tt)) warnings.push('table type not clear from the title: used Kitchen & Dining Tables'); } }\nconst cat = CAT[tax];\n// Which sheet size fills which Etsy field (first one with a value wins). Anything else goes into a line in the description.\nconst SRC = { Moulding: { width: ['Length'], height: ['Height'], depth: ['Thickness'] }, OutdoorCornice: { width: ['Length'], height: ['Height'], depth: ['Projection'] },\n  Wainscoting: { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] }, 'Wall-Coverings': { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] },\n  Balustrade: { width: ['Width', 'Handrail Width', 'Base/Plinth Width'], height: ['Overall Height', 'Height'], depth: ['Depth', 'Baluster Diameter'] }, Stairs: { width: ['Width'], height: ['Height'] } };\nconst DEFAULT_SRC = cat.dims === 'wl' ? { width: ['Width'], length: ['Length', 'Depth'] } : { width: ['Width'], height: ['Height'], depth: ['Depth', 'Length'] };\nconst src = cat.dims === '' ? {} : (cat.dims === 'whd' && SRC[cfg.tab] ? SRC[cfg.tab] : DEFAULT_SRC);\nconst usedFields = new Set(), mapped = {};\nObject.entries(src).forEach(([k, fields]) => { mapped[k] = 0; for (const fl of fields) { const v = num(get(r, fl + ' Inch')); if (v > 0) { mapped[k] = v; usedFields.add(fl); break; } } });\nconst MEAS = ['Length', 'Width', 'Height', 'Depth', 'Thickness', 'Projection', 'Diameter', 'Inner Opening Diameter', 'Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'];\nconst measParts = skipUsed => { const parts = []; MEAS.forEach(L => { if (skipUsed && usedFields.has(L)) return; const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); if (cm > 0 || inch > 0) parts.push(L.toLowerCase() + ' ' + (cm > 0 ? Math.round(cm * 10) / 10 + ' cm' : '') + (cm > 0 && inch > 0 ? ' / ' : '') + (inch > 0 ? Math.round(inch * 100) / 100 + ' in' : '')); }); return parts; };\nconst WRITE = ['Etsy_status', 'Etsy_error', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_fields_to_update', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_ready_to_post'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nconst listingId = str(r, 'Etsy_listing_id'), sheetStatus = str(r, 'Etsy_status');\nif (!/^\\d+$/.test(listingId)) problems.push('row has no Etsy_listing_id');\nconst ALLF = ['title', 'description', 'tags', 'price', 'category', 'properties', 'sku', 'images', 'publish'].concat(Array.from({ length: 11 }, (_, i) => 'image url' + (i + 1)));\nconst rawFields = String(cfg.fields || '').trim() || str(r, 'Etsy_fields_to_update');\nlet fields = rawFields.split(/[,;\\n|]+/).map(x => x.trim().toLowerCase()).filter(Boolean);\nif (fields.includes('all')) fields = ALLF.filter(x => x !== 'publish' && !x.startsWith('image url')).concat(fields.includes('publish') ? ['publish'] : []);\nconst unknownFields = fields.filter(x => !ALLF.includes(x));\nif (unknownFields.length) problems.push('unknown field(s) in Etsy_fields_to_update: ' + unknownFields.join(', ') + ' (use: title, description, tags, price, category, properties, sku, images, IMAGE URL1 to IMAGE URL11, publish, all)');\nif (!fields.length) problems.push('Etsy_fields_to_update is empty: nothing to update');\nconst need = t => fields.includes(t);\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\ndescription = description.replace(/\\*\\*|__/g, '').replace(/^#{1,6}\\s+/gm, '');\nif (description) {\n  const parts = measParts(cat.dims !== '');\n  if (parts.length) description += '\\n\\n' + (cat.dims === '' ? 'Dimensions: ' : 'Additional dimensions: ') + parts.join(', ') + '.';\n  else if (cat.dims === '') warnings.push('no sizes for the Dimensions line');\n}\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\n// Same rule as the Shopify sync: two photos are the same only when the URLs are identical after removing Shopify's v= cache-buster. No filename guessing.\nconst normUrl = u => { const s = String(u || ''); const q = s.indexOf('?'); if (q === -1) return s; const base = s.slice(0, q); const kept = s.slice(q + 1).split('&').filter(p => p && !/^v=/.test(p)).join('&'); return kept ? base + '?' + kept : base; };\nconst cad = str(r, 'IMAGE URL11');\nconst cadKey = /^https?:/i.test(cad) ? normUrl(cad) : '';\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) {\n  const u = str(r, 'IMAGE URL' + k);\n  if (!/^https?:/i.test(u)) continue;\n  const key = normUrl(u);\n  if (cadKey && key === cadKey) { warnings.push('IMAGE URL' + k + ' is the same file as the CAD drawing: kept once, at the end'); continue; }\n  if (seen.has(key)) { warnings.push('IMAGE URL' + k + ' repeats an earlier photo: skipped'); continue; }\n  seen.add(key); imgs.push({ url: u, label: 'IMAGE URL' + k });\n}\nif (cadKey) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) { const msg = 'only ' + tags.length + ' tags (Etsy allows 13); run the tag generator first'; if (cfg.requireFullTags === true) problems.push(msg); else warnings.push(msg); }\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst properties = [{ id: cat.mat, name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nif (cat.craft) properties.push({ id: PROP.craft, name: 'craft type', body: { value_ids: [cat.craft], values: [] } });\nconst dv = (v, name) => { if (v > 0) properties.push({ id: PROP[name], name, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + name + ' (inches)'); };\nif (cat.dims === 'whd') { dv(mapped.width, 'width'); dv(mapped.height, 'height'); dv(mapped.depth, 'depth'); }\nif (cat.dims === 'wl') { dv(mapped.width, 'width'); dv(mapped.length, 'length'); }\nconst rel = m => { if (/Title_Etsy|^title is/.test(m)) return need('title'); if (/Price/.test(m)) return need('price') || need('sku'); if (/photos/.test(m)) return need('images') || fields.some(x => x.startsWith('image url')); return true; };\nconst relevant = problems.filter(rel);\nreturn out({ listingId, sheetStatus, fields, ok: relevant.length === 0, problems: relevant, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
+        "jsCode": "// Finds the row to turn into a draft, validates it and builds the Etsy request. Nothing is sent to Etsy here.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst nk = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst letters = n => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst out = (o) => [{ json: o }];\nconst apiKey = String(cfg.apiKey || '').trim();\nif (!/^[^\\s:]+:[^\\s:]+$/.test(apiKey) || /PASTE|SHARED_SECRET_HERE/i.test(apiKey)) return out({ ok: false, problems: ['Config apiKey is not set: it must be keystring:shared_secret (paste it in n8n only, never in the repo)'], warnings: [] });\nif (res.error || !res.values) return out({ ok: false, problems: ['could not read the tab: ' + JSON.stringify(res.error || 'no data').slice(0, 200)], warnings: [] });\nconst rows = res.values;\nconst hk = (rows[0] || []).map(nk);\nconst ix = name => hk.indexOf(nk(name));\nconst get = (r, name) => { const i = ix(name); return i < 0 || r[i] == null ? '' : r[i]; };\nconst str = (r, name) => String(get(r, name)).trim();\nconst num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\\-]/g, '')); return isFinite(n) ? n : 0; };\nconst yes = v => /^(yes|true|1)$/i.test(String(v || '').trim());\nconst skuCol = hk.lastIndexOf('productno');\n// Etsy category per tab, confirmed with the read-only category check (2026-11). 'table' = chosen from the title.\nconst TAB_CAT = { Bathtub: 11353, Sink: 11353, 'Marble+ Basin': 11353, Fireplace: 12219, Vanity: 903, 'Marble+ ConsoleTable': 11355, Bench: 12369, Lamppost: 12410, Statue: 2869, Animal: 2869, Carving: 129, Table: 'table',\n  Moulding: 784, DoorSurround: 784, WindowSurround: 784, OutdoorCornice: 784, Columns: 784, Balustrade: 784, Stairs: 784, Wainscoting: 784, 'Wall-Coverings': 784, MarbleRangeHood: 784,\n  StoneMosaicTile: 781, MarbleMedallion: 781, MarbleSlab: 781, BookMatchedSlabs: 781, Fountain: 12240, Planter: 6061, 'Exterior-Wall-Decoration': 2784 };\n// mat = material property id (marble is value 171 in every list). dims: 'whd' = Width/Height/Depth, 'wl' = Width/Length, '' = none (size goes in the description). craft = required Craft type value.\nconst M1 = 148789511893;\nconst CAT = { 11353: { mat: 570246212865, dims: 'whd' }, 12219: { mat: M1, dims: 'whd' }, 903: { mat: M1, dims: 'whd' }, 11355: { mat: M1, dims: 'whd' }, 12369: { mat: M1, dims: 'whd' }, 12410: { mat: M1, dims: 'whd' }, 2869: { mat: M1, dims: 'whd' },\n  129: { mat: 570246213483, dims: 'whd' }, 977: { mat: M1, dims: 'whd' }, 12371: { mat: M1, dims: 'whd' }, 12372: { mat: M1, dims: 'whd' },\n  784: { mat: M1, dims: 'whd', craft: 560 }, 781: { mat: M1, dims: 'wl', craft: 560 },\n  12240: { mat: M1, dims: '' }, 6061: { mat: M1, dims: '' }, 2784: { mat: M1, dims: '' } };\nconst PROP = { width: 47626759898, height: 47626759834, depth: 54142602037, length: 47626759838, craft: 47626759760 };\nconst problems = [], warnings = [];\nconst baseTax = TAB_CAT[cfg.tab];\nif (!baseTax) return out({ ok: false, problems: ['tab \"' + cfg.tab + '\" has no Etsy category set up (set up: ' + Object.keys(TAB_CAT).join(', ') + ')'], warnings });\nif (skuCol < 0) return out({ ok: false, problems: ['no Product No. column'], warnings });\nconst want = String(cfg.sku || '').trim().toUpperCase();\nconst count = {};\nfor (let i = 1; i < rows.length; i++) { const s = String((rows[i] || [])[skuCol] || '').trim().toUpperCase(); if (s) count[s] = (count[s] || 0) + 1; }\nlet hit = -1;\nfor (let i = 1; i < rows.length; i++) {\n  const r = rows[i] || [];\n  const s = String(r[skuCol] || '').trim().toUpperCase();\n  if (!s) continue;\n  if (want) { if (s === want) { hit = i; break; } continue; }\n  if (yes(str(r, 'Etsy_ready_to_post')) && !str(r, 'Etsy_listing_id') && !str(r, 'Etsy_status')) { hit = i; break; }\n}\nif (hit < 0) return out({ ok: false, problems: [want ? 'SKU ' + want + ' not found in ' + cfg.tab : 'no row in ' + cfg.tab + ' is flagged Etsy_ready_to_post = yes without an Etsy listing'], warnings });\nconst r = rows[hit];\nconst sku = String(r[skuCol]).trim();\nlet tax = baseTax;\nif (tax === 'table') { const tt = (str(r, 'Title_Etsy') + ' ' + str(r, 'Title_Shopify')).toLowerCase(); if (/coffee|cocktail/.test(tt)) tax = 12371; else if (/end table|side table|accent table|bedside|nightstand/.test(tt)) tax = 12372; else { tax = 977; if (!/dining|kitchen|dinner|conference/.test(tt)) warnings.push('table type not clear from the title: used Kitchen & Dining Tables'); } }\nconst cat = CAT[tax];\n// Which sheet size fills which Etsy field (first one with a value wins). Anything else goes into a line in the description.\nconst SRC = { Moulding: { width: ['Length'], height: ['Height'], depth: ['Thickness'] }, OutdoorCornice: { width: ['Length'], height: ['Height'], depth: ['Projection'] },\n  Wainscoting: { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] }, 'Wall-Coverings': { width: ['Width'], height: ['Length', 'Height'], depth: ['Thickness', 'Depth'] },\n  Balustrade: { width: ['Width', 'Handrail Width', 'Base/Plinth Width'], height: ['Overall Height', 'Height'], depth: ['Depth', 'Baluster Diameter'] }, Stairs: { width: ['Width'], height: ['Height'] } };\nconst DEFAULT_SRC = cat.dims === 'wl' ? { width: ['Width'], length: ['Length', 'Depth'] } : { width: ['Width'], height: ['Height'], depth: ['Depth', 'Length'] };\nconst src = cat.dims === '' ? {} : (cat.dims === 'whd' && SRC[cfg.tab] ? SRC[cfg.tab] : DEFAULT_SRC);\nconst usedFields = new Set(), mapped = {};\nObject.entries(src).forEach(([k, fields]) => { mapped[k] = 0; for (const fl of fields) { const v = num(get(r, fl + ' Inch')); if (v > 0) { mapped[k] = v; usedFields.add(fl); break; } } });\nconst MEAS = ['Length', 'Width', 'Height', 'Depth', 'Thickness', 'Projection', 'Diameter', 'Inner Opening Diameter', 'Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'];\nconst measParts = skipUsed => { const parts = []; MEAS.forEach(L => { if (skipUsed && usedFields.has(L)) return; const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); if (cm > 0 || inch > 0) parts.push(L.toLowerCase() + ' ' + (cm > 0 ? Math.round(cm * 10) / 10 + ' cm' : '') + (cm > 0 && inch > 0 ? ' / ' : '') + (inch > 0 ? Math.round(inch * 100) / 100 + ' in' : '')); }); return parts; };\nconst WRITE = ['Etsy_status', 'Etsy_error', 'Etsy_image_count', 'Etsy_synced_at', 'Etsy_fields_to_update', 'Etsy_price_cad', 'Etsy_category_id', 'Etsy_ready_to_post'];\nconst writeCols = {};\nWRITE.forEach(n => { const i = ix(n); if (i < 0) problems.push('missing column ' + n); else writeCols[nk(n)] = letters(i); });\nif (count[sku.toUpperCase()] > 1) problems.push('SKU appears ' + count[sku.toUpperCase()] + ' times in this tab');\nconst listingId = str(r, 'Etsy_listing_id'), sheetStatus = str(r, 'Etsy_status');\nif (!/^\\d+$/.test(listingId)) problems.push('row has no Etsy_listing_id');\nconst ALLF = ['title', 'description', 'tags', 'price', 'category', 'properties', 'sku', 'images', 'publish'].concat(Array.from({ length: 11 }, (_, i) => 'image url' + (i + 1)));\nconst rawFields = String(cfg.fields || '').trim() || str(r, 'Etsy_fields_to_update');\n// Tokens may be the sheet column names (like the Shopify sync) or the short words; both work.\nconst TOKEN_ALIAS = { title_etsy: 'title', description_etsy: 'description', tags_etsy: 'tags', 'price in cad': 'price', 'product no.': 'sku', etsy_category_id: 'category', material: 'properties', 'width inch': 'properties', 'height inch': 'properties', 'depth inch': 'properties', 'length inch': 'properties', 'thickness inch': 'properties', 'projection inch': 'properties' };\nlet fields = rawFields.split(/[,;\\n|]+/).map(x => x.trim().toLowerCase()).filter(Boolean).map(x => TOKEN_ALIAS[x] || x);\nfields = fields.filter((x, i) => fields.indexOf(x) === i);\nif (fields.includes('all')) fields = ALLF.filter(x => x !== 'publish' && x !== 'images' && !x.startsWith('image url')).concat(fields.includes('publish') ? ['publish'] : []);\nconst unknownFields = fields.filter(x => !ALLF.includes(x));\nif (unknownFields.length) problems.push('unknown field(s) in Etsy_fields_to_update: ' + unknownFields.join(', ') + ' (use column names: Title_Etsy, Description_Etsy, Tags_Etsy, Price In CAD, Product No., Etsy_category_id, Width Inch / Height Inch / Depth Inch / Length Inch / Material, IMAGE URL1 to IMAGE URL11, or the words images, publish, all)');\nif (!fields.length) problems.push('Etsy_fields_to_update is empty: nothing to update');\nconst need = t => fields.includes(t);\nconst title = str(r, 'Title_Etsy');\nif (!title) problems.push('no Title_Etsy'); else if (title.length > 140) problems.push('title is ' + title.length + ' characters (max 140)');\nconst specials = (title.match(/[&%:]/g) || []).length;\nif (specials > 1) warnings.push('title uses & % : more than once (' + specials + '); Etsy may reject it');\nlet description = str(r, 'Description_Etsy');\ndescription = description.replace(/\\*\\*|__/g, '').replace(/^#{1,6}\\s+/gm, '');\n// Dimensions block (cm / inch) on top, only for categories where Etsy has no size fields (as in the client's video); then the text, then the product number.\nif (description && cat.dims === '' && !/^\\s*dimensions/i.test(description)) {\n  const WHD = ['Width', 'Height', 'Depth'], LWT = ['Length', 'Width', 'Thickness'];\n  const DIM_LABELS = { Fireplace: WHD, MarbleRangeHood: WHD, Carving: WHD, WindowSurround: WHD, Moulding: ['Length', 'Height', 'Thickness'], OutdoorCornice: ['Length', 'Height', 'Projection'],\n    Stairs: ['Width', 'Height', 'Diameter', 'Inner Opening Diameter'], Balustrade: ['Overall Height', 'Handrail Height', 'Handrail Width', 'Baluster Diameter', 'Baluster Height', 'Base/Plinth Width', 'Base/Plinth Height'],\n    BookMatchedSlabs: ['Length', 'Width'], MarbleSlab: LWT, 'Wall-Coverings': LWT, StoneMosaicTile: LWT, MarbleMedallion: LWT, 'Exterior-Wall-Decoration': LWT, Wainscoting: LWT };\n  const labels = DIM_LABELS[cfg.tab] || ['Length', 'Width', 'Height'];\n  const lines = [];\n  labels.forEach(L => { const cm = num(get(r, L + ' CM')), inch = num(get(r, L + ' Inch')); const bits = []; if (cm > 0) bits.push(String(Math.round(cm * 10) / 10)); if (inch > 0) bits.push((Math.round(inch * 100) / 100).toFixed(2)); if (bits.length) lines.push(L + ': ' + bits.join(' / ')); });\n  if (lines.length) description = 'Dimensions (cm/Inch)\\n' + lines.join('\\n') + '\\n\\n' + description; else warnings.push('no sizes for the Dimensions block');\n}\nif (description && !/Product No:/i.test(description)) description += '\\n\\nProduct No: ' + sku;\nconst price = num(get(r, 'Price In CAD'));\nif (!(price > 0)) problems.push('no valid Price In CAD');\n// Same rule as the Shopify sync: two photos are the same only when the URLs are identical after removing Shopify's v= cache-buster. No filename guessing.\nconst normUrl = u => { const s = String(u || ''); const q = s.indexOf('?'); if (q === -1) return s; const base = s.slice(0, q); const kept = s.slice(q + 1).split('&').filter(p => p && !/^v=/.test(p)).join('&'); return kept ? base + '?' + kept : base; };\nconst cad = str(r, 'IMAGE URL11');\nconst cadKey = /^https?:/i.test(cad) ? normUrl(cad) : '';\nconst imgs = [], seen = new Set();\nfor (let k = 1; k <= 10; k++) {\n  const u = str(r, 'IMAGE URL' + k);\n  if (!/^https?:/i.test(u)) continue;\n  const key = normUrl(u);\n  if (cadKey && key === cadKey) { warnings.push('IMAGE URL' + k + ' is the same file as the CAD drawing: kept once, at the end'); continue; }\n  if (seen.has(key)) { warnings.push('IMAGE URL' + k + ' repeats an earlier photo: skipped'); continue; }\n  seen.add(key); imgs.push({ url: u, label: 'IMAGE URL' + k });\n}\nif (cadKey) imgs.push({ url: cad, label: 'IMAGE URL11 (CAD drawing)' });\nimgs.forEach((x, i) => { x.rank = i + 1; });\nif (!imgs.length) problems.push('no photos');\nif (!/^https?:/i.test(cad)) warnings.push('no CAD drawing in IMAGE URL11');\nconst tags = [];\nstr(r, 'Tags_Etsy').split(/[,;\\n|]+/).forEach(t => { t = t.replace(/[^\\p{L}\\p{N} \\-']/gu, '').replace(/\\s+/g, ' ').trim(); if (t && t.length <= 20 && !tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t); });\nif (tags.length < 13) { const msg = 'only ' + tags.length + ' tags (Etsy allows 13); run the tag generator first'; if (cfg.requireFullTags === true) problems.push(msg); else warnings.push(msg); }\nif (tags.length > 13) tags.length = 13;\nconst who = str(r, 'who_made') || 'collective', when = str(r, 'when_made') || 'made_to_order';\nconst weight = num(get(r, 'Weight KG'));\nif (!(weight > 0)) warnings.push('no Weight KG');\nconst listing = { quantity: 1, title, description, price, who_made: who, when_made: when, taxonomy_id: tax, shipping_profile_id: Number(cfg.shippingProfileId), readiness_state_id: Number(cfg.readinessStateId), type: 'physical', is_supply: false };\nif (tags.length) listing.tags = tags;\nif (weight > 0) { listing.item_weight = weight; listing.item_weight_unit = 'kg'; }\nconst properties = [{ id: cat.mat, name: 'material', body: { value_ids: [171], values: ['Marble'] } }];\nif (cat.craft) properties.push({ id: PROP.craft, name: 'craft type', body: { value_ids: [cat.craft], values: [] } });\nconst dv = (v, name) => { if (v > 0) properties.push({ id: PROP[name], name, body: { value_ids: [], values: [String(Math.round(v * 100) / 100)], scale_id: 5 } }); else warnings.push('no ' + name + ' (inches)'); };\nif (cat.dims === 'whd') { dv(mapped.width, 'width'); dv(mapped.height, 'height'); dv(mapped.depth, 'depth'); }\nif (cat.dims === 'wl') { dv(mapped.width, 'width'); dv(mapped.length, 'length'); }\nconst rel = m => { if (/Title_Etsy|^title is/.test(m)) return need('title'); if (/Price/.test(m)) return need('price') || need('sku'); if (/photos/.test(m)) return need('images') || fields.some(x => x.startsWith('image url')); return true; };\nconst relevant = problems.filter(rel);\nreturn out({ listingId, sheetStatus, fields, ok: relevant.length === 0, problems: relevant, warnings, tab: cfg.tab, row: hit + 2, sku, title, priceCad: price, taxonomyId: tax, tags, listing, properties, images: imgs, expectedImages: imgs.length, writeCols, descriptionChars: description.length });"
       },
-      "id": "9b43d676-334a-40d6-a9da-9597157621b2",
+      "id": "64634249-be50-4cd2-9af0-eb6eb6008c3e",
       "name": "Pick Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        704,
-        656
+        672,
+        544
       ]
     },
     {
@@ -157,26 +157,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "c98950f6-2fdd-4af7-bbfc-abc18f825502",
+      "id": "80d34fb2-4eeb-482f-b5d5-3b5b9ead4844",
       "name": "Can update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        912,
-        656
+        880,
+        544
       ]
     },
     {
       "parameters": {
         "jsCode": "const j = $input.first().json;\nreturn [{ json: { ok: false, tab: $('Config').first().json.tab, sku: $('Config').first().json.sku, problems: j.problems || [] } }];"
       },
-      "id": "b386c8d7-ec25-4253-aed0-db1d77b15285",
+      "id": "d48d1b8c-1751-4211-89ec-37d94080698f",
       "name": "Report (no write)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1136,
-        880
+        1104,
+        768
       ]
     },
     {
@@ -195,13 +195,13 @@
         },
         "options": {}
       },
-      "id": "56ba128c-c914-4d6a-853c-59bf598797b4",
+      "id": "c4aa1c8c-0740-4124-958e-9f0ef5773918",
       "name": "Get Listing",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1136,
-        640
+        1104,
+        528
       ],
       "credentials": {
         "oAuth2Api": {
@@ -227,13 +227,13 @@
         },
         "options": {}
       },
-      "id": "724e0e1c-c82f-47c1-aa35-7a76096b13f9",
+      "id": "cf90e9ee-4e5b-4954-9096-75066c80493a",
       "name": "Get Inventory",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1360,
-        640
+        1328,
+        528
       ],
       "credentials": {
         "oAuth2Api": {
@@ -259,13 +259,13 @@
         },
         "options": {}
       },
-      "id": "f41c07e0-a630-463c-93cb-5044e3acbdea",
+      "id": "96c1ea4b-9cba-4181-a3cc-cf6e58bd99cc",
       "name": "Get Properties",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1584,
-        640
+        1552,
+        528
       ],
       "credentials": {
         "oAuth2Api": {
@@ -277,15 +277,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Compares the sheet with what is on Etsy for every field named in Etsy_fields_to_update and lists each change (old -> new).\nconst cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst L = $('Get Listing').first().json;\nconst INV = $('Get Inventory').first().json;\nconst PR = $('Get Properties').first().json;\nconst err = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nif (L.error || !L.listing_id) return [{ json: { ok: false, problems: ['could not read the listing on Etsy: ' + err(L.error || L)] } }];\nconst problems = [], warnings = [];\nconst state = L.state;\nif (!['draft', 'active'].includes(state)) problems.push('listing state is \"' + state + '\": only draft and active listings are updated');\nconst has = t => p.fields.includes(t);\nconst changes = [];\nconst norm = s => String(s == null ? '' : s).replace(/\\r\\n/g, '\\n').trim();\nconst sh = s => { s = String(s == null ? '' : s); return s.length > 70 ? s.slice(0, 70) + '...' : s; };\nconst patch = {};\nif (has('title') && p.title && norm(L.title) !== norm(p.title)) { patch.title = p.title; changes.push({ field: 'title', from: sh(L.title), to: sh(p.title) }); }\nif (has('description') && p.listing.description && norm(L.description) !== norm(p.listing.description)) { patch.description = p.listing.description; changes.push({ field: 'description', from: (L.description || '').length + ' chars', to: p.listing.description.length + ' chars' }); }\nif (has('tags')) {\n  if (!p.tags.length) problems.push('tags requested but the sheet has none');\n  else {\n    const e = (L.tags || []).map(t => String(t).toLowerCase()), s = p.tags.map(t => t.toLowerCase());\n    if (!(e.length === s.length && s.every(t => e.includes(t)))) { patch.tags = p.tags; changes.push({ field: 'tags', from: (L.tags || []).join(', ') || '(none)', to: p.tags.join(', ') }); }\n  }\n}\nif (has('category') && Number(L.taxonomy_id) !== Number(p.taxonomyId)) { patch.taxonomy_id = Number(p.taxonomyId); changes.push({ field: 'category', from: String(L.taxonomy_id), to: String(p.taxonomyId) }); }\n// inventory: price and SKU (listings with variations are not touched)\nconst prods = INV.products || [];\nlet invBody = null;\nif (has('price') || has('sku')) {\n  if (INV.error || !prods.length) problems.push('could not read the inventory: ' + err(INV.error || INV));\n  else if (prods.length !== 1 || (prods[0].offerings || []).length !== 1) problems.push('listing has variations: price/sku not updated');\n  else {\n    const pr = prods[0], off = pr.offerings[0];\n    const curPrice = off.price ? off.price.amount / off.price.divisor : NaN;\n    const priceChange = has('price') && Math.abs(curPrice - p.priceCad) > 0.004;\n    const skuChange = has('sku') && String(pr.sku || '').trim().toUpperCase() !== p.sku;\n    if (priceChange) changes.push({ field: 'price', from: String(curPrice), to: String(p.priceCad) });\n    if (skuChange) changes.push({ field: 'sku', from: pr.sku || '(none)', to: p.sku });\n    if (priceChange || skuChange) invBody = { products: [{ sku: skuChange ? p.sku : (pr.sku || ''), property_values: pr.property_values || [], offerings: [{ price: priceChange ? p.priceCad : curPrice, quantity: off.quantity, is_enabled: off.is_enabled, readiness_state_id: off.readiness_state_id || Number(cfg.readinessStateId) }] }], price_on_property: INV.price_on_property || [], quantity_on_property: INV.quantity_on_property || [], sku_on_property: INV.sku_on_property || [] };\n  }\n}\n// properties (sizes, material, craft type): only the ones that differ\nconst propsToSet = [];\nif (has('properties')) {\n  const cur = {}; (PR.results || []).forEach(x => { cur[x.property_id] = x; });\n  p.properties.forEach(x => {\n    const c = cur[x.id];\n    let same = false;\n    if (c) {\n      if (x.body.value_ids && x.body.value_ids.length) same = x.body.value_ids.every(v => (c.value_ids || []).includes(v));\n      else same = (c.values || []).map(String).includes(String(x.body.values[0]));\n    }\n    if (!same) { propsToSet.push(x); changes.push({ field: 'property ' + x.name, from: c ? (c.values || []).join('/') : '(none)', to: (x.body.values && x.body.values[0]) || (x.body.value_ids || []).join('/') }); }\n  });\n}\n// images: add the missing ones at the end; nothing is ever removed\nconst images = (L.images || []).slice().sort((a, b) => a.rank - b.rank);\nconst have = images.length;\nconst uploads = has('images') && have < p.expectedImages ? p.images.slice(have).map(x => ({ listing_id: L.listing_id, url: x.url, rank: x.rank, label: x.label })) : [];\nif (uploads.length) changes.push({ field: 'images', from: have + ' on Etsy', to: 'add ' + uploads.length + ': ' + uploads.map(u => u.label).join(', ') });\n// replace single photos: token \"IMAGE URL3\" replaces the photo at that column's position (Etsy keeps no file names, so the position is the only link)\nconst fileName = u => { const l = String(u || '').split('?')[0].split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst replaces = [];\np.fields.filter(t => /^image url\\d+$/.test(t)).forEach(t => {\n  const n = Number(t.slice(9));\n  const e = p.images.find(x => x.label === 'IMAGE URL' + n || x.label.startsWith('IMAGE URL' + n + ' '));\n  if (!e) { warnings.push('IMAGE URL' + n + ' has no photo to use (empty cell or a duplicate): skipped'); return; }\n  if (have !== p.expectedImages) { problems.push('cannot replace IMAGE URL' + n + ': Etsy has ' + have + ' photos but the sheet has ' + p.expectedImages + ', so positions would not match (use \"images\" to add the missing ones first)'); return; }\n  const old = images[e.rank - 1];\n  if (!old || !old.listing_image_id) { problems.push('cannot find the photo at position ' + e.rank + ' on Etsy'); return; }\n  replaces.push({ listing_id: L.listing_id, url: e.url, rank: e.rank, label: e.label, old_image_id: old.listing_image_id });\n  changes.push({ field: 'photo ' + e.rank + ' (' + e.label + ')', from: 'photo now at position ' + e.rank, to: 'replace with ' + fileName(e.url) });\n});\nif (has('images') && have > p.expectedImages) warnings.push('Etsy has ' + have + ' images, the sheet has ' + p.expectedImages + ': nothing removed');\n// what Etsy will hold after this run: tags from the sheet when they are being set, otherwise the ones already there\nconst tagsFinal = patch.tags ? p.tags.length : (L.tags || []).length;\nconst imagesFinal = have + uploads.length;\nif (has('publish')) {\n  if (state !== 'draft') warnings.push('publish requested but the listing is already ' + state);\n  else {\n    const why = [];\n    if (tagsFinal !== 13) why.push('it would have ' + tagsFinal + ' of 13 tags');\n    if (imagesFinal !== p.expectedImages) why.push('it would have ' + imagesFinal + ' of ' + p.expectedImages + ' photos');\n    if (why.length) warnings.push('would NOT publish: ' + why.join(', '));\n    else changes.push({ field: 'publish', from: 'draft', to: 'live (Etsy fee 0.20 USD)' });\n  }\n}\nconst dry = cfg.dryRun !== false;\nconst doUpdate = problems.length === 0 && !dry;\nreturn [{ json: { ok: problems.length === 0, problems, warnings, state, changes, patch, needPatch: Object.keys(patch).length > 0, invBody, propsToSet, uploads, replaces, imagesOnEtsy: have, tagsFinal, wantPublish: has('publish'), doUpdate, dry } }];"
+        "jsCode": "// Compares the sheet with what is on Etsy for every field named in Etsy_fields_to_update and lists each change (old -> new).\nconst cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst L = $('Get Listing').first().json;\nconst INV = $('Get Inventory').first().json;\nconst PR = $('Get Properties').first().json;\nconst err = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nif (L.error || !L.listing_id) return [{ json: { ok: false, problems: ['could not read the listing on Etsy: ' + err(L.error || L)] } }];\nconst problems = [], warnings = [];\nconst state = L.state;\nif (!['draft', 'active'].includes(state)) problems.push('listing state is \"' + state + '\": only draft and active listings are updated');\nconst has = t => p.fields.includes(t);\nconst changes = [];\nconst norm = s => String(s == null ? '' : s).replace(/\\r\\n/g, '\\n').trim();\nconst sh = s => { s = String(s == null ? '' : s); return s.length > 70 ? s.slice(0, 70) + '...' : s; };\nconst patch = {};\nif (has('title') && p.title && norm(L.title) !== norm(p.title)) { patch.title = p.title; changes.push({ field: 'title', from: sh(L.title), to: sh(p.title) }); }\nif (has('description') && p.listing.description && norm(L.description) !== norm(p.listing.description)) { patch.description = p.listing.description; changes.push({ field: 'description', from: (L.description || '').length + ' chars', to: p.listing.description.length + ' chars' }); }\nif (has('tags')) {\n  if (!p.tags.length) problems.push('tags requested but the sheet has none');\n  else {\n    const e = (L.tags || []).map(t => String(t).toLowerCase()), s = p.tags.map(t => t.toLowerCase());\n    if (!(e.length === s.length && s.every(t => e.includes(t)))) { patch.tags = p.tags; changes.push({ field: 'tags', from: (L.tags || []).join(', ') || '(none)', to: p.tags.join(', ') }); }\n  }\n}\nif (has('category') && Number(L.taxonomy_id) !== Number(p.taxonomyId)) { patch.taxonomy_id = Number(p.taxonomyId); changes.push({ field: 'category', from: String(L.taxonomy_id), to: String(p.taxonomyId) }); }\n// inventory: price and SKU (listings with variations are not touched)\nconst prods = INV.products || [];\nlet invBody = null;\nif (has('price') || has('sku')) {\n  if (INV.error || !prods.length) problems.push('could not read the inventory: ' + err(INV.error || INV));\n  else if (prods.length !== 1 || (prods[0].offerings || []).length !== 1) problems.push('listing has variations: price/sku not updated');\n  else {\n    const pr = prods[0], off = pr.offerings[0];\n    const curPrice = off.price ? off.price.amount / off.price.divisor : NaN;\n    const priceChange = has('price') && Math.abs(curPrice - p.priceCad) > 0.004;\n    const skuChange = has('sku') && String(pr.sku || '').trim().toUpperCase() !== p.sku;\n    if (priceChange) changes.push({ field: 'price', from: String(curPrice), to: String(p.priceCad) });\n    if (skuChange) changes.push({ field: 'sku', from: pr.sku || '(none)', to: p.sku });\n    if (priceChange || skuChange) invBody = { products: [{ sku: skuChange ? p.sku : (pr.sku || ''), property_values: pr.property_values || [], offerings: [{ price: priceChange ? p.priceCad : curPrice, quantity: off.quantity, is_enabled: off.is_enabled, readiness_state_id: off.readiness_state_id || Number(cfg.readinessStateId) }] }], price_on_property: INV.price_on_property || [], quantity_on_property: INV.quantity_on_property || [], sku_on_property: INV.sku_on_property || [] };\n  }\n}\n// properties (sizes, material, craft type): only the ones that differ\nconst propsToSet = [];\nif (has('properties')) {\n  const cur = {}; (PR.results || []).forEach(x => { cur[x.property_id] = x; });\n  p.properties.forEach(x => {\n    const c = cur[x.id];\n    let same = false;\n    if (c) {\n      if (x.body.value_ids && x.body.value_ids.length) same = x.body.value_ids.every(v => (c.value_ids || []).includes(v));\n      else same = (c.values || []).map(String).includes(String(x.body.values[0]));\n    }\n    if (!same) { propsToSet.push(x); changes.push({ field: 'property ' + x.name, from: c ? (c.values || []).join('/') : '(none)', to: (x.body.values && x.body.values[0]) || (x.body.value_ids || []).join('/') }); }\n  });\n}\n// images: the sheet always wins, like the Shopify sync. Etsy keeps no file names, so the link is the POSITION.\n//  \"images\"        = full sync: every sheet photo overwrites the Etsy photo at the same position, missing ones are added, extra Etsy photos beyond the sheet's count are removed\n//  \"IMAGE URL<n>\"  = only that position is replaced (needs the same number of photos on Etsy and in the sheet)\nconst images = (L.images || []).slice().sort((a, b) => a.rank - b.rank);\nconst have = images.length;\nconst fileName = u => { const l = String(u || '').split('?')[0].split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst uploads = [], replaces = [], deletes = [];\nconst fullSync = has('images');\nif (fullSync) {\n  p.images.forEach(e => {\n    const old = images[e.rank - 1];\n    if (old && old.listing_image_id) { replaces.push({ listing_id: L.listing_id, url: e.url, rank: e.rank, label: e.label, old_image_id: old.listing_image_id }); changes.push({ field: 'photo ' + e.rank + ' (' + e.label + ')', from: 'photo now at position ' + e.rank, to: 'replace with ' + fileName(e.url) }); }\n    else { uploads.push({ listing_id: L.listing_id, url: e.url, rank: e.rank, label: e.label }); changes.push({ field: 'photo ' + e.rank + ' (' + e.label + ')', from: '(none)', to: 'add ' + fileName(e.url) }); }\n  });\n  images.slice(p.expectedImages).forEach((im, k) => { deletes.push({ listing_id: L.listing_id, listing_image_id: im.listing_image_id, rank: p.expectedImages + k + 1 }); changes.push({ field: 'photo ' + (p.expectedImages + k + 1), from: 'extra photo on Etsy', to: 'remove (the sheet has ' + p.expectedImages + ' photos)' }); });\n}\np.fields.filter(t => /^image url\\d+$/.test(t) && !fullSync).forEach(t => {\n  const n = Number(t.slice(9));\n  const e = p.images.find(x => x.label === 'IMAGE URL' + n || x.label.startsWith('IMAGE URL' + n + ' '));\n  if (!e) { warnings.push('IMAGE URL' + n + ' has no photo to use (empty cell or a duplicate): skipped'); return; }\n  if (have !== p.expectedImages) { problems.push('cannot replace IMAGE URL' + n + ': Etsy has ' + have + ' photos but the sheet has ' + p.expectedImages + ', so positions would not match (use the images token to sync all photos with the sheet)'); return; }\n  const old = images[e.rank - 1];\n  if (!old || !old.listing_image_id) { problems.push('cannot find the photo at position ' + e.rank + ' on Etsy'); return; }\n  replaces.push({ listing_id: L.listing_id, url: e.url, rank: e.rank, label: e.label, old_image_id: old.listing_image_id });\n  changes.push({ field: 'photo ' + e.rank + ' (' + e.label + ')', from: 'photo now at position ' + e.rank, to: 'replace with ' + fileName(e.url) });\n});\n// what Etsy will hold after this run: tags from the sheet when they are being set, otherwise the ones already there\nconst tagsFinal = patch.tags ? p.tags.length : (L.tags || []).length;\nconst imagesFinal = fullSync ? p.expectedImages : have;\nif (has('publish')) {\n  if (state !== 'draft') warnings.push('publish requested but the listing is already ' + state);\n  else {\n    const why = [];\n    if (tagsFinal !== 13) why.push('it would have ' + tagsFinal + ' of 13 tags');\n    if (imagesFinal !== p.expectedImages) why.push('it would have ' + imagesFinal + ' of ' + p.expectedImages + ' photos');\n    if (why.length) warnings.push('would NOT publish: ' + why.join(', '));\n    else changes.push({ field: 'publish', from: 'draft', to: 'live (Etsy fee 0.20 USD)' });\n  }\n}\nconst dry = cfg.dryRun !== false;\nconst doUpdate = problems.length === 0 && !dry;\nreturn [{ json: { ok: problems.length === 0, problems, warnings, state, changes, patch, needPatch: Object.keys(patch).length > 0, invBody, propsToSet, uploads, replaces, deletes, imagesOnEtsy: have, tagsFinal, wantPublish: has('publish'), doUpdate, dry } }];"
       },
-      "id": "af91a0e8-0c6d-428d-a889-1af614a3acd6",
+      "id": "5e9a99e5-9ab9-4eee-84ba-095ee6e70de0",
       "name": "Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
-        640
+        1760,
+        528
       ]
     },
     {
@@ -313,26 +313,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "228976ca-eb35-4064-84f3-402a14560570",
+      "id": "750d850d-69e9-4415-9ca7-b2a7bd080e3a",
       "name": "Plan ok?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2016,
-        640
+        1984,
+        528
       ]
     },
     {
       "parameters": {
         "jsCode": "const j = $input.first().json;\nreturn [{ json: { ok: false, tab: $('Config').first().json.tab, sku: $('Config').first().json.sku, problems: j.problems || [] } }];"
       },
-      "id": "32c36797-d599-43cd-bca0-1ac7a6b38f6d",
+      "id": "aa38cbf8-708b-4307-9e3f-353bd8fda9c0",
       "name": "Report Plan Problem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2352,
-        656
+        2320,
+        544
       ]
     },
     {
@@ -360,13 +360,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "c60c5e27-8665-4f41-a21c-00ba677f4ede",
+      "id": "6d2ac0fd-346c-4d86-9d4c-d14192f9f561",
       "name": "Listing fields to change?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        480,
-        336
+        448,
+        224
       ]
     },
     {
@@ -389,13 +389,13 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($('Plan').first().json.patch) }}"
       },
-      "id": "7f4b6e02-d239-47b1-9530-ce2a47e73369",
+      "id": "712b2365-853a-40f5-afdd-e5f8325e7c7e",
       "name": "Update Listing",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        448,
-        160
+        416,
+        48
       ],
       "credentials": {
         "oAuth2Api": {
@@ -430,26 +430,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "f5b759e7-0d26-4e27-b8c6-aff75298ee2c",
+      "id": "1fc0b71b-45d2-4663-91a9-aad9cbecc619",
       "name": "Properties to set?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        816,
-        352
+        784,
+        240
       ]
     },
     {
       "parameters": {
         "jsCode": "const p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nreturn plan.propsToSet.map(x => ({ json: { listing_id: p.listingId, property_id: x.id, name: x.name, body: x.body } }));"
       },
-      "id": "ae6571a5-4744-471e-9991-db97891cdb58",
+      "id": "4dfef9c5-2284-4987-a0be-ec2cbdd7aeec",
       "name": "Prep Properties",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        704,
-        112
+        672,
+        0
       ]
     },
     {
@@ -479,13 +479,13 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.body) }}"
       },
-      "id": "480799fd-7f7a-4201-b742-bd0154428de5",
+      "id": "388f4311-3ec1-4612-9eeb-d4dc54f80bef",
       "name": "Set Property",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        912,
-        112
+        880,
+        0
       ],
       "credentials": {
         "oAuth2Api": {
@@ -499,13 +499,13 @@
       "parameters": {
         "jsCode": "const err = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 160);\nconst names = $('Prep Properties').all().map(i => i.json.name);\nconst errors = $input.all().map((i, k) => i.json.error ? names[k] + ': ' + err(i.json.error) : null).filter(Boolean);\nreturn [{ json: { propErrors: errors, propsSet: names.length - errors.length } }];"
       },
-      "id": "63c2f79b-b4c7-42ea-920e-64c8ad181cc8",
+      "id": "be1ff58e-b76c-43e1-9336-4e048459449f",
       "name": "Collect Props",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
-        112
+        1088,
+        0
       ]
     },
     {
@@ -533,13 +533,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "5ace2239-f9ec-4fb1-939f-e9df6b44d477",
+      "id": "b1e937ba-905a-450f-9443-2fa85d744837",
       "name": "Price or SKU to set?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1088,
-        368
+        1056,
+        256
       ]
     },
     {
@@ -562,13 +562,13 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($('Plan').first().json.invBody) }}"
       },
-      "id": "476a2308-06b9-4237-9a8f-55647ea263a9",
+      "id": "d66d95a9-f8cb-4ba0-804c-38802a680769",
       "name": "Update Inventory",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1488,
-        112
+        1456,
+        0
       ],
       "credentials": {
         "oAuth2Api": {
@@ -603,26 +603,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "8e6152aa-9b2f-4d1f-8c1c-1395bb721b6d",
+      "id": "1d60e4fe-ef8d-4e4a-ad4e-5932f9628db4",
       "name": "Images to add?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1440,
-        384
+        1408,
+        272
       ]
     },
     {
       "parameters": {
         "jsCode": "return $('Plan').first().json.uploads.map(x => ({ json: x }));"
       },
-      "id": "3b73f5ff-44b3-4742-a14a-3091e3876e7c",
+      "id": "17231149-f19e-4d47-bcf3-e6aa2c91e52e",
       "name": "Prep Images",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1776,
-        128
+        1744,
+        16
       ]
     },
     {
@@ -642,13 +642,13 @@
           }
         }
       },
-      "id": "3b8e12b6-d8b8-406b-a91f-cc40e0fc81c8",
+      "id": "4daa64e6-98e6-4643-8921-a2bb21772bed",
       "name": "Download Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1984,
-        128
+        1952,
+        16
       ],
       "onError": "continueRegularOutput"
     },
@@ -691,13 +691,13 @@
           ]
         }
       },
-      "id": "e2dfca3f-dd0d-4f9d-be63-eae7bd1615c1",
+      "id": "766d9de6-247f-4d6f-884b-e49c31817160",
       "name": "Upload Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2208,
-        128
+        2176,
+        16
       ],
       "credentials": {
         "oAuth2Api": {
@@ -714,13 +714,13 @@
       "parameters": {
         "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst prep = $('Prep Images').all().map(i => i.json);\nconst failed = [];\n$input.all().forEach((i, k) => { const j = i.json; if (j.error || !j.listing_image_id) failed.push(prep[k].label + ': ' + friendly(j.error || j)); });\nreturn [{ json: { uploaded: prep.length - failed.length, failed } }];"
       },
-      "id": "0ab70e76-51e5-4dc1-aab0-48338f1d6410",
+      "id": "4f8cb6bf-cb7a-4f7b-92b3-ccd645065e13",
       "name": "Collect Uploads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2432,
-        128
+        2400,
+        16
       ]
     },
     {
@@ -739,13 +739,13 @@
         },
         "options": {}
       },
-      "id": "8947c310-e4df-433a-bf00-0ae8512c0b88",
+      "id": "e45c4925-b8eb-4f43-b448-34ad9055ec54",
       "name": "Verify Images",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1968,
-        416
+        1936,
+        304
       ],
       "credentials": {
         "oAuth2Api": {
@@ -757,15 +757,15 @@
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nconst f = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nconst tryGet = n => { try { return $(n).first().json; } catch (e) { return null; } };\nconst patchRes = tryGet('Update Listing'), invRes = tryGet('Update Inventory'), props = tryGet('Collect Props'), up = tryGet('Collect Uploads'), rep = tryGet('Collect Replace');\nconst v = $input.first().json;\nconst errors = [];\nif (patchRes && patchRes.error) errors.push('listing: ' + f(patchRes.error));\nif (invRes && invRes.error) errors.push('price/sku: ' + f(invRes.error));\nif (props && props.propErrors.length) errors.push('properties: ' + props.propErrors.join('; '));\nif (up && up.failed.length) errors.push('images: ' + up.failed.join('; '));\nif (rep && rep.failed.length) errors.push('photo replace: ' + rep.failed.join('; '));\nlet onEtsy = plan.imagesOnEtsy;\nif (!cfg.dryRun) { if (v.error) errors.push('could not re-count images: ' + f(v.error)); else if (Array.isArray(v.results)) onEtsy = v.results.length; }\nif (!cfg.dryRun && (p.fields.includes('images') || plan.replaces.length) && onEtsy !== p.expectedImages) errors.push('images on Etsy ' + onEtsy + ' of ' + p.expectedImages);\nconst tagsNow = patchRes && !patchRes.error && Array.isArray(patchRes.tags) ? patchRes.tags.length : (plan.needPatch && plan.patch.tags ? 0 : null);\nconst tagsOk = plan.patch.tags ? (patchRes && !patchRes.error && p.tags.length === 13) : p.tags.length === 13;\nconst publishNow = !cfg.dryRun && plan.wantPublish && plan.state === 'draft' && plan.tagsFinal === 13 && onEtsy === p.expectedImages && onEtsy > 0 && errors.length === 0;\nif (plan.wantPublish && plan.state !== 'draft') plan.warnings.push('publish requested but the listing is already ' + plan.state);\nif (plan.wantPublish && !cfg.dryRun && !publishNow && plan.state === 'draft') errors.push('not published: needs 13 tags, all photos and no errors');\nreturn [{ json: { publishNow, errors, imagesOnEtsy: onEtsy } }];"
+        "jsCode": "const cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nconst f = e => (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 200);\nconst tryGet = n => { try { return $(n).first().json; } catch (e) { return null; } };\nconst patchRes = tryGet('Update Listing'), invRes = tryGet('Update Inventory'), props = tryGet('Collect Props'), up = tryGet('Collect Uploads'), rep = tryGet('Collect Replace'), del_ = tryGet('Collect Delete');\nconst v = $input.first().json;\nconst errors = [];\nif (patchRes && patchRes.error) errors.push('listing: ' + f(patchRes.error));\nif (invRes && invRes.error) errors.push('price/sku: ' + f(invRes.error));\nif (props && props.propErrors.length) errors.push('properties: ' + props.propErrors.join('; '));\nif (up && up.failed.length) errors.push('images: ' + up.failed.join('; '));\nif (rep && rep.failed.length) errors.push('photo replace: ' + rep.failed.join('; '));\nif (del_ && del_.failed.length) errors.push('photo remove: ' + del_.failed.join('; '));\nlet onEtsy = plan.imagesOnEtsy;\nif (!cfg.dryRun) { if (v.error) errors.push('could not re-count images: ' + f(v.error)); else if (Array.isArray(v.results)) onEtsy = v.results.length; }\nif (!cfg.dryRun && (p.fields.includes('images') || plan.replaces.length) && onEtsy !== p.expectedImages) errors.push('images on Etsy ' + onEtsy + ' of ' + p.expectedImages);\nconst tagsNow = patchRes && !patchRes.error && Array.isArray(patchRes.tags) ? patchRes.tags.length : (plan.needPatch && plan.patch.tags ? 0 : null);\nconst tagsOk = plan.patch.tags ? (patchRes && !patchRes.error && p.tags.length === 13) : p.tags.length === 13;\nconst publishNow = !cfg.dryRun && plan.wantPublish && plan.state === 'draft' && plan.tagsFinal === 13 && onEtsy === p.expectedImages && onEtsy > 0 && errors.length === 0;\nif (plan.wantPublish && plan.state !== 'draft') plan.warnings.push('publish requested but the listing is already ' + plan.state);\nif (plan.wantPublish && !cfg.dryRun && !publishNow && plan.state === 'draft') errors.push('not published: needs 13 tags, all photos and no errors');\nreturn [{ json: { publishNow, errors, imagesOnEtsy: onEtsy } }];"
       },
-      "id": "71a24000-f1ae-4400-97cb-461060fa14f9",
+      "id": "b873c8c7-0f58-441d-b3b1-9f221519d8dc",
       "name": "Finish",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
-        416
+        2128,
+        304
       ]
     },
     {
@@ -793,13 +793,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "737967a9-976f-4c33-be2c-a551e730ad52",
+      "id": "92373ba0-d143-4ff0-9988-6da677ca7206",
       "name": "Publish?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2368,
-        416
+        2336,
+        304
       ]
     },
     {
@@ -822,13 +822,13 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ state: 'active' }) }}"
       },
-      "id": "351a0d20-9966-40d9-81e5-2e4ac6e21bcd",
+      "id": "fec9983d-a1c5-42bb-8ada-20b9ceee9a20",
       "name": "Publish",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2800,
-        128
+        2768,
+        16
       ],
       "credentials": {
         "oAuth2Api": {
@@ -842,13 +842,13 @@
       "parameters": {
         "jsCode": "const cfg = $('Config').first().json;\nconst p = $('Pick Row').first().json;\nconst plan = $('Plan').first().json;\nconst f = $('Finish').first().json;\nconst tryGet = n => { try { return $(n).first().json; } catch (e) { return null; } };\nconst pub = tryGet('Publish');\nconst errors = f.errors.slice();\nconst published = !!(f.publishNow && pub && !pub.error && pub.state === 'active');\nif (f.publishNow && !published) errors.push('publish: ' + (pub && pub.error ? JSON.stringify(pub.error).slice(0, 200) : 'did not become active'));\n// the status word follows the real state: a draft is draft (or draft_with_errors while there are errors), our listings that are live are published, old listings keep their word (live)\nlet status = p.sheetStatus;\nif (published) status = 'published';\nelse if (plan.state === 'draft') status = errors.length ? 'draft_with_errors' : 'draft';\nelse if (plan.state === 'active' && (!status || status === 'draft' || status === 'draft_with_errors')) status = 'published';\nconst vals = { etsystatus: status, etsyerror: errors.join(' | '), etsyimagecount: f.imagesOnEtsy, etsysyncedat: new Date().toISOString(), etsyfieldstoupdate: errors.length ? p.fields.join(', ') : '', etsyreadytopost: 'no' };\nif (!errors.length) { vals.etsypricecad = p.priceCad; vals.etsycategoryid = p.taxonomyId; }\nconst data = Object.entries(vals).map(([k, val]) => ({ range: \"'\" + p.tab.replace(/'/g, \"''\") + \"'!\" + p.writeCols[k] + p.row, values: [[val]] }));\nreturn [{ json: { body: { valueInputOption: 'RAW', data }, summary: { tab: p.tab, sku: p.sku, row: p.row, listingId: p.listingId, fields: p.fields, changes: plan.changes, dryRun: !!cfg.dryRun, published, status, errors, warnings: plan.warnings || [] }, doWrite: cfg.dryRun !== true } }];"
       },
-      "id": "3870fcd5-abb2-4498-85df-449803c37fb6",
+      "id": "a8d98ce5-1e4b-4357-af87-2f704092beed",
       "name": "Build Write",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2704,
-        432
+        2672,
+        320
       ]
     },
     {
@@ -876,13 +876,13 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "130770ab-7d59-4dab-a111-94f32ced3ad0",
+      "id": "a8cf74cd-8ba1-40d7-afcd-e1b52d04d73c",
       "name": "Write to sheet?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2912,
-        432
+        2880,
+        320
       ]
     },
     {
@@ -896,13 +896,13 @@
         "jsonBody": "={{ JSON.stringify($json.body) }}",
         "options": {}
       },
-      "id": "7588f533-d340-4288-8c88-07b30ccbdda5",
+      "id": "3b447ce0-39ff-4c80-8004-52a0d95c6def",
       "name": "Write Back",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        2848,
-        672
+        2816,
+        560
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -915,13 +915,13 @@
       "parameters": {
         "jsCode": "const s = $('Build Write').first().json.summary;\nreturn [{ json: { ok: s.errors.length === 0, ...s } }];"
       },
-      "id": "be6aad66-d292-492e-aae3-03527d1f3a4f",
+      "id": "d544a589-3df5-43d5-a741-9c58a571b341",
       "name": "Final Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3376,
-        448
+        3344,
+        336
       ]
     },
     {
@@ -949,26 +949,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "5af3d42b-25e7-497a-8866-f272035bb2e9",
+      "id": "cdb712ff-0ec2-4d20-affb-f24f716b8d29",
       "name": "Photos to replace?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1632,
-        400
+        1600,
+        288
       ]
     },
     {
       "parameters": {
         "jsCode": "return $('Plan').first().json.replaces.map(x => ({ json: x }));"
       },
-      "id": "bae329f5-15aa-4ef5-b32a-85f5eac4f4df",
+      "id": "8bc009b6-a3d9-4131-b749-ed6fd448e564",
       "name": "Prep Replace",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1552,
-        976
+        1520,
+        864
       ]
     },
     {
@@ -988,13 +988,13 @@
           }
         }
       },
-      "id": "2fa7c206-6bc8-4a48-88b7-e668daeb2875",
+      "id": "51a25e79-306f-49fd-b593-467371ad88c6",
       "name": "Download Replacement",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1744,
-        976
+        1712,
+        864
       ],
       "onError": "continueRegularOutput"
     },
@@ -1041,13 +1041,13 @@
           ]
         }
       },
-      "id": "a7fe4aa7-77f4-40a8-b8ff-66754524f0dd",
+      "id": "6f120b56-c834-41fa-a07c-f4fda2e168e2",
       "name": "Replace Photo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1952,
-        976
+        1920,
+        864
       ],
       "credentials": {
         "oAuth2Api": {
@@ -1064,13 +1064,113 @@
       "parameters": {
         "jsCode": "const friendly = e => { const t = typeof e === 'string' ? e : JSON.stringify(e); return /binary file/i.test(t) ? 'the image could not be downloaded (the link in the sheet may be dead)' : t.slice(0, 200); };\nconst prep = $('Prep Replace').all().map(i => i.json);\nconst failed = [];\n$input.all().forEach((i, k) => { const j = i.json; if (j.error || !j.listing_image_id) failed.push(prep[k].label + ': ' + friendly(j.error || j)); });\nreturn [{ json: { replaced: prep.length - failed.length, failed } }];"
       },
-      "id": "3362c2d3-8f5c-4f8b-a95e-cf9e20f23376",
+      "id": "2892a415-dc25-44ae-9c6f-a4b9180e8bdd",
       "name": "Collect Replace",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2144,
-        976
+        2112,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "df131b6d-6fd5-4c61-b42c-f428f41f1630",
+              "leftValue": "={{ $('Plan').first().json.deletes.length > 0 && $('Plan').first().json.doUpdate === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "35fbbe59-bc26-471d-953a-b12889329288",
+      "name": "Photos to delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2320,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Plan').first().json.deletes.map(x => ({ json: x }));"
+      },
+      "id": "55ac54ab-3939-4653-aa23-32c1d4ab7da0",
+      "name": "Prep Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://openapi.etsy.com/v3/application/shops/{{ $('Config').first().json.shopId }}/listings/{{ $json.listing_id }}/images/{{ $json.listing_image_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Config').first().json.apiKey }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "76628a07-2bdf-40bd-8b4c-a8d1a60757ce",
+      "name": "Delete Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        864
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "rMYED9sGlRCBOoEN",
+          "name": "Etsy - MarblebeeDesign"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Prep Delete').all().map(i => i.json);\nconst failed = [];\n$input.all().forEach((i, k) => { const j = i.json; if (j.error) failed.push('photo ' + prep[k].rank + ': ' + JSON.stringify(j.error).slice(0, 200)); });\nreturn [{ json: { removed: prep.length - failed.length, failed } }];"
+      },
+      "id": "46cad756-b097-435e-9ffe-538bc8ebf8e6",
+      "name": "Collect Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        864
       ]
     }
   ],
@@ -1484,7 +1584,7 @@
         ],
         [
           {
-            "node": "Verify Images",
+            "node": "Photos to delete?",
             "type": "main",
             "index": 0
           }
@@ -1528,6 +1628,57 @@
       "main": [
         [
           {
+            "node": "Photos to delete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Photos to delete?": {
+      "main": [
+        [
+          {
+            "node": "Prep Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verify Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Photo": {
+      "main": [
+        [
+          {
+            "node": "Collect Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Delete": {
+      "main": [
+        [
+          {
             "node": "Verify Images",
             "type": "main",
             "index": 0
@@ -1542,8 +1693,8 @@
     "binaryMode": "separate"
   },
   "tags": [],
-  "id": "yKcukUhxxiWPlUQx",
-  "versionId": "c301f798-8172-477a-8f5c-c5ae70f94e2a",
+  "id": "NHkOg7jbEoDuJ9Ym",
+  "versionId": "301f7cd6-ecba-47b8-bfb9-7dd452a88e19",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
