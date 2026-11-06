@@ -52,6 +52,18 @@
               "name": "sheets",
               "type": "string",
               "value": ""
+            },
+            {
+              "id": "cfg-skus",
+              "name": "skus",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "cfg-force",
+              "name": "forceFields",
+              "type": "string",
+              "value": "IMAGE URL1"
             }
           ]
         },
@@ -132,7 +144,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Memory fix: the pipeline used to read EVERY column of EVERY row of every sheet (long descriptions, HTML\n// signatures, Etsy text...) and keep it in memory for the whole run. Now each sheet is read in two phases:\n//   1) only the few short columns the CAD sync / publish check / readiness check need, for all rows\n//   2) every column, but only for the rows that are Ready_to_post\n// This node turns the header row (row 2) into the column ranges for phase 1.\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst SHEET = $('🔄 Loop Through Sheets').item?.json?.sheet_name\n  ?? $('🔄 Loop Through Sheets').first()?.json?.sheet_name;\nconst headers = ($input.first().json.values?.[0] || []).map(h => String(h ?? '').trim());\nconst NEEDED = ['Ready_to_post', 'Fields_to_update', 'Shopify_Product_URL', 'Shopify_Update_product_URL',\n  'create_time', 'CAD Drawing URL', 'IMAGE URL11'];\nconst letters = (n) => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\n// last occurrence wins, like the Sheets node when a header name repeats\nconst slimCols = NEEDED.map(name => ({ name, idx: headers.lastIndexOf(name) })).filter(c => c.idx >= 0);\nconst ranges = slimCols.length\n  ? slimCols.map(c => `${q(SHEET)}!${letters(c.idx)}3:${letters(c.idx)}`)\n  : [`${q(SHEET)}!A2:A2`];\nconst slimUrl = `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=COLUMNS&valueRenderOption=FORMATTED_VALUE&`\n  + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');\nreturn [{ json: { sheet_name: SHEET, headers, lastCol: letters(Math.max(headers.length - 1, 0)), slimCols, slimUrl } }];\n"
+        "jsCode": "// Memory fix: the pipeline used to read EVERY column of EVERY row of every sheet (long descriptions, HTML\n// signatures, Etsy text...) and keep it in memory for the whole run. Now each sheet is read in two phases:\n//   1) only the few short columns the CAD sync / publish check / readiness check need, for all rows\n//   2) every column, but only for the rows that are Ready_to_post\n// This node turns the header row (row 2) into the column ranges for phase 1.\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst SHEET = $('🔄 Loop Through Sheets').item?.json?.sheet_name\n  ?? $('🔄 Loop Through Sheets').first()?.json?.sheet_name;\nconst headers = ($input.first().json.values?.[0] || []).map(h => String(h ?? '').trim());\nconst NEEDED = ['Product No.', 'Ready_to_post', 'Fields_to_update', 'Shopify_Product_URL', 'Shopify_Update_product_URL',\n  'create_time', 'CAD Drawing URL', 'IMAGE URL11'];\nconst letters = (n) => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\n// last occurrence wins, like the Sheets node when a header name repeats\nconst slimCols = NEEDED.map(name => ({ name, idx: headers.lastIndexOf(name) })).filter(c => c.idx >= 0);\nconst ranges = slimCols.length\n  ? slimCols.map(c => `${q(SHEET)}!${letters(c.idx)}3:${letters(c.idx)}`)\n  : [`${q(SHEET)}!A2:A2`];\nconst slimUrl = `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=COLUMNS&valueRenderOption=FORMATTED_VALUE&`\n  + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');\nreturn [{ json: { sheet_name: SHEET, headers, lastCol: letters(Math.max(headers.length - 1, 0)), slimCols, slimUrl } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -182,7 +194,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Phase 2: which rows of this sheet are Ready_to_post? Only those are read in full.\n// Consecutive row numbers are merged into one range, and the ranges are sent in chunks of 40.\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst plan = $('🧮 Plan Slim Columns').first().json;\nconst slim = $('🧱 Build Slim Rows').all().map(i => i.json);\nconst isReady = (r) => ['yes', 'true'].includes(String(r.Ready_to_post ?? '').trim().toLowerCase());\nconst rowNumbers = slim.filter(r => r.row_number && isReady(r)).map(r => r.row_number).sort((a, b) => a - b);\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\nconst runs = [];\nfor (const n of rowNumbers) {\n  const last = runs[runs.length - 1];\n  if (last && n === last[1] + 1) last[1] = n; else runs.push([n, n]);\n}\nconst ranges = runs.map(([a, b]) => `${q(plan.sheet_name)}!A${a}:${plan.lastCol}${b}`);\nif (!ranges.length) {\n  // nothing ready: a harmless request (the header row) so the line still continues\n  return [{ json: { noReady: true, url: `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values/${encodeURIComponent(q(plan.sheet_name) + '!2:2')}` } }];\n}\nconst out = [];\nfor (let i = 0; i < ranges.length; i += 40) {\n  const chunk = ranges.slice(i, i + 40);\n  out.push({ json: { noReady: false, url: `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE&` + chunk.map(r => 'ranges=' + encodeURIComponent(r)).join('&') } });\n}\nreturn out;\n"
+        "jsCode": "// Phase 2: which rows of this sheet are Ready_to_post? Only those are read in full.\n// Consecutive row numbers are merged into one range, and the ranges are sent in chunks of 40.\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst plan = $('🧮 Plan Slim Columns').first().json;\nconst slim = $('🧱 Build Slim Rows').all().map(i => i.json);\n// Settings.skus: comma separated product numbers that are processed even when the sheet row is not flagged (the sheet is not edited to flag them)\nlet skuSet = new Set();\ntry { skuSet = new Set(String($('⚙️ Settings').first().json.skus || '').split(/[,;\\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean)); } catch (e) { skuSet = new Set(); }\nconst isListed = (r) => skuSet.has(String(r['Product No.'] ?? '').trim().toUpperCase());\nconst isReady = (r) => ['yes', 'true'].includes(String(r.Ready_to_post ?? '').trim().toLowerCase()) || isListed(r);\nconst rowNumbers = slim.filter(r => r.row_number && isReady(r)).map(r => r.row_number).sort((a, b) => a - b);\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\nconst runs = [];\nfor (const n of rowNumbers) {\n  const last = runs[runs.length - 1];\n  if (last && n === last[1] + 1) last[1] = n; else runs.push([n, n]);\n}\nconst ranges = runs.map(([a, b]) => `${q(plan.sheet_name)}!A${a}:${plan.lastCol}${b}`);\nif (!ranges.length) {\n  // nothing ready: a harmless request (the header row) so the line still continues\n  return [{ json: { noReady: true, url: `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values/${encodeURIComponent(q(plan.sheet_name) + '!2:2')}` } }];\n}\nconst out = [];\nfor (let i = 0; i < ranges.length; i += 40) {\n  const chunk = ranges.slice(i, i + 40);\n  out.push({ json: { noReady: false, url: `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE&` + chunk.map(r => 'ranges=' + encodeURIComponent(r)).join('&') } });\n}\nreturn out;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -219,7 +231,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Turns the full-row responses into the same row objects the \"Read Sheet Data\" node used to produce\n// (header name -> cell text, plus row_number), but only for the Ready_to_post rows. These go straight into\n// the unchanged product filter. A sheet with nothing ready emits one not-ready placeholder.\nconst plan = $('🧮 Plan Slim Columns').first().json;\nif ($('🔎 Pick Ready Rows').all()[0]?.json?.noReady) {\n  return [{ json: { __sheet_name: plan.sheet_name, __no_ready: true } }];\n}\nconst out = [];\nfor (const resp of $input.all()) {\n  for (const vr of (resp.json.valueRanges || [])) {\n    const m = String(vr.range || '').match(/!\\$?[A-Z]+(\\d+)/);\n    const start = m ? Number(m[1]) : null;\n    (vr.values || []).forEach((vals, k) => {\n      const row = {};\n      plan.headers.forEach((h, i) => { if (h) row[h] = vals[i] === undefined ? '' : vals[i]; });\n      row.row_number = start + k;\n      row.__sheet_name = plan.sheet_name;\n      out.push({ json: row });\n    });\n  }\n}\nreturn out.length ? out : [{ json: { __sheet_name: plan.sheet_name, __no_ready: true } }];\n"
+        "jsCode": "// Turns the full-row responses into the same row objects the \"Read Sheet Data\" node used to produce\n// (header name -> cell text, plus row_number), but only for the Ready_to_post rows. These go straight into\n// the unchanged product filter. A sheet with nothing ready emits one not-ready placeholder.\nconst plan = $('🧮 Plan Slim Columns').first().json;\nif ($('🔎 Pick Ready Rows').all()[0]?.json?.noReady) {\n  return [{ json: { __sheet_name: plan.sheet_name, __no_ready: true } }];\n}\nlet skuSet = new Set(), forceFields = '';\ntry { const s = $('⚙️ Settings').first().json; skuSet = new Set(String(s.skus || '').split(/[,;\\s]+/).map(x => x.trim().toUpperCase()).filter(Boolean)); forceFields = String(s.forceFields || '').trim(); } catch (e) { skuSet = new Set(); }\nconst out = [];\nfor (const resp of $input.all()) {\n  for (const vr of (resp.json.valueRanges || [])) {\n    const m = String(vr.range || '').match(/!\\$?[A-Z]+(\\d+)/);\n    const start = m ? Number(m[1]) : null;\n    (vr.values || []).forEach((vals, k) => {\n      const row = {};\n      plan.headers.forEach((h, i) => { if (h) row[h] = vals[i] === undefined ? '' : vals[i]; });\n      row.row_number = start + k;\n      // listed SKU: treated as flagged for this run (needs both Shopify links to count as an update)\n      if (skuSet.has(String(row['Product No.'] ?? '').trim().toUpperCase())) { row.Ready_to_post = 'yes'; if (forceFields) row.Fields_to_update = forceFields; }\n      row.__sheet_name = plan.sheet_name;\n      out.push({ json: row });\n    });\n  }\n}\nreturn out.length ? out : [{ json: { __sheet_name: plan.sheet_name, __no_ready: true } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -354,7 +366,7 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_UPDATE_SUBWORKFLOW_ID",
+          "value": "n63ydI4EUCqwbGoL",
           "mode": "list",
           "cachedResultName": "Shopify Update Pipeline (GraphQL) - Update Product (sub-workflow)"
         },
@@ -378,11 +390,12 @@
       "position": [
         1632,
         96
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { dryRun: false, processed: $input.all().length, message: 'Update run finished. Check each product on the website and the sheet rows (Ready_to_post back to no, Fields_to_update cleared).' } }];"
+        "jsCode": "const items = $input.all();\nconst failed = items.filter(i => i.json && i.json.error);\nconst msg = i => { const e = i.json.error; return String((e && e.message) || e).slice(0, 220); };\nreturn [{ json: { dryRun: false, processed: items.length, succeeded: items.length - failed.length, failed: failed.length, failedMessages: failed.slice(0, 40).map(msg), message: failed.length ? 'Some products failed (a failed product is left unchanged). See failedMessages.' : 'Update run finished. Check each product on the website.' } }];"
       },
       "id": "ae92a405-6a16-42f0-9914-139e3889cd92",
       "name": "Summary",
