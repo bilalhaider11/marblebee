@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -80,
-        -260
+        10608,
+        3392
       ]
     },
     {
@@ -23,8 +23,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        300
+        11312,
+        4032
       ]
     },
     {
@@ -154,8 +154,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        220,
-        300
+        11536,
+        4032
       ]
     },
     {
@@ -170,8 +170,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        440,
-        300
+        11760,
+        4032
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -195,8 +195,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
-        300
+        11984,
+        4032
       ],
       "executeOnce": true,
       "retryOnFail": true,
@@ -227,8 +227,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        880,
-        300
+        12192,
+        4032
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -260,8 +260,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1100,
-        300
+        12416,
+        4032
       ],
       "executeOnce": true,
       "alwaysOutputData": true,
@@ -283,8 +283,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        300
+        12640,
+        4032
       ]
     },
     {
@@ -327,8 +327,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1500,
-        300
+        12912,
+        4032
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -347,8 +347,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1600,
-        160
+        13136,
+        4032
       ]
     },
     {
@@ -370,8 +370,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1760,
-        160
+        13376,
+        4032
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -390,8 +390,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1920,
-        300
+        13600,
+        4032
       ]
     },
     {
@@ -424,8 +424,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1980,
-        300
+        12384,
+        4272
       ]
     },
     {
@@ -437,8 +437,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
-        480
+        12112,
+        4240
       ]
     },
     {
@@ -450,8 +450,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
-        140
+        12624,
+        4256
       ]
     },
     {
@@ -484,8 +484,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2420,
-        140
+        12848,
+        4256
       ]
     },
     {
@@ -511,8 +511,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2640,
-        60
+        13104,
+        4240
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -531,8 +531,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2860,
-        140
+        13072,
+        4480
       ]
     },
     {
@@ -544,8 +544,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3080,
-        140
+        13312,
+        4480
       ]
     },
     {
@@ -578,8 +578,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        3300,
-        140
+        13536,
+        4480
       ]
     },
     {
@@ -615,8 +615,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3520,
-        60
+        13744,
+        4304
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -635,8 +635,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3740,
-        140
+        13936,
+        4496
       ]
     }
   ],
