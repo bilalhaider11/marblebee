@@ -1,0 +1,881 @@
+{
+  "name": "Pinterest Repair Stuck Pins (manual)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pinterest - Repair stuck Scheduled pins (manual)\n\nFixes rows that say **Scheduled** but never went out (their Metricool post failed, or they were published and the sheet never found out). Every Scheduled row is matched to its real Metricool post (by Post ID, or by the number in its Metricool Link):\n\n- **Published in Metricool** -> row becomes Published, with Pin URL, Pinned Time and Post ID.\n- **Failed, but the same photo is already published to the same board** -> row becomes Duplicate (never resent). The same photo on a different board is a deliberate re-pin and is still resent.\n- **Failed, otherwise** -> row goes back to Review / Approved with a new free slot (blog 15 a day, 2:3 5 a day), so the publish workflow sends it again. Only when resendFailed = true.\n- **Already posted by Tailwind** (a Tailwind pin with the same title and the same product or blog page, whose pin id is not in the sheet) -> row becomes Published with that pin's link and time. Never resent. This is checked before anything is resent.\n- **Failed, and Tailwind has an unclaimed pin for the same product/blog page** -> row is held (heldTailwindProduct), not resent, because one of them may be that pin. Check these by hand.\n- **Failed for an unclear reason (timeout, pin not found)** -> left alone and listed under checkByHand, because Pinterest may have created the pin anyway.\n- **Still pending / not found in Metricool** -> left alone and reported.\n\n**How to use**\n1. Leave dryRun = true and run. The last node lists what WOULD change; nothing is written.\n2. Set dryRun = false, resendFailed = false: marks the published rows and the duplicates. Safe while Pinterest is disconnected.\n3. After Pinterest is reconnected: set resendFailed = true and run again to send the failed BLOG pins back to Review. The 2:3 pins are held by a separate switch, resendPhoto, because Tailwind may already have posted some of them: only set resendPhoto = true after you have checked.\n4. **Before switching the publish workflow back on:** also set reslotOverdueReview = true. Approved pins in Review whose slot has passed would otherwise be given slots 24 h from now at 20-minute spacing, up to 25 per run, which sends far more than 15 a day. This gives them proper daily slots (after the resends) instead.\n5. Optional: deleteErroredPosts = true also deletes the failed Metricool posts that were reset (frees this month's Metricool limit). Off by default.\n\nRows with a Tailwind ID are never touched. resetUnmatched = true also treats rows whose Metricool post can no longer be found as failed (default false). Do NOT use it until you have confirmed those pins were not already posted another way (for example by Tailwind).\n\n**Safety (2026-11-10):** a real run (dryRun = false) writes nothing if any Metricool or Tailwind date window failed to load. A missing window makes real posts look 'not found', and with resetUnmatched on that reset a row whose pin may exist (row 1190). It reports NOT APPLIED instead: just run it again.",
+        "height": 560,
+        "width": 560
+      },
+      "id": "rp-readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "rp-run",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "userId",
+              "type": "string",
+              "value": "2803097"
+            },
+            {
+              "id": "c2",
+              "name": "blogId",
+              "type": "string",
+              "value": "3535389"
+            },
+            {
+              "id": "c3",
+              "name": "sheetId",
+              "type": "string",
+              "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc"
+            },
+            {
+              "id": "c4",
+              "name": "pinsTab",
+              "type": "string",
+              "value": "Pinterest Pins"
+            },
+            {
+              "id": "c5",
+              "name": "pinsTab2",
+              "type": "string",
+              "value": "Pinterest2:3 Pins"
+            },
+            {
+              "id": "c6",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "c7",
+              "name": "resendFailed",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c8",
+              "name": "resetUnmatched",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c17",
+              "name": "reslotOverdueReview",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c18",
+              "name": "resendPhoto",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c9",
+              "name": "deleteErroredPosts",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c10",
+              "name": "startDayOffset",
+              "type": "number",
+              "value": 1
+            },
+            {
+              "id": "c19",
+              "name": "tailwindAccountId",
+              "type": "string",
+              "value": "919328"
+            },
+            {
+              "id": "c11",
+              "name": "blogPerDay",
+              "type": "number",
+              "value": 15
+            },
+            {
+              "id": "c12",
+              "name": "blogHours",
+              "type": "string",
+              "value": "7,8,9,10,11,12,13,14,15,16,17,18,19,20,21"
+            },
+            {
+              "id": "c13",
+              "name": "blogMinute",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "c14",
+              "name": "photoPerDay",
+              "type": "number",
+              "value": 5
+            },
+            {
+              "id": "c15",
+              "name": "photoHours",
+              "type": "string",
+              "value": "7,10,13,16,19"
+            },
+            {
+              "id": "c16",
+              "name": "photoMinute",
+              "type": "number",
+              "value": 30
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "rp-cfg",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $('Config').first().json.sheetId + '/values/' + encodeURIComponent(\"'\" + String($('Config').first().json.pinsTab).replace(/'/g, \"''\") + \"'!1:1\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "rp-h1",
+      "name": "Get Header (Blog)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $('Config').first().json.sheetId + '/values/' + encodeURIComponent(\"'\" + String($('Config').first().json.pinsTab2).replace(/'/g, \"''\") + \"'!1:1\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "rp-h2",
+      "name": "Get Header (2:3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.pinsTab }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "rp-g1",
+      "name": "Get Pins",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        300
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1sl_1dY_q_o7lzHNdBx4oqlc_ERO8A_ApuPh_cR0MSdc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.pinsTab2 }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "rp-g2",
+      "name": "Get Pins 2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        300
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 14-day windows covering the period the stuck rows could have been scheduled in.\nconst out = [];\nlet cur = DateTime.fromISO('2026-07-01T00:00:00');\nconst end = DateTime.fromISO('2026-12-31T23:59:59');\nwhile (cur < end) {\n  const winEnd = DateTime.min(cur.plus({ days: 13 }).endOf('day'), end);\n  out.push({ json: { start: cur.toFormat(\"yyyy-LL-dd'T'HH:mm:ss\"), end: winEnd.toFormat(\"yyyy-LL-dd'T'HH:mm:ss\") } });\n  cur = cur.plus({ days: 14 }).startOf('day');\n}\nreturn out;\n"
+      },
+      "id": "rp-win",
+      "name": "Build Windows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://app.metricool.com/api/v2/scheduler/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $('Config').first().json.userId }}"
+            },
+            {
+              "name": "blogId",
+              "value": "={{ $('Config').first().json.blogId }}"
+            },
+            {
+              "name": "start",
+              "value": "={{ $json.start }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $json.end }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "id": "rp-mc",
+      "name": "Get Metricool Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HyOn8LPYniNVacXo",
+          "name": "Metricool API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1-day windows from July 1 to tomorrow. Tailwind needs a start and end date and returns at most 100 posts per call,\n// so a busy week would be cut off; one day at a time never reaches the limit.\nconst out = [];\nlet cur = DateTime.fromISO('2026-07-01T00:00:00', { zone: 'utc' });\nconst end = DateTime.utc().plus({ days: 1 });\nwhile (cur < end) {\n  const we = DateTime.min(cur.plus({ days: 1 }), end);\n  out.push({ json: { start: cur.toUTC().toISO(), end: we.toUTC().toISO() } });\n  cur = we;\n}\nreturn out;\n"
+      },
+      "id": "rp-twwin",
+      "name": "Build Tailwind Windows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api-v1.tailwind.ai/v1/accounts/' + $('Config').first().json.tailwindAccountId + '/posts?status=sent&limit=100&startDate=' + $json.start + '&endDate=' + $json.end }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "id": "rp-tw",
+      "name": "Get Tailwind Sent Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        160
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "04bNNmDkPyRmwKce",
+          "name": "Tailwind App"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// READ-ONLY planner. Looks at every row with Status = Scheduled, finds its real Metricool post and decides:\n//   PUBLISHED in Metricool  -> mark the row Published (Pin URL, Pinned Time, Post ID)\n//   ERROR, same photo already published to the same board -> mark Duplicate (never resent)\n//   ERROR, otherwise        -> back to Review + a new free slot (only when resendFailed = true)\n//   PENDING, row missing its Post ID or Scheduled Date -> fill ONLY those blank cells from the Metricool post (backfill)\n//   PENDING / not found     -> left alone (reported)\nconst cfg = $('Config').first().json;\nconst str = v => (v == null ? '' : String(v).trim());\nconst norm = v => str(v).toLowerCase();\nconst hoursOf = s => String(s).split(',').map(h => parseInt(h.trim(), 10)).filter(h => !isNaN(h));\nfunction colLetter(i) { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }\nfunction parseDate(v) {\n  const s = str(v); if (!s) return null;\n  for (const f of ['yyyy-LL-dd HH:mm', 'yyyy-LL-dd H:mm', 'M/d/yyyy HH:mm:ss', 'M/d/yyyy H:mm:ss', 'M/d/yyyy H:mm']) { const dt = DateTime.fromFormat(s, f); if (dt.isValid) return dt; }\n  const d = new Date(s); return isNaN(d.getTime()) ? null : DateTime.fromJSDate(d);\n}\n// Metricool posts, by id and by uuid (uuids are huge numbers: compare as doubles, exactly like the sheet link is parsed)\nconst byId = new Map(), byUuid = new Map();\nlet windowErrors = 0;\nfor (const it of $('Get Metricool Posts').all()) {\n  const j = it.json || {};\n  if (j.error) { windowErrors++; continue; }\n  const list = Array.isArray(j.data) ? j.data : Array.isArray(j.posts) ? j.posts : Array.isArray(j) ? j : (j.id ? [j] : []);\n  for (const p of list) { if (p.id != null) byId.set(String(p.id), p); if (p.uuid != null) byUuid.set(String(Number(p.uuid)), p); }\n}\n// Tailwind (the old scheduler) may already have published a pin the sheet never recorded. Match: same title AND same\n// product/blog page. Only Tailwind pins whose pin id is NOT already in the sheet are used, and each can be claimed once.\nconst normT = v => str(v).toLowerCase().replace(/\\s+/g, ' ').trim();\nconst normU = v => str(v).toLowerCase().split('?')[0].replace(/\\/+$/, '');\nconst twPosts = new Map(); let twWindowErrors = 0, twWindowsAtLimit = 0;\nfor (const it of $('Get Tailwind Sent Posts').all()) {\n  const j = it.json || {};\n  if (j.error) { twWindowErrors++; continue; }\n  const list = (j.data && Array.isArray(j.data.posts)) ? j.data.posts : (Array.isArray(j.posts) ? j.posts : []);\n  if (list.length >= 100) twWindowsAtLimit++;\n  for (const p of list) if (p.id && p.pinId) twPosts.set(String(p.id), p);\n}\nconst sheetPinIds = new Set();\nconst tabs = [\n  { key: 'blog', name: cfg.pinsTab, rows: $('Get Pins').all(), header: $('Get Header (Blog)').first().json, perDay: Number(cfg.blogPerDay), hours: hoursOf(cfg.blogHours), minute: Number(cfg.blogMinute) },\n  { key: 'photo', name: cfg.pinsTab2, rows: $('Get Pins 2').all(), header: $('Get Header (2:3)').first().json, perDay: Number(cfg.photoPerDay), hours: hoursOf(cfg.photoHours), minute: Number(cfg.photoMinute) }\n];\nfor (const t0 of tabs) for (const it of t0.rows) { const m = /pin\\/(\\d+)/.exec(str((it.json || {})['Pin URL'])); if (m) sheetPinIds.add(m[1]); }\nconst twByKey = new Map();\nfor (const tp of twPosts.values()) {\n  if (sheetPinIds.has(String(tp.pinId))) continue;           // already recorded in a row\n  const k = normT(tp.title) + '|' + normU(tp.url);\n  if (!twByKey.has(k)) twByKey.set(k, []);\n  twByKey.get(k).push(tp);\n}\nconst reslotOverdue = cfg.reslotOverdueReview === true, resendFailed = cfg.resendFailed === true, resetUnmatched = cfg.resetUnmatched === true, deleteErrored = cfg.deleteErroredPosts === true;\nconst summary = { dryRun: cfg.dryRun !== false, resendFailed, reslotOverdueReview: reslotOverdue, resetUnmatched, deleteErroredPosts: deleteErrored, metricoolPostsFound: byId.size, metricoolWindowErrors: windowErrors, tailwindSentPostsFound: twPosts.size, tailwindPinsNotInSheet: [...twByKey.values()].reduce((a, v) => a + v.length, 0), tailwindWindowErrors: twWindowErrors, tailwindWindowsAtLimit: twWindowsAtLimit, tabs: {} };\nconst writes = [], deletes = [];\nconst pinnedIso = (post) => {\n  const pd = post.publicationDate || {}; if (!pd.dateTime) return '';\n  const dt = DateTime.fromISO(pd.dateTime, { zone: pd.timezone || 'utc' });\n  return dt.isValid ? dt.toUTC().toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\") : '';\n};\n\nfor (const t of tabs) {\n  const headers = ((t.header.values || [[]])[0] || []).map(h => str(h));\n  const col = {}; headers.forEach((h, i) => { if (h && !(h in col)) col[h] = colLetter(i); });\n  const rows = t.rows.map(i => i.json || {}).filter(r => r['row_number'] != null);\n  // A pin is a duplicate only when the SAME photo is already published to the SAME board. The same photo on a\n  // different board is a deliberate re-pin (allowed for Manual Blogs) and must still be sent.\n  const imgKey = r => (str(r['Image File ID']) || str(r['Image 1 URL']).split('?')[0]);\n  const dupKey = r => imgKey(r) ? imgKey(r) + '|' + (str(r['Board ID']) || str(r['Board'])) : '';\n  const pubKeys = new Set(rows.filter(r => norm(r['Status']) === 'published' && dupKey(r)).map(dupKey));\n  const s = { heldTailwindProduct: 0, tailwindAlreadyPosted: 0, checkByHand: 0, overdueReview: 0, reslot: 0, reslotHeld: 0, scanned: 0, pending: 0, backfill: 0, markPublished: 0, publishedNoUrl: 0, duplicates: 0, resend: 0, resendHeld: 0, unmatched: 0, unmatchedDuplicate: 0, other: 0, missingColumns: [], samples: { backfill: [], markPublished: [], resend: [], duplicates: [], unmatched: [], checkByHand: [], tailwind: [], heldTailwindProduct: [] } };\n  const act = []; // {row, kind, post?}\n  for (const r of rows) {\n    if (norm(r['Status']) !== 'scheduled') continue;\n    if (norm(r['Platform']) === 'tailwind' || str(r['Tailwind Post ID'])) { s.other++; continue; }\n    s.scanned++;\n    const id = str(r['Metricool Post ID']);\n    const um = /openWithPostUuid=(-?\\d+)/.exec(str(r['Metricool Link']));\n    const post = (id && byId.get(id)) || (um && byUuid.get(String(Number(um[1])))) || null;\n    const claimTw = () => { const kk = normT(r['Pin Title']) + '|' + normU(r['Product Link'] || r['Blog Link']); const arr = twByKey.get(kk); return arr && arr.length ? arr.shift() : null; };\n    const k = dupKey(r), dup = !!(k && pubKeys.has(k));\n    if (!post) {\n      const twm = claimTw();\n      if (twm) { act.push({ r, kind: 'tailwind', tw: twm }); continue; }\n      s.unmatched++; if (dup) s.unmatchedDuplicate++;\n      if (s.samples.unmatched.length < 4) s.samples.unmatched.push({ row: r['row_number'], pin: str(r['Pin ID']).slice(0, 30), photoPublishedElsewhere: dup });\n      if (resetUnmatched) act.push({ r, kind: dup ? 'duplicate' : 'resend' });\n      continue;\n    }\n    const prov = (post.providers || []).find(x => String(x.network).toLowerCase() === 'pinterest') || (post.providers || [])[0] || {};\n    const st = String(prov.status || '').toUpperCase();\n    if (st === 'PUBLISHED') {\n      if (!prov.publicUrl) { s.publishedNoUrl++; continue; }\n      act.push({ r, kind: 'published', post, prov });\n    } else if (st === 'ERROR') {\n      // Only resend when the failure clearly happened BEFORE anything was published (not connected, limit reached,\n      // login problem). A timeout or \"pin not found\" can mean Pinterest created the pin anyway: check those by hand.\n      const twe = claimTw();\n      if (twe) { act.push({ r, kind: 'tailwind', tw: twe, post }); continue; }\n      const sure = /disconnect|account limit|monthly|quota|authoriz|token/i.test(String(prov.detailedStatus || ''));\n      if (!sure) { s.checkByHand++; if (s.samples.checkByHand.length < 4) s.samples.checkByHand.push({ row: r['row_number'], pin: str(r['Pin ID']).slice(0, 30), reason: String(prov.detailedStatus || '').slice(0, 70) }); continue; }\n      act.push({ r, kind: dup ? 'duplicate' : 'resend', post });\n    } else {\n      s.pending++;\n      if (!id || !parseDate(r['Scheduled Date'])) act.push({ r, kind: 'backfill', post, prov });\n    }\n  }\n  // slot allocator for resends: free slots from tomorrow on, never above perDay, existing future rows count\n  // Hold-back for anything the exact title match could not settle: if Tailwind has a pin for the SAME product/blog page\n  // that no row claimed, rows of that page are NOT resent (one of them may be that pin). Better a pin held than posted twice.\n  const unclaimedByUrl = {};\n  for (const arr of twByKey.values()) for (const tp of arr) { const u = normU(tp.url); if (u) unclaimedByUrl[u] = (unclaimedByUrl[u] || 0) + 1; }\n  for (const a of act) {\n    if (a.kind !== 'resend') continue;\n    const u = normU(a.r['Product Link'] || a.r['Blog Link']);\n    if (u && unclaimedByUrl[u] > 0) a.kind = 'heldTailwind';\n  }\n  const resetRows = new Set(act.filter(a => a.kind !== 'published').map(a => a.r['row_number']));\n  const dayCount = {};\n  for (const r of rows) {\n    if (resetRows.has(r['row_number'])) continue;\n    const stt = norm(r['Status']); if (stt === 'published' || stt === 'duplicate') continue;\n    const dt = parseDate(r['Scheduled Date']); if (!dt || dt <= $now) continue;\n    const key = dt.toFormat('yyyy-LL-dd'); (dayCount[key] = dayCount[key] || []).push(dt.hour);\n  }\n  const startDay = $now.plus({ days: Number(cfg.startDayOffset) || 1 }).startOf('day');\n  function nextSlot() {\n    let day = startDay;\n    for (let g = 0; g < 730; g++, day = day.plus({ days: 1 })) {\n      const key = day.toFormat('yyyy-LL-dd'); const taken = dayCount[key] || [];\n      if (taken.length >= t.perDay) continue;\n      const h = t.hours.find(x => !taken.includes(x)); if (h === undefined) continue;\n      taken.push(h); dayCount[key] = taken;\n      return day.set({ hour: h, minute: t.minute, second: 0, millisecond: 0 }).toFormat('yyyy-LL-dd HH:mm');\n    }\n    return '';\n  }\n  const slots = [];\n  const cells = (row, obj) => {\n    for (const [field, value] of Object.entries(obj)) {\n      if (!col[field]) { if (!s.missingColumns.includes(field)) s.missingColumns.push(field); continue; }\n      writes.push({ range: \"'\" + t.name.replace(/'/g, \"''\") + \"'!\" + col[field] + row, values: [[value]] });\n    }\n  };\n  act.sort((a, b) => a.r['row_number'] - b.r['row_number']);\n  for (const a of act) {\n    const row = a.r['row_number'], sample = { row, pin: str(a.r['Pin ID']).slice(0, 30) };\n    if (a.kind === 'heldTailwind') {\n      s.heldTailwindProduct++; if (s.samples.heldTailwindProduct.length < 4) s.samples.heldTailwindProduct.push({ ...sample, page: String(a.r['Product Link'] || a.r['Blog Link']).slice(0, 70) });\n      continue;\n    }\n    if (a.kind === 'backfill') {\n      const pd = a.post.publicationDate || {};\n      const when = pd.dateTime ? DateTime.fromISO(pd.dateTime, { zone: pd.timezone || 'utc' }) : null;\n      const fill = {};\n      if (!str(a.r['Metricool Post ID'])) fill['Metricool Post ID'] = String(a.post.id);\n      if (!parseDate(a.r['Scheduled Date']) && when && when.isValid) fill['Scheduled Date'] = when.setZone('America/Toronto').toFormat('M/d/yyyy HH:mm:ss');\n      if (!str(a.r['Platform'])) fill['Platform'] = 'Metricool';\n      if (!Object.keys(fill).length) continue;\n      s.backfill++; if (s.samples.backfill.length < 4) s.samples.backfill.push({ ...sample, fill });\n      cells(row, fill);\n      continue;\n    }\n    if (a.kind === 'tailwind') {\n      s.tailwindAlreadyPosted++; const sentIso = DateTime.fromSeconds(Number(a.tw.sentAt) > 1e12 ? Number(a.tw.sentAt) / 1000 : Number(a.tw.sentAt), { zone: 'utc' }).toFormat(\"yyyy-LL-dd'T'HH:mm:ss'Z'\");\n      if (s.samples.tailwind.length < 4) s.samples.tailwind.push({ ...sample, pinId: String(a.tw.pinId), sent: sentIso });\n      cells(row, { 'Status': 'Published', 'Pin URL': 'https://www.pinterest.com/pin/' + a.tw.pinId + '/', 'Pinned Time': sentIso, 'Platform': 'Tailwind', 'Tailwind Post ID': String(a.tw.id), 'Metricool Post ID': '', 'Metricool Link': '', 'Scheduled Date': '', 'Error': '' });\n      if (deleteErrored && a.post) deletes.push(String(a.post.id));\n    } else if (a.kind === 'published') {\n      s.markPublished++; if (s.samples.markPublished.length < 4) s.samples.markPublished.push({ ...sample, url: String(a.prov.publicUrl).slice(0, 50) });\n      cells(row, { 'Status': 'Published', 'Metricool Post ID': String(a.post.id), 'Pin URL': a.prov.publicUrl, 'Pinned Time': pinnedIso(a.post), 'Platform': 'Metricool', 'Scheduled Date': '', 'Error': '' });\n    } else if (a.kind === 'duplicate') {\n      s.duplicates++; if (s.samples.duplicates.length < 4) s.samples.duplicates.push(sample);\n      cells(row, { 'Status': 'Duplicate', 'Error': 'Same photo is already published to the same board', 'Scheduled Date': '', 'Metricool Post ID': '', 'Metricool Link': '' });\n      if (deleteErrored && a.post) deletes.push(String(a.post.id));\n    } else {\n      const canResend = resendFailed && (t.key !== 'photo' || cfg.resendPhoto === true);\n      if (!canResend) { s.resendHeld++; if (s.samples.resend.length < 4) s.samples.resend.push({ ...sample, plan: t.key === 'photo' ? 'held until resendFailed and resendPhoto are true' : 'held until resendFailed = true' }); continue; }\n      const slot = nextSlot(); slots.push(slot);\n      s.resend++; if (s.samples.resend.length < 4) s.samples.resend.push({ ...sample, newSlot: slot });\n      cells(row, { 'Status': 'Review', 'Approval': 'Approved', 'Metricool Post ID': '', 'Metricool Link': '', 'Platform': '', 'Error': '', 'Scheduled Date': slot });\n      if (deleteErrored && a.post) deletes.push(String(a.post.id));\n    }\n  }\n  // Approved rows already in Review whose slot has passed (or never had one). The publish workflow would give EVERY such\n  // row a slot 24 h from now at 20-minute spacing, 25 per run, which bunches far more than 15 a day. Give them proper\n  // slots here instead, after the resends, so the daily limit holds.\n  const overdue = rows.filter(r => norm(r['Status']) === 'review' && norm(r['Approval']) === 'approved' && !resetRows.has(r['row_number']) && (() => { const d = parseDate(r['Scheduled Date']); return !d || d <= $now.plus({ minutes: 15 }); })())\n    .sort((a, b) => a['row_number'] - b['row_number']);\n  s.overdueReview = overdue.length;\n  if (reslotOverdue) {\n    for (const r of overdue) { const slot = nextSlot(); if (!slot) continue; slots.push(slot); s.reslot++; cells(r['row_number'], { 'Scheduled Date': slot }); }\n  } else s.reslotHeld = overdue.length;\n  if (slots.length) { slots.sort(); s.firstSlot = slots[0]; s.lastSlot = slots[slots.length - 1]; s.daysSpanned = new Set(slots.map(x => x.slice(0, 10))).size; }\n  summary.tabs[t.name] = s;\n}\nsummary.cellWrites = writes.length; summary.erroredPostsToDelete = deletes.length;\nreturn [{ json: { summary, writes, deletes: [...new Set(deletes)] } }];\n"
+      },
+      "id": "rp-plan",
+      "name": "Plan Repair",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rp-if1-c",
+              "leftValue": "={{ $('Config').first().json.dryRun === false && $json.summary.metricoolWindowErrors === 0 && $json.summary.tailwindWindowErrors === 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "rp-if1",
+      "name": "Apply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const plan = $('Plan Repair').first().json;\nconst blocked = plan.summary.dryRun === false && (plan.summary.metricoolWindowErrors > 0 || plan.summary.tailwindWindowErrors > 0);\nreturn [{ json: { mode: blocked ? 'NOT APPLIED - a Metricool or Tailwind date window failed to load (see metricoolWindowErrors / tailwindWindowErrors), so some rows could look unmatched. Nothing was written. Run again.' : 'DRY RUN - nothing was written, nothing was deleted', summary: plan.summary } }];\n"
+      },
+      "id": "rp-dry",
+      "name": "Dry Run Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sheets API batchUpdate takes many ranges per call. 400 cells per call keeps each request small.\nconst writes = $('Plan Repair').first().json.writes || [];\nconst sheetId = $('Config').first().json.sheetId;\nconst out = [];\nfor (let i = 0; i < writes.length; i += 400) out.push({ json: { sheetId, body: { valueInputOption: 'RAW', data: writes.slice(i, i + 400) } } });\nreturn out.length ? out : [{ json: { sheetId, body: { valueInputOption: 'RAW', data: [] }, empty: true } }];\n"
+      },
+      "id": "rp-chunks",
+      "name": "Build Write Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rp-if2-c",
+              "leftValue": "={{ $json.empty !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "rp-if2",
+      "name": "Has Cells?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sheetId + '/values:batchUpdate' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          }
+        }
+      },
+      "id": "rp-write",
+      "name": "Write Cells",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        60
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// How many write calls went through.\nconst res = $input.all().map(i => i.json || {});\nconst failed = res.filter(r => r.error || r.message).length;\nreturn [{ json: { writeCalls: res.length, writeCallsFailed: failed } }];\n"
+      },
+      "id": "rp-collect",
+      "name": "Collect Write Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst ids = $('Plan Repair').first().json.deletes || [];\nif (cfg.deleteErroredPosts === true && ids.length) return ids.map(postId => ({ json: { postId } }));\nreturn [{ json: { skip: true } }];\n"
+      },
+      "id": "rp-delitems",
+      "name": "Build Delete Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rp-if3-c",
+              "leftValue": "={{ $json.skip !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "rp-if3",
+      "name": "Has Posts To Delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://app.metricool.com/api/v2/scheduler/posts/' + $json.postId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "={{ $('Config').first().json.userId }}"
+            },
+            {
+              "name": "blogId",
+              "value": "={{ $('Config').first().json.blogId }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "id": "rp-del",
+      "name": "Delete Errored Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3520,
+        60
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HyOn8LPYniNVacXo",
+          "name": "Metricool API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const plan = $('Plan Repair').first().json;\nconst wr = $('Collect Write Results').first().json;\nconst items = $input.all().map(i => i.json || {});\nconst skipped = items.length === 1 && items[0].skip === true;\nconst delFailed = skipped ? 0 : items.filter(i => i.error || i.message).length;\nreturn [{ json: { mode: 'APPLIED', writeCalls: wr.writeCalls, writeCallsFailed: wr.writeCallsFailed, erroredPostsDeleted: skipped ? 0 : items.length - delFailed, erroredPostDeletesFailed: delFailed, summary: plan.summary } }];\n"
+      },
+      "id": "rp-final",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        140
+      ]
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Header (Blog)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Header (Blog)": {
+      "main": [
+        [
+          {
+            "node": "Get Header (2:3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Header (2:3)": {
+      "main": [
+        [
+          {
+            "node": "Get Pins",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins": {
+      "main": [
+        [
+          {
+            "node": "Get Pins 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pins 2": {
+      "main": [
+        [
+          {
+            "node": "Build Windows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Windows": {
+      "main": [
+        [
+          {
+            "node": "Get Metricool Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Metricool Posts": {
+      "main": [
+        [
+          {
+            "node": "Build Tailwind Windows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Tailwind Windows": {
+      "main": [
+        [
+          {
+            "node": "Get Tailwind Sent Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tailwind Sent Posts": {
+      "main": [
+        [
+          {
+            "node": "Plan Repair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Repair": {
+      "main": [
+        [
+          {
+            "node": "Apply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply?": {
+      "main": [
+        [
+          {
+            "node": "Build Write Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dry Run Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Write Chunks": {
+      "main": [
+        [
+          {
+            "node": "Has Cells?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Cells?": {
+      "main": [
+        [
+          {
+            "node": "Write Cells",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collect Write Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Cells": {
+      "main": [
+        [
+          {
+            "node": "Collect Write Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Write Results": {
+      "main": [
+        [
+          {
+            "node": "Build Delete Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delete Items": {
+      "main": [
+        [
+          {
+            "node": "Has Posts To Delete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Posts To Delete?": {
+      "main": [
+        [
+          {
+            "node": "Delete Errored Posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Errored Posts": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "nETo8yQdCbRv52pK",
+    "executionTimeout": 900
+  }
+}

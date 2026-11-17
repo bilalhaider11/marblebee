@@ -1,0 +1,429 @@
+{
+  "name": "Shopify Gallery vs Sheet Check (read only)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Shopify gallery vs sheet check (READ ONLY)\n\nCompares, for every product, the photos on the website with the IMAGE URL1 to IMAGE URL11 links in the sheet, matched by exact file name (the `v=` cache part is ignored). It changes NOTHING: no Shopify call that writes, no sheet write.\n\nSettings: `sheets` (blank = all tabs, or e.g. Bathtub,Stairs).\n\nReport (last node): per tab how many products were checked and how many match, with each difference sorted into a category: cad_missing (only the CAD drawing is missing), copies_only (same pictures but Shopify holds _uuid copies), order_only, and check (wrong, missing or extra files: needs a person). Only the 'check' products are listed.\n\nAll tabs take roughly 15 to 20 minutes (Shopify rate limit). Start with one tab.",
+        "height": 340,
+        "width": 560
+      },
+      "id": "ac90f0e2-f3e0-49b3-a736-16284d38553f",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -120
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f8377c24-f4eb-44e9-ae97-bb57c1d64830",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "sheets",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b45c342-a67d-402c-89da-5cd9c4db8853",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ALL = ['2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst wanted = String($('Config').first().json.sheets || '').split(',').map(s => s.trim()).filter(Boolean);\nreturn ALL.filter(s => !wanted.length || wanted.includes(s)).map(sheet_name => ({ json: { sheet_name } }));"
+      },
+      "id": "363f2553-21db-4d15-9f31-8e5db1628e21",
+      "name": "Get Sheet Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "40e853d3-b3ce-41e2-bd43-c7b7d7ce99ce",
+      "name": "Loop Through Sheets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI/values/' + encodeURIComponent(\"'\" + String($json.sheet_name).replace(/'/g, \"''\") + \"'!2:2\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "a51fa048-86b2-40e6-b87f-fc3166c364ca",
+      "name": "Read Header Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        900,
+        440
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Which columns are needed: Product No., the Shopify admin link and IMAGE URL1 to IMAGE URL11.\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst SHEET = $('Loop Through Sheets').first().json.sheet_name;\nconst headers = ($input.first().json.values?.[0] || []).map(h => String(h ?? '').trim());\nconst NEEDED = ['Product No.', 'Shopify_Update_product_URL'].concat(Array.from({ length: 11 }, (_, i) => 'IMAGE URL' + (i + 1)));\nconst letters = (n) => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\nconst cols = NEEDED.map(name => ({ name, idx: headers.lastIndexOf(name) })).filter(c => c.idx >= 0);\nconst ranges = cols.length ? cols.map(c => `${q(SHEET)}!${letters(c.idx)}3:${letters(c.idx)}`) : [`${q(SHEET)}!A2:A2`];\nconst url = `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=COLUMNS&valueRenderOption=FORMATTED_VALUE&` + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');\nreturn [{ json: { sheet_name: SHEET, cols, url, hasUrlCol: cols.some(c => c.name === 'Shopify_Update_product_URL') } }];\n"
+      },
+      "id": "a4fb72c0-1857-490a-a357-9145834b5769",
+      "name": "Plan Columns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "8649bbdc-ed4b-4e2a-b359-5f1fadf8cc13",
+      "name": "Read Columns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1340,
+        440
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds, for each product of the tab, the list of photo files the sheet expects (exact file names, in slot order, exact duplicates dropped).\nconst plan = $('Plan Columns').first().json;\nconst vr = $input.first().json.valueRanges || [];\nconst col = {}; plan.cols.forEach((c, i) => { col[c.name] = vr[i]?.values?.[0] || []; });\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst SHOP_FILES = /(\\/s\\/files\\/1\\/0503\\/5730\\/5497\\/files\\/|\\/cdn\\/shop\\/files\\/)/;\nconst nameOf = (u) => { const l = baseUrl(u).split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst keyOf = (u) => { const b = baseUrl(u).trim(); return b ? (SHOP_FILES.test(b) ? 'f:' + nameOf(b) : b) : ''; };\nconst nRows = Math.max(0, ...Object.values(col).map(a => a.length));\nconst stats = { tab: plan.sheet_name, rows: 0, noShopifyUrl: 0, noImagesInSheet: 0, toCheck: 0 };\nconst prods = [];\nfor (let i = 0; i < nRows; i++) {\n  const sku = String((col['Product No.'] || [])[i] ?? '').trim();\n  const adm = String((col['Shopify_Update_product_URL'] || [])[i] ?? '');\n  const m = adm.match(/\\/products\\/(\\d+)/);\n  if (!sku && !m) continue;\n  stats.rows++;\n  if (!m) { stats.noShopifyUrl++; continue; }\n  const exp = []; const seen = new Set();\n  for (let s = 1; s <= 11; s++) {\n    const u = String((col['IMAGE URL' + s] || [])[i] ?? '').trim();\n    if (!/^https?:/i.test(u)) continue;\n    const k = keyOf(u); if (seen.has(k)) continue; seen.add(k);\n    exp.push({ slot: s, key: k, name: nameOf(u) });\n  }\n  if (!exp.length) { stats.noImagesInSheet++; continue; }\n  prods.push({ row: i + 3, sku, id: m[1], exp });\n}\nstats.toCheck = prods.length;\nif (!prods.length) return [{ json: { tab: plan.sheet_name, noProducts: true, stats } }];\nconst Q = `query Gallery($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id media(first: 20) { nodes { ... on MediaImage { image { url } } } } } } }`;\nconst out = [];\nfor (let i = 0; i < prods.length; i += 8) {\n  const chunk = prods.slice(i, i + 8);\n  out.push({ json: { tab: plan.sheet_name, stats, chunk, body: { query: Q, variables: { ids: chunk.map(p => 'gid://shopify/Product/' + p.id) } } } });\n}\nreturn out;\n"
+      },
+      "id": "ba39d3cf-7d37-486a-b9ba-8e3ac33d03a9",
+      "name": "Build Products",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b3baef5d-a872-47d3-85ca-704198955a31",
+              "leftValue": "={{ $json.noProducts === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "0b39e93f-953c-4fda-a173-7e883e1b3917",
+      "name": "Nothing to check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1780,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { kind: 'summary', tab: j.tab, ...j.stats, checked: 0, ok: 0, mismatched: 0 } }];"
+      },
+      "id": "b398c031-979a-460b-b69e-c4f0310c026b",
+      "name": "Empty Tab",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://marblebee.myshopify.com/admin/api/2026-07/graphql.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1800
+            }
+          }
+        }
+      },
+      "id": "7f72e851-2d0e-4b36-8ecc-905922c3f8f4",
+      "name": "Fetch Gallery (read only)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        300
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "x329GQy4zF2R3arS",
+          "name": "Shopify account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compares each product's gallery on Shopify with the files the sheet expects. Read only.\n// Each difference gets a category so the real errors are not buried:\n//   cad_missing        only the CAD drawing (slot 11) is missing on the product\n//   copies_only        same pictures, but Shopify holds _uuid copies of the sheet files (different file names)\n//   order_only         same files, different order\n//   check              anything else: wrong/missing/extra files = needs a person\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst SHOP_FILES = /(\\/s\\/files\\/1\\/0503\\/5730\\/5497\\/files\\/|\\/cdn\\/shop\\/files\\/)/;\nconst nameOf = (u) => { const l = baseUrl(u).split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst keyOf = (u) => { const b = baseUrl(u).trim(); return b ? (SHOP_FILES.test(b) ? 'f:' + nameOf(b) : b) : ''; };\nconst UUID = /_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\\.[A-Za-z0-9]+$)/i;\nconst noUuid = (n) => n.replace(UUID, '');\nconst reqs = $('Build Products').all().map(i => i.json);\nconst stats = reqs[0].stats;\nconst out = [];\nconst cats = {};\nlet checked = 0, ok = 0, bad = 0;\nconst add = (c) => { cats[c] = (cats[c] || 0) + 1; };\n$input.all().forEach((it, k) => {\n  const rq = reqs[k]; const res = it.json;\n  if (!rq) return;\n  if (res.error || (res.errors && res.errors.length) || !res.data || !Array.isArray(res.data.nodes)) {\n    out.push({ json: { kind: 'error', tab: rq.tab, skus: rq.chunk.map(p => p.sku).join(', '), error: JSON.stringify(res.error || res.errors || res).slice(0, 200) } });\n    return;\n  }\n  rq.chunk.forEach((p, i) => {\n    const n = res.data.nodes[i];\n    checked++;\n    if (!n) { bad++; add('check'); out.push({ json: { kind: 'mismatch', category: 'check', tab: rq.tab, row: p.row, sku: p.sku, productId: p.id, problem: 'product not found on Shopify (deleted or wrong link)' } }); return; }\n    const act = (n.media?.nodes || []).filter(m => m && m.image && m.image.url).map(m => ({ key: keyOf(m.image.url), name: nameOf(m.image.url) }));\n    const actKeys = act.map(a => a.key), expKeys = p.exp.map(e => e.key);\n    // The uuid part of a name is only Shopify's copy id: two names that differ only by it are the same picture.\n    const expBase = p.exp.map(e => ({ ...e, base: noUuid(e.name) }));\n    const actLeft = act.map(a2 => ({ ...a2, base: noUuid(a2.name) }));\n    let paired = 0;\n    const missingLeft = [];\n    expBase.forEach(e => {\n      let j = actLeft.findIndex(x => x.key === e.key);          // exact same file\n      if (j >= 0) { actLeft.splice(j, 1); return; }\n      j = actLeft.findIndex(x => x.base === e.base);            // same picture, different copy id\n      if (j >= 0) { actLeft.splice(j, 1); paired++; return; }\n      missingLeft.push(e);\n    });\n    const missing = missingLeft, extra = actLeft;\n    const missCad = missingLeft.filter(m => m.slot === 11), missOther = missingLeft.filter(m => m.slot !== 11);\n    // order, comparing with the uuid part ignored\n    const e2 = p.exp.map(e => noUuid(e.name)), a2 = act.map(a => noUuid(a.name));\n    const common = e2.filter(x => a2.includes(x)), actCommon = a2.filter(x => e2.includes(x));\n    const orderOk = JSON.stringify(common) === JSON.stringify(actCommon);\n    if (!missing.length && !extra.length && orderOk) { ok++; return; }\n    bad++;\n    let category = 'check';\n    if (!extra.length && !missOther.length) {\n      if (missCad.length && orderOk) category = 'cad_missing';\n      else if (!missCad.length && orderOk && paired) category = 'copies_only';\n      else if (!missCad.length && !orderOk && !paired) category = 'order_only';\n    }\n    if (category === 'cad_missing' && paired) category = 'cad_missing';\n    add(category);\n    const problems = [];\n    if (missingLeft.length) problems.push('missing on Shopify: ' + missingLeft.map(m => 'slot ' + m.slot + ' ' + m.name).join(', '));\n    if (paired) problems.push(paired + ' file(s) are _uuid copies of the sheet files');\n    if (extra.length) problems.push('not in the sheet: ' + extra.map(a => a.name).join(', '));\n    if (!orderOk) problems.push('order differs from the sheet');\n    out.push({ json: { kind: 'mismatch', category, tab: rq.tab, row: p.row, sku: p.sku, productId: p.id, expected: p.exp.length, onShopify: act.length, problem: problems.join(' | ') } });\n  });\n});\nout.push({ json: { kind: 'summary', tab: stats.tab, rows: stats.rows, noShopifyUrl: stats.noShopifyUrl, noImagesInSheet: stats.noImagesInSheet, checked, ok, mismatched: bad, cats } });\nreturn out;\n"
+      },
+      "id": "2c76b4d1-6758-4624-8115-4ddd81bc01d9",
+      "name": "Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Last step: totals per tab and per category, and the list of products that need a person (category \"check\"). Nothing was changed anywhere.\nconst all = $input.all().map(i => i.json);\nconst sums = all.filter(j => j.kind === 'summary');\nconst mism = all.filter(j => j.kind === 'mismatch');\nconst errs = all.filter(j => j.kind === 'error');\nconst tot = sums.reduce((a, s) => ({ checked: a.checked + (s.checked || 0), ok: a.ok + (s.ok || 0), mismatched: a.mismatched + (s.mismatched || 0) }), { checked: 0, ok: 0, mismatched: 0 });\nconst byCategory = {};\nmism.forEach(m => { byCategory[m.category] = (byCategory[m.category] || 0) + 1; });\nconst needsPerson = mism.filter(m => m.category === 'check');\nconst cap = 150;\nreturn [{ json: {\n  readOnly: true, ...tot, errors: errs.length, byCategory,\n  meaning: { cad_missing: 'only the CAD drawing (IMAGE URL11) is missing on the product', copies_only: 'same pictures, Shopify holds _uuid copies of the sheet files', order_only: 'same files, different order', check: 'wrong, missing or extra files: needs a person' },\n  perTab: sums.map(s => ({ tab: s.tab, checked: s.checked, ok: s.ok, mismatched: s.mismatched, ...s.cats })),\n  skuLists: (() => { const o = {}; mism.forEach(m => { if (!m.sku) return; o[m.category] = o[m.category] || {}; o[m.category][m.tab] = (o[m.category][m.tab] ? o[m.category][m.tab] + ',' : '') + m.sku; }); return o; })(),\n  orderOnly: mism.filter(m => m.category === 'order_only').map(m => ({ tab: m.tab, row: m.row, sku: m.sku })),\n  needsPerson: needsPerson.slice(0, cap).map(m => ({ tab: m.tab, row: m.row, sku: m.sku, expected: m.expected, onShopify: m.onShopify, problem: m.problem })),\n  moreNeedsPersonNotShown: Math.max(0, needsPerson.length - cap),\n  errorDetails: errs.slice(0, 20)\n} }];\n"
+      },
+      "id": "5dda89e4-5fcd-4bf6-91fd-b9b6f9cabb6c",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Names": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Header Row": {
+      "main": [
+        [
+          {
+            "node": "Plan Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Columns": {
+      "main": [
+        [
+          {
+            "node": "Read Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Columns": {
+      "main": [
+        [
+          {
+            "node": "Build Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Products": {
+      "main": [
+        [
+          {
+            "node": "Nothing to check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Gallery (read only)": {
+      "main": [
+        [
+          {
+            "node": "Compare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Empty Tab": {
+      "main": [
+        [
+          {
+            "node": "Loop Through Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Through Sheets": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Header Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nothing to check?": {
+      "main": [
+        [
+          {
+            "node": "Empty Tab",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Gallery (read only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
