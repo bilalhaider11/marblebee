@@ -7,8 +7,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -40,
-        -260
+        5872,
+        1824
       ],
       "parameters": {
         "content": "## Remove wrong CAD drawings (dry run by default)\n\nReads the review tab (default 'CAD check'): every row with **no** in column F is a wrong drawing (column G = Agen's note). For each wrong drawing it finds all products whose IMAGE URL11 or CAD Drawing URL is that file, in the tabs named in column A, and checks on Shopify (read only) whether the drawing is live on the product.\n\n**mode = yes:** report only. Takes the rows marked yes (correct drawings) and shows, for each product, whether the CAD picture and the download button are already on Shopify. The SKU list needUpdateSkusByTab is what the Shopify update workflow must add (skus + forceFields IMAGE URL11, CAD Drawing URL). Changes nothing, ignores dryRun.\n\n**dryRun = true (default):** changes nothing. The report lists, per drawing, the products, which of them are live on Shopify, and the SKU lists to use in the next step.\n\n**dryRun = false:** keeps sheet and Shopify in step. (1) Products where the wrong drawing is live on Shopify: the picture is detached from the product gallery (the shared file itself is NOT deleted, other products keep it) and the product's CAD Drawing URL button metafield (custom.cad_drawing_url) is deleted when it points to the wrong file. (2) Then IMAGE URL11 and CAD Drawing URL are cleared in the sheet row (only the cell that holds the wrong drawing). Products not on Shopify get the sheet clear only. If the Shopify step fails for a product, its sheet cells stay, so a re-run finds it again. Refuses to run if the review tab or a Shopify read failed.\n\nTest with one or two 'no' rows first.\n\nReview tab layout: A Tab, B Drawing file, C Products to add, D Typical size, E Example products, F matches? (yes/no), G Note. Rows whose B is a product number (not a file) are matched by product.",
@@ -23,8 +23,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        300
+        5920,
+        2384
       ]
     },
     {
@@ -76,8 +76,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        220,
-        300
+        6128,
+        2384
       ]
     },
     {
@@ -86,8 +86,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        440,
-        300
+        6352,
+        2384
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -109,8 +109,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
-        300
+        6576,
+        2384
       ],
       "parameters": {
         "jsCode": "// Reads the review tab. Wrong drawing = column F says 'no' (any case). Everything else is only counted.\nconst res = $input.first().json;\nif (res.error || !Array.isArray(res.values)) {\n  return [{ json: { reviewOk: false, error: JSON.stringify(res.error || res).slice(0, 300), wrong: [] } }];\n}\nconst rows = res.values.slice(1);\nconst norm = (s) => String(s ?? '').trim();\nconst counts = { rows: 0, yes: 0, no: 0, blank: 0, other: 0 };\nconst cfg = $('Config').first().json;\nconst onlyTabs = String(cfg.tabs || '').split(',').map(x => x.trim()).filter(Boolean);\nconst want = String(cfg.mode || '').toLowerCase() === 'yes' ? 'yes' : 'no'; // mode 'yes' = report on the correct drawings, never changes anything\nconst includeNoted = cfg.includeNoted === true || want === 'yes';\n// Rows whose note names the wrong products: 'drawing file:SKU,SKU;drawing file:SKU' -> only those products are treated as wrong (not the whole drawing).\nconst overrides = {};\nString(cfg.noteSkus || '').split(';').map(x => x.trim()).filter(Boolean).forEach(x => { const [r, l] = x.split(':'); if (r && l) overrides[r.trim().toLowerCase()] = l.split(/[,\\s]+/).map(v => v.toUpperCase()).filter(Boolean); });\nconst wrong = [], held = [];\nrows.forEach((r, i) => {\n  const rawTab = norm(r[0]);\n  const tab = rawTab.replace(/^.*?:\\s*/, '').trim(); // 'CHECK ONE PRODUCT: Bathtub' -> 'Bathtub'\n  const file = norm(r[1]);\n  if (!tab && !file) return;\n  counts.rows++;\n  const f = norm(r[5]).toLowerCase();\n  if (f === 'yes') counts.yes++; else if (f === 'no') counts.no++; else if (!f) counts.blank++; else counts.other++;\n  if (f === want) {\n    // Single-product check rows ('CHECK ONE PRODUCT: <tab>') name the drawing in B but the product in E: only that product is meant.\n    const single = /^CHECK ONE PRODUCT/i.test(rawTab) || !/\\.[A-Za-z0-9]{2,5}$/.test(file);\n    const skuText = /^CHECK ONE PRODUCT/i.test(rawTab) ? norm(r[4]) : file;\n    const item = { reviewRow: i + 2, tab, rawTab, file, isFile: !single, skus: single ? skuText.split(/[,;\\s]+/).map(x => x.toUpperCase()).filter(x => /^[A-Z]{2,}\\d+/.test(x)) : [], products: norm(r[2]), size: norm(r[3]), note: norm(r[6]) };\n    if (onlyTabs.length && !onlyTabs.includes(tab)) { item.reason = 'tab not in Config.tabs'; held.push(item); }\n    else if (overrides[file.toLowerCase()] && want === 'no') { item.isFile = false; item.skus = overrides[file.toLowerCase()]; item.reason = 'note: only these products'; wrong.push(item); }\n    else if (item.note && !includeNoted) { item.reason = 'has a note: may be one product or a size problem, not the whole drawing'; held.push(item); }\n    else wrong.push(item);\n  }\n});\nreturn [{ json: { reviewOk: true, counts, wrong, held } }];"
@@ -146,8 +146,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        880,
-        300
+        6800,
+        2384
       ]
     },
     {
@@ -156,8 +156,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1100,
-        220
+        7120,
+        2368
       ],
       "parameters": {
         "jsCode": "// Only the tabs named in the review's column A are read.\nconst w = $('Parse Review').first().json.wrong || [];\nconst ALL = ['2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'];\nconst tabs = [...new Set(w.map(x => x.tab).filter(t => ALL.includes(t)))];\nreturn tabs.map(sheet_name => ({ json: { sheet_name } }));"
@@ -172,8 +172,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1320,
-        220
+        7408,
+        2368
       ]
     },
     {
@@ -188,8 +188,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1540,
-        360
+        7696,
+        2384
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -206,8 +206,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        360
+        7920,
+        2384
       ],
       "parameters": {
         "jsCode": "// Columns needed: Product No., the Shopify admin link, IMAGE URL11 and CAD Drawing URL (with their column letters, to clear them later).\nconst DOC = '1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI';\nconst SHEET = $('Loop Through Sheets').first().json.sheet_name;\nconst headers = ($input.first().json.values?.[0] || []).map(h => String(h ?? '').trim());\nconst NEEDED = ['Product No.', 'Shopify_Update_product_URL', 'IMAGE URL11', 'CAD Drawing URL'];\nconst letters = (n) => { let s = ''; n += 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };\nconst q = (s) => `'${String(s).replace(/'/g, \"''\")}'`;\nconst cols = NEEDED.map(name => ({ name, idx: headers.lastIndexOf(name) })).filter(c => c.idx >= 0).map(c => ({ ...c, letter: letters(c.idx) }));\nconst ranges = cols.length ? cols.map(c => `${q(SHEET)}!${c.letter}3:${c.letter}`) : [`${q(SHEET)}!A2:A2`];\nconst url = `https://sheets.googleapis.com/v4/spreadsheets/${DOC}/values:batchGet?majorDimension=COLUMNS&valueRenderOption=FORMATTED_VALUE&` + ranges.map(r => 'ranges=' + encodeURIComponent(r)).join('&');\nreturn [{ json: { sheet_name: SHEET, cols, url, hasUrlCol: cols.some(c => c.name === 'Shopify_Update_product_URL') } }];"
@@ -225,8 +225,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1980,
-        360
+        8128,
+        2384
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -243,8 +243,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
-        360
+        8352,
+        2384
       ],
       "parameters": {
         "jsCode": "// Finds, in this tab, the products whose IMAGE URL11 or CAD Drawing URL is one of the wrong drawings (exact file name; a _uuid copy suffix is ignored).\nconst plan = $('Plan Columns').first().json;\nconst wrong = $('Parse Review').first().json.wrong.filter(w => w.tab === plan.sheet_name);\nconst vr = $input.first().json.valueRanges || [];\nconst col = {}; plan.cols.forEach((c, i) => { col[c.name] = vr[i]?.values?.[0] || []; });\nconst letterOf = {}; plan.cols.forEach(c => { letterOf[c.name] = c.letter; });\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst nameOf = (u) => { const l = baseUrl(u).split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst UUID = /_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\\.[A-Za-z0-9]+$)/i;\nconst base = (n) => String(n).replace(UUID, '').toLowerCase();\nconst byFile = new Map(); const bySku = new Map();\nwrong.forEach(w => { if (w.isFile) byFile.set(base(w.file), w); else w.skus.forEach(s => bySku.set(s, w)); });\nconst stats = { tab: plan.sheet_name, wrongDrawings: wrong.length, rows: 0, affected: 0, noShopifyUrl: 0 };\nconst nRows = Math.max(0, ...Object.values(col).map(a => a.length));\nconst prods = [], sheetOnly = [];\nfor (let i = 0; i < nRows; i++) {\n  const sku = String((col['Product No.'] || [])[i] ?? '').trim();\n  const adm = String((col['Shopify_Update_product_URL'] || [])[i] ?? '');\n  const u11 = String((col['IMAGE URL11'] || [])[i] ?? '').trim();\n  const cad = String((col['CAD Drawing URL'] || [])[i] ?? '').trim();\n  if (!sku) continue;\n  stats.rows++;\n  const m11 = u11 && byFile.get(base(nameOf(u11))), mCad = cad && byFile.get(base(nameOf(cad)));\n  const w = m11 || mCad || bySku.get(sku.toUpperCase());\n  if (!w) continue;\n  stats.affected++;\n  const clear = [];\n  const isSkuRow = !w.isFile;\n  if (m11 || (isSkuRow && u11)) clear.push({ cell: `'${plan.sheet_name.replace(/'/g, \"''\")}'!${letterOf['IMAGE URL11']}${i + 3}`, column: 'IMAGE URL11' });\n  if (mCad || (isSkuRow && cad)) clear.push({ cell: `'${plan.sheet_name.replace(/'/g, \"''\")}'!${letterOf['CAD Drawing URL']}${i + 3}`, column: 'CAD Drawing URL' });\n  // the other cell holds a different drawing: left alone, but shown\n  const otherCell = (m11 && cad && !mCad) ? 'CAD Drawing URL holds a different file: ' + nameOf(cad) : ((mCad && u11 && !m11) ? 'IMAGE URL11 holds a different file: ' + nameOf(u11) : '');\n  const mid = adm.match(/\\/products\\/(\\d+)/);\n  const bases = []; if (clear.some(c => c.column === 'IMAGE URL11') && u11) bases.push(base(nameOf(u11))); if (clear.some(c => c.column === 'CAD Drawing URL') && cad) bases.push(base(nameOf(cad))); if (w.isFile) bases.push(base(w.file));\n  const p = { old11: u11, oldCad: cad, row: i + 3, sku, id: mid ? mid[1] : null, drawing: w.file, note: w.note, reviewRow: w.reviewRow, clear: clear.filter(c => letterOf[c.column]), otherCell, bases: [...new Set(bases)] };\n  if (!mid) { stats.noShopifyUrl++; sheetOnly.push(p); } else prods.push(p);\n}\nif (!prods.length) return [{ json: { tab: plan.sheet_name, noProducts: true, stats, sheetOnly } }];\nconst Q = `query Gallery($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id media(first: 20) { nodes { ... on MediaImage { id image { url } } } } metafield(namespace: \"custom\", key: \"cad_drawing_url\") { id value } } } }`;\nconst out = [];\nfor (let i = 0; i < prods.length; i += 8) {\n  const chunk = prods.slice(i, i + 8);\n  out.push({ json: { tab: plan.sheet_name, stats, sheetOnly: i === 0 ? sheetOnly : [], chunk, body: { query: Q, variables: { ids: chunk.map(p => 'gid://shopify/Product/' + p.id) } } } });\n}\nreturn out;"
@@ -280,8 +280,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2420,
-        360
+        8624,
+        2384
       ]
     },
     {
@@ -290,8 +290,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
-        520
+        8576,
+        2656
       ],
       "parameters": {
         "jsCode": "const j = $input.first().json;\nconst out = (j.sheetOnly || []).map(p => ({ json: { kind: 'product', tab: j.tab, ...p, liveOnShopify: false, where: 'sheet only (no Shopify link)' } }));\nout.push({ json: { kind: 'summary', tab: j.tab, ...j.stats, checked: 0 } });\nreturn out;"
@@ -329,8 +329,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        2640,
-        300
+        8848,
+        2400
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -349,8 +349,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2860,
-        300
+        9056,
+        2400
       ],
       "parameters": {
         "jsCode": "// For every affected product: is the wrong drawing in its Shopify gallery? Read only.\nconst baseUrl = (u) => String(u || '').split('?')[0];\nconst nameOf = (u) => { const l = baseUrl(u).split('/').pop() || ''; try { return decodeURIComponent(l); } catch (e) { return l; } };\nconst UUID = /_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\\.[A-Za-z0-9]+$)/i;\nconst base = (n) => String(n).replace(UUID, '').toLowerCase();\nconst reqs = $('Find Affected').all().map(i => i.json);\nconst stats = reqs[0].stats;\nconst out = [];\nlet checked = 0, live = 0, errors = 0;\n$input.all().forEach((it, k) => {\n  const rq = reqs[k]; const res = it.json;\n  if (!rq) return;\n  (rq.sheetOnly || []).forEach(p => out.push({ json: { kind: 'product', tab: rq.tab, ...p, liveOnShopify: false, where: 'sheet only (no Shopify link)' } }));\n  if (res.error || (res.errors && res.errors.length) || !res.data || !Array.isArray(res.data.nodes)) {\n    errors++;\n    out.push({ json: { kind: 'error', tab: rq.tab, skus: rq.chunk.map(p => p.sku).join(', '), error: JSON.stringify(res.error || res.errors || res).slice(0, 200) } });\n    return;\n  }\n  rq.chunk.forEach((p, i) => {\n    const n = res.data.nodes[i];\n    checked++;\n    if (!n) { out.push({ json: { kind: 'product', tab: rq.tab, ...p, liveOnShopify: false, where: 'product not found on Shopify (deleted or wrong link)' } }); return; }\n    const media = (n.media?.nodes || []).filter(m => m && m.id && m.image && m.image.url);\n    const mediaIds = media.filter(m => p.bases.includes(base(nameOf(m.image.url)))).map(m => m.id);\n    const meta = n.metafield || null;\n    const metaMatch = !!(meta && meta.value && p.bases.includes(base(nameOf(meta.value))));\n    const isLive = mediaIds.length > 0 || metaMatch;\n    if (isLive) live++;\n    out.push({ json: { kind: 'product', tab: rq.tab, ...p, mediaIds, metaId: meta ? meta.id : null, metaMatch, liveOnShopify: isLive, where: isLive ? 'live on Shopify (' + (mediaIds.length ? mediaIds.length + ' picture' : '') + (mediaIds.length && metaMatch ? ' + ' : '') + (metaMatch ? 'download button' : '') + ')' : 'not on the Shopify product' } });\n  });\n});\nout.push({ json: { kind: 'summary', tab: stats.tab, ...stats, checked, live, shopifyReadErrors: errors } });\nreturn out;"
@@ -362,8 +362,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        60
+        6768,
+        2192
       ],
       "parameters": {
         "jsCode": "// Last step: report per drawing and per tab. dryRun true = nothing is changed.\nconst cfg = $('Config').first().json;\nconst review = $('Parse Review').first().json;\nconst all = $input.all().map(i => i.json);\nconst prods = all.filter(j => j.kind === 'product');\nconst sums = all.filter(j => j.kind === 'summary');\nconst errs = all.filter(j => j.kind === 'error');\nif (!review.reviewOk) return [{ json: { applied: false, apply: false, problem: 'The review tab could not be read: ' + review.error + ' (check Config.reviewTab)' } }];\nif (!review.wrong.length) return [{ json: { applied: false, apply: false, counts: review.counts, held: review.held, problem: 'No row to act on (all \"no\" rows are held: see held).' } }];\nconst shopifyErrors = errs.length;\nconst dryRun = cfg.dryRun !== false;\nconst perDrawing = review.wrong.map(w => {\n  const mine = prods.filter(p => p.reviewRow === w.reviewRow);\n  return { reviewRow: w.reviewRow, tab: w.tab, drawing: w.file, note: w.note, expectedProducts: w.products, foundInSheet: mine.length, liveOnShopify: mine.filter(p => p.liveOnShopify).length, notLive: mine.filter(p => !p.liveOnShopify).length };\n});\nconst live = prods.filter(p => p.liveOnShopify);\nconst liveFiles = live.reduce((n, p) => n + (p.mediaIds || []).length, 0), liveMeta = live.filter(p => p.metaMatch).length;\nconst skuLists = (rows) => { const o = {}; rows.forEach(p => { o[p.tab] = (o[p.tab] ? o[p.tab] + ',' : '') + p.sku; }); return o; };\nconst cells = []; prods.forEach(p => (p.clear || []).forEach(c => cells.push(c.cell)));\nconst unknownTabs = [...new Set(review.wrong.map(w => w.tab).filter(t => !['2026Instock','Animal','Balustrade','Bathtub','Bench','BookMatchedSlabs','Carving','Columns','DoorSurround','Exterior-Wall-Decoration','Fireplace','Fountain','Lamppost','Marble+ Basin','Marble+ ConsoleTable','MarbleMedallion','MarbleRangeHood','MarbleSlab','Moulding','OutdoorCornice','Planter','Sink','Stairs','Statue','StoneMosaicTile','Table','Vanity','Wainscoting','Wall-Coverings','WindowSurround'].includes(t)))];\nconst notFound = perDrawing.filter(d => d.foundInSheet === 0).map(d => d.tab + ' / ' + d.drawing);\nconst yesMode = String(cfg.mode || '').toLowerCase() === 'yes';\nconst needs = prods.filter(p => p.id && (!(p.mediaIds || []).length || !p.metaMatch));\nconst apply = !yesMode && !dryRun && shopifyErrors === 0 && unknownTabs.length === 0 && cells.length > 0;\nreturn [{ json: {\n  dryRun, applied: false, apply,\n  blockedBecause: !dryRun && shopifyErrors > 0 ? 'a Shopify read failed, so nothing was changed; run again' : (!dryRun && unknownTabs.length ? 'a tab name in the review tab is not a sheet tab, so nothing was changed' : undefined),\n  reviewCounts: review.counts,\n  wrongDrawings: review.wrong.length, productsInSheet: prods.length, liveOnShopify: live.length, galleryPicturesToDetach: liveFiles, metafieldsToDelete: liveMeta, notLiveOrSheetOnly: prods.length - live.length,\n  cellsToClear: cells.length, shopifyReadErrors: shopifyErrors,\n  heldCount: (review.held || []).length,\n  held: (review.held || []).map(h => ({ reviewRow: h.reviewRow, tab: h.tab, drawing: h.file, skus: h.skus.join(','), reason: h.reason, note: h.note })),\n  yesModeReport: yesMode ? { meaning: 'drawings marked yes: is the correct CAD on each product on Shopify (gallery picture and download button)?', productsOnShopify: prods.filter(p => p.id).length, fullyThere: prods.filter(p => p.id && (p.mediaIds || []).length && p.metaMatch).length, missingPicture: prods.filter(p => p.id && !(p.mediaIds || []).length).length, missingButton: prods.filter(p => p.id && !p.metaMatch).length, sheetOnlyNotCreatedYet: prods.filter(p => !p.id).length, needUpdateSkusByTab: skuLists(needs) } : undefined,\n  tabsNotRecognised: unknownTabs,\n  drawingsNotFoundInSheet: notFound,\n  perDrawing,\n  liveSkusByTab: skuLists(live),\n  notLiveSkusByTab: skuLists(prods.filter(p => !p.liveOnShopify)),\n  otherCellNotes: prods.filter(p => p.otherCell).slice(0, 30).map(p => ({ tab: p.tab, sku: p.sku, note: p.otherCell })),\n  perTab: sums.map(s => ({ tab: s.tab, rows: s.rows, affected: s.affected, live: s.live, noShopifyUrl: s.noShopifyUrl })),\n  errorDetails: errs.slice(0, 10),\n  _log: apply ? prods.map(p => ({ live: !!p.liveOnShopify, tab: p.tab, row: p.row, sku: p.sku, drawing: p.drawing, note: p.note, old11: p.old11 || '', oldCad: p.oldCad || '' })) : [],\n  _removals: apply ? live.map(p => ({ tab: p.tab, sku: p.sku, id: p.id, mediaIds: p.mediaIds || [], metaId: p.metaMatch ? p.metaId : null, cells: (p.clear || []).map(c => c.cell) })) : [],\n  _cellsNow: apply ? prods.filter(p => !p.liveOnShopify).flatMap(p => (p.clear || []).map(c => c.cell)) : []\n} }];"
@@ -399,8 +399,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1540,
-        60
+        7008,
+        2192
       ]
     },
     {
@@ -409,8 +409,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        60
+        7264,
+        2176
       ],
       "parameters": {
         "jsCode": "// One request per live product: detach the wrong picture from the product (the shared file stays for other products) and delete the CAD download-button metafield.\nconst rem = $input.first().json._removals || [];\nconst out = rem.map(r => {\n  const vars = {}; const decl = []; const parts = [];\n  if (r.mediaIds.length) { decl.push('$files: [FileUpdateInput!]!'); vars.files = r.mediaIds.map(id => ({ id, referencesToRemove: ['gid://shopify/Product/' + r.id] })); parts.push('fileUpdate(files: $files) { files { id } userErrors { field message } }'); }\n  if (r.metaId) { decl.push('$mf: [MetafieldIdentifierInput!]!'); vars.mf = [{ ownerId: 'gid://shopify/Product/' + r.id, namespace: 'custom', key: 'cad_drawing_url' }]; parts.push('metafieldsDelete(metafields: $mf) { deletedMetafields { key } userErrors { field message } }'); }\n  return { json: { ...r, body: { query: 'mutation R(' + decl.join(', ') + ') { ' + parts.join(' ') + ' }', variables: vars } } };\n});\n// no live product: one harmless request so the next steps still run\nif (!out.length) out.push({ json: { noop: true, cells: [], body: { query: '{ shop { name } }' } } });\nreturn out;"
@@ -448,8 +448,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1980,
-        60
+        7472,
+        2176
       ],
       "credentials": {
         "shopifyOAuth2Api": {
@@ -468,8 +468,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
-        60
+        7696,
+        2176
       ],
       "parameters": {
         "jsCode": "// Which products were really changed on Shopify. Their sheet cells are cleared next; failed ones keep their cells so a re-run finds them again.\nconst reqs = $('Build Shopify Removals').all().map(i => i.json);\nconst rep = $('Final Report').first().json;\nconst cells = [...(rep._cellsNow || [])];\nconst ok = [], failed = [];\n$input.all().forEach((it, k) => {\n  const rq = reqs[k]; const r = it.json;\n  if (!rq || rq.noop) return;\n  const ue = [].concat(r.data?.fileUpdate?.userErrors || [], r.data?.metafieldsDelete?.userErrors || []);\n  if (r.error || (r.errors && r.errors.length) || !r.data || ue.length) { failed.push({ tab: rq.tab, sku: rq.sku, error: JSON.stringify(r.error || r.errors || ue || r).slice(0, 250) }); return; }\n  ok.push(rq.sku); rq.cells.forEach(c => cells.push(c));\n});\n// Log of everything that is about to be cleared (old values), so nothing is lost.\nconst okSet = new Set(ok);\nconst when = new Date().toISOString();\nconst log = (rep._log || []).filter(l => !l.live || okSet.has(l.sku)).map(l => [when, l.tab, l.row, l.sku, l.drawing, l.note, l.old11, l.oldCad]);\nreturn [{ json: { cells, shopifyOk: ok.length, shopifyFailed: failed.length, failed, sheetOnlyCells: (rep._cellsNow || []).length, log } }];"
@@ -481,8 +481,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        2420,
-        160
+        7936,
+        2176
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -508,8 +508,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        2640,
-        160
+        8192,
+        2176
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -535,8 +535,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2420,
-        60
+        8432,
+        2176
       ],
       "parameters": {
         "jsCode": "const lg = $input.first().json;\nif (lg.error || !lg.updates) throw new Error('The log of old values could not be written, so nothing was cleared in the sheet: ' + JSON.stringify(lg.error || lg).slice(0, 300));\nconst cells = $('Collect Results').first().json.cells || [];\nconst out = [];\nfor (let i = 0; i < cells.length; i += 200) out.push({ json: { n: cells.slice(i, i + 200).length, body: { ranges: cells.slice(i, i + 200) } } });\nreturn out;"
@@ -548,8 +548,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        2640,
-        60
+        8656,
+        2176
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -575,8 +575,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2860,
-        60
+        8864,
+        2176
       ],
       "parameters": {
         "jsCode": "// Result of the real run. Shopify first, then the sheet.\nconst reqs = $('Build Clear Request').all().map(i => i.json);\nconst col = $('Collect Results').first().json;\nlet cleared = 0, failed = 0; const errors = [];\n$input.all().forEach((it, k) => {\n  const r = it.json;\n  if (r.error || !r.clearedRanges) { failed += (reqs[k] ? reqs[k].n : 0); errors.push(JSON.stringify(r.error || r).slice(0, 200)); }\n  else cleared += r.clearedRanges.length;\n});\nreturn [{ json: { applied: true, shopifyProductsChanged: col.shopifyOk, shopifyFailed: col.shopifyFailed, shopifyFailures: col.failed, sheetOnlyCellsCleared: col.sheetOnlyCells, sheetCellsCleared: cleared, sheetCellsFailed: failed, errors, note: 'Failed products keep their sheet cells: fix the cause and run again.' } }];"

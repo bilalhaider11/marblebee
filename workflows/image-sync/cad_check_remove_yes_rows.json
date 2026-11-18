@@ -1,0 +1,399 @@
+{
+  "name": "CAD check - remove finished yes rows (dry run by default)",
+  "nodes": [
+    {
+      "id": "c352b09d-5656-472a-8d4e-fdc29a145503",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3248,
+        1136
+      ],
+      "parameters": {
+        "height": 330,
+        "width": 760,
+        "content": "## Remove finished rows from the CAD check tab (answer yes or no)\n\nLeaves only the rows that still need attention (the 'no' rows). dryRun true (default) only reports how many rows would go and which stay.\n\ndryRun false: first copies every row it is about to delete to a tab 'CAD check done (yes)' (all columns, with the date), then deletes those rows from the CAD check tab. If the copy fails, nothing is deleted. Rows with a blank or other answer in column F are never touched.\n\nConfig: answer (yes = default, or no), keepFiles (comma list of drawing files whose rows stay, e.g. rows still needing a decision), reviewTab (CAD check), tabs (blank = all, or e.g. Bathtub,Marble+ Basin: only yes rows of these tabs). Run it after the CAD pictures of those products are live on Shopify."
+      }
+    },
+    {
+      "id": "c7f895d6-09f1-4810-ad9c-89a59f7c9efc",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        1680
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c01fd325-3cff-441b-9bc5-01f49fe33e16",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3504,
+        1680
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "reviewTab",
+              "type": "string",
+              "value": "CAD check"
+            },
+            {
+              "id": "c2",
+              "name": "dryRun",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "c3",
+              "name": "tabs",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "c4",
+              "name": "answer",
+              "type": "string",
+              "value": "yes"
+            },
+            {
+              "id": "c5",
+              "name": "keepFiles",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ac546325-fd9a-4b52-a1f6-0522fb1f62ee",
+      "name": "Get Sheet Ids",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3728,
+        1680
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI?fields=sheets.properties(sheetId,title)",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      }
+    },
+    {
+      "id": "2aafaf1c-9a59-441e-8ff6-fecfbe071116",
+      "name": "Get Review Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3952,
+        1680
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI/values/' + encodeURIComponent(\"'\" + String($('Config').first().json.reviewTab).replace(/'/g, \"''\") + \"'!A:G\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      }
+    },
+    {
+      "id": "de657378-4ed6-4205-a0ff-013214e563f2",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        1680
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst sheets = ($('Get Sheet Ids').first().json.sheets || []).map(s => s.properties);\nconst sh = sheets.find(s => s.title === cfg.reviewTab);\nconst res = $input.first().json;\nif (!sh || res.error || !Array.isArray(res.values)) return [{ json: { ok: false, apply: false, problem: 'Review tab not found or not readable: ' + (sh ? JSON.stringify(res.error || res).slice(0, 200) : 'no tab named ' + cfg.reviewTab) } }];\nconst ans = String(cfg.answer || 'yes').toLowerCase() === 'no' ? 'no' : 'yes';\nconst keepF = String(cfg.keepFiles || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);\nconst only = String(cfg.tabs || '').split(',').map(x => x.trim()).filter(Boolean);\nconst norm = (x) => String(x ?? '').trim();\nconst vals = res.values;\nconst yes = [], keep = [];\nvals.forEach((r, i) => {\n  if (i === 0) return;\n  const tab = norm(r[0]).replace(/^.*?:\\s*/, '');\n  const f = norm(r[5]).toLowerCase();\n  if (f === ans && (!only.length || only.includes(tab)) && !keepF.includes(norm(r[1]).toLowerCase())) yes.push({ i, r });\n  else if (norm(r[0]) || norm(r[1])) keep.push({ row: i + 1, tab: norm(r[0]), drawing: norm(r[1]), answer: norm(r[5]), note: norm(r[6]) });\n});\nconst when = new Date().toISOString();\nconst width = 7;\nconst backup = [['removed_at'].concat((vals[0] || []).slice(0, width))].concat(yes.map(y => [when].concat(Array.from({ length: width }, (_, k) => norm(y.r[k])))));\n// delete from the bottom up so row numbers stay valid\nconst requests = yes.map(y => y.i).sort((a, b) => b - a).map(i => ({ deleteDimension: { range: { sheetId: sh.sheetId, dimension: 'ROWS', startIndex: i, endIndex: i + 1 } } }));\nconst dry = cfg.dryRun !== false;\nreturn [{ json: { ok: true, dryRun: dry, apply: !dry && yes.length > 0, yesRowsToRemove: yes.length, rowsThatStay: keep.length, stayByAnswer: keep.reduce((o, k) => { const a = k.answer.toLowerCase() || '(blank)'; o[a] = (o[a] || 0) + 1; return o; }, {}), staySample: keep.slice(0, 5), ...(dry ? {} : { backup, requests }) } }];"
+      }
+    },
+    {
+      "id": "432a4d56-b790-487d-897d-15a0128497ad",
+      "name": "Apply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4384,
+        1680
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "406d3176-8b1b-4e21-86de-de15a12f221f",
+              "leftValue": "={{ $json.apply === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "eaaaac09-8324-43e1-aa20-f047ee2255a3",
+      "name": "Create Backup Tab",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4688,
+        1664
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ requests: [{ addSheet: { properties: { title: 'CAD check done (' + $('Config').first().json.answer + ')' } } }] }) }}"
+      }
+    },
+    {
+      "id": "3fdeabe6-01c0-4cb5-9197-63fb05a02096",
+      "name": "Append Backup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4912,
+        1664
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI/values/' + encodeURIComponent(\"'CAD check done (\" + $('Config').first().json.answer + \")'!A1\") + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ values: $('Plan').first().json.backup }) }}"
+      }
+    },
+    {
+      "id": "4bb39e95-dee3-4e49-9388-7eed6b56ce31",
+      "name": "Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5136,
+        1664
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (r.error || !r.updates) throw new Error('The backup copy of the yes rows could not be written, so nothing was deleted: ' + JSON.stringify(r.error || r).slice(0, 300));\nreturn [{ json: { requests: $('Plan').first().json.requests } }];"
+      }
+    },
+    {
+      "id": "a249ada9-d143-42bf-abd2-889fe802c0e2",
+      "name": "Delete Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5344,
+        1664
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1ITSJNL7iql08AklUOLI1QSpOO0HlYEb8Dui0eNBXSeI:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ requests: $json.requests }) }}"
+      }
+    },
+    {
+      "id": "39c3b0ec-219e-49cb-93b1-aa567a49c3a4",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5568,
+        1664
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Plan').first().json; const r = $input.first().json;\nreturn [{ json: { applied: !r.error, deleteError: r.error ? JSON.stringify(r.error).slice(0, 300) : undefined, rowsRemoved: r.error ? 0 : p.yesRowsToRemove, rowsThatStay: p.rowsThatStay, backupTab: 'CAD check done (' + $('Config').first().json.answer + ')' } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Ids": {
+      "main": [
+        [
+          {
+            "node": "Get Review Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Review Tab": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Apply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply?": {
+      "main": [
+        [
+          {
+            "node": "Create Backup Tab",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Create Backup Tab": {
+      "main": [
+        [
+          {
+            "node": "Append Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Backup": {
+      "main": [
+        [
+          {
+            "node": "Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard": {
+      "main": [
+        [
+          {
+            "node": "Delete Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Rows": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
