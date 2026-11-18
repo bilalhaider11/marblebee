@@ -558,10 +558,6 @@
         "filtersUI": {
           "values": [
             {
-              "lookupColumn": "timestamp",
-              "lookupValue": "={{ $json.timestamp }}"
-            },
-            {
               "lookupColumn": "fromEmail",
               "lookupValue": "={{ $json.fromEmail }}"
             },
@@ -598,7 +594,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// The lookup node above replaces our data with whatever row it found (or\n// {} via Always Output Data if nothing matched, or an {error: ...} shaped\n// item if the sheet is missing a filtered-on column) -- recover the real\n// message data (and its binary attachments) from before the lookup, and\n// just carry forward whether a real row was found.\n//\n// 'row_number' (not 'id') is the found-signal: it's a field n8n's Sheets\n// node always attaches to every real matched row, regardless of which\n// actual columns that row has -- unlike 'id', which only exists on rows\n// logged by this dedup feature itself. Matching is done on timestamp +\n// fromEmail + toEmail + subject (see the lookup node) specifically because\n// those columns already exist on every row ever logged, old and new, so\n// messages logged before this feature existed are still correctly\n// recognized as already-logged instead of silently re-duplicated.\nconst lookupResult = $input.first().json;\nconst original = $('Normalize | Extract Clean Reply Text2').item;\nreturn [{\n  json: { ...original.json, _alreadyLogged: !!(lookupResult && lookupResult.row_number !== undefined) },\n  binary: original.binary\n}];"
+        "jsCode": "// The lookup node above replaces our data with whatever row it found (or\n// {} via Always Output Data if nothing matched, or an {error: ...} shaped\n// item if the sheet is missing a filtered-on column) -- recover the real\n// message data (and its binary attachments) from before the lookup, and\n// just carry forward whether a real row was found.\n//\n// 'row_number' (not 'id') is the found-signal: it's a field n8n's Sheets\n// node always attaches to every real matched row, regardless of which\n// actual columns that row has -- unlike 'id', which only exists on rows\n// logged by this dedup feature itself. Matching is done on timestamp +\n// fromEmail + toEmail + subject (see the lookup node) specifically because\n// those columns already exist on every row ever logged, old and new, so\n// messages logged before this feature existed are still correctly\n// recognized as already-logged instead of silently re-duplicated.\n// Already logged? The lookup above matches on fromEmail + toEmail + subject and returns ALL matching rows (the node's 'Return only First Matching Row' option must stay OFF, its default); the\n// timestamp is compared here as a point in time (epoch seconds), NOT as text. Gmail writes '2026-07-09T15:17:56.000Z' and\n// Outlook '2026-07-09T15:17:56Z': the same e-mail seen from both mailboxes (e.g. Emily's Gmail with Jack in copy in\n// Outlook) was never recognised as logged and got a second row. Rows logged in either format, old or new, now match.\nconst secs = (t) => { const d = new Date(String(t == null ? '' : t).trim()); return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000); };\nconst original = $('Normalize | Extract Clean Reply Text2').item;\nconst mine = secs(original.json.timestamp);\nconst found = mine !== null && $input.all().some(i => i.json && i.json.row_number !== undefined && secs(i.json.timestamp) === mine);\nreturn [{\n  json: { ...original.json, _alreadyLogged: found },\n  binary: original.binary\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

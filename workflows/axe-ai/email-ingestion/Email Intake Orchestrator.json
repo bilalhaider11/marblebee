@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Reuse-or-create + watermark + single-path consolidation\n\n**Reuse-or-create:** before, every run unconditionally created a new client root folder, attachments subfolder, and conversation sheet -- even for a client that already had them, duplicating everything and re-logging their entire history the moment `Processed` got reset to false. Now, each of the 3 resources is preceded by a Find -> Pick Exact Match -> If Found trio (same pattern already used in drive_shopify_image_sync.json's 'Find Category Folder'/'Pick Exact Category Match'). Found -> reuse its id, skip creating. Not found -> create exactly as before. Downstream nodes read from a stable '... (Resolved)' node instead of the Create node directly, since the Create node no longer always runs. New accounts with no existing folder are unaffected -- same create + full-history-fetch behavior as before.\n\n**Watermark:** the control sheet needs a `last_synced_at` column (manually add the header -- blank = new account). Gmail search is scoped to `after:<date>` when present; each successful run writes the new `last_synced_at` back alongside `Processed: true`.\n\n**Outlook watermark:** Microsoft Graph won't combine $search (needed for \"from OR to\" matching) with $filter (needed for a date range) in one request, and toRecipients isn't $filter-able at all -- confirmed against Graph's docs. So Outlook still calls the API with the full-history search, but 'Normalize Outlook Messages' filters the results client-side against last_synced_at before anything gets queued.\n\n**Single-path consolidation:** this workflow used to have two nearly-identical parallel paths -- a \"single-provider\" path (triggered when Platform was exactly \"gmail\" or \"outlook\") and a \"merged\" path (triggered otherwise, handling accounts active on both providers). The only reason two paths existed was that the merged path's account-splitting logic did `JSON.parse(Platform)`, which throws on a plain \"gmail\"/\"outlook\" string -- not an actual difference in what needed to happen. That parsing was made tolerant of both a plain string and a JSON array (treating a plain string as a single-element array), so the merged path's already-optional-chained gmail/outlook handling now correctly covers the single-provider case too. The single-provider path (its own copy of the reuse-or-create trio, its own Gmail/Outlook search+normalize, its own queue/mark-processed nodes -- 39 nodes) was deleted; every account now goes through what used to be only the \"merged\" path. 82 nodes -> 43, no loss of behavior.\n\n**Not yet addressed:** per-message/per-attachment dedup for anything that still gets queued despite the watermark (Outlook's full-history refetch, or anything the Gmail date-scoping doesn't catch) -- relies on the Gmail/Outlook Processor Final sub-workflows, not yet implemented. Also, nothing resets `Processed` back to false automatically -- still a manual action; the watermark only matters once someone does that for an account that already has infrastructure.\n\n**Drive scoping audit (no global search):** confirmed every Google Drive operation in this workflow is parent-scoped, none search Drive-wide. Search nodes (`📂 Find Client Root Folder`, `📂 Find Attachments Subfolder`, `📂 Find Conversation Sheet`) all set `filter.folderId`. Create nodes (`Create Client Root Folder`, `Create Attachments Subfolder`) and `Move Sheet to Client Folder` all set an explicit parent `folderId`. The only exception is `Create Conversation Sheet` (Google Sheets node) landing wherever the credential's default location is on creation -- the Sheets API has no create-with-parent option -- but `Move Sheet to Client Folder` relocates it into the resolved client root folder immediately after, in the same execution.\nFolder hierarchy (top -> bottom): `1a6nPIjW5VLARperP9yrSqXJMDmfojqUl` (top-level Axe AI parent -- corrected; superseded 1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr, which was the older/wrong top folder) contains the 3 provider parents used as `folder_id` in 'Combine Gmail & Outlook Per Client' -- gmail-only `1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE`, outlook-only `1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8`, combined `102oeld1yMYGMmWs2Od198HqO1KeVhv_n` -- each of which contains that provider's per-client folders, each of which contains that client's attachments subfolder + conversation sheet. Every search/create already resolves within this tree, so no change was needed to scope things \"inside this folder\" -- it already was.\n\n**Fixed: zero-new-messages stalled the loop.** Root cause identical in shape to the earlier \"empty Platform kills the loop\" bug, just one stage later: `Expand Gmail Message IDs` / `Expand Outlook Message IDs` return 0 items when an account has no new mail on that side, and by default n8n doesn't run a node at all when its only input produced 0 items -- so when BOTH sides are empty (nothing new anywhere for that account this cycle), `Merge Expanded Messages` never fires, which means `Queue Messages` never fires, which means `Mark Account Processed` never fires -- and since `Mark Account Processed` was the only thing looping back into `For Each Account`, that account (and every account still left in the batch) stalled silently, exactly like Michael Latifi's case did earlier. Fixed by turning on \"Always Output Data\" on `Merge Expanded Messages` (so it emits one placeholder item instead of nothing when both sides are truly empty) and adding `❓ Any New Messages?` right after it, gating on `{{ $json.id }}` notEmpty: real messages -> unchanged path through `Queue Messages` -> `Mark Account Processed`; no messages -> straight to `Mark Account Processed`, bypassing `Queue Messages` entirely so the placeholder item never risks writing a blank row into the queue sheet (the same mistake \"Always Output Data\" caused once already, when it was tried on `Queue Messages` directly instead).\n\n**Seven mailboxes (added 2026-10).** Gmail: Emily, Terry, Office. Outlook: Jack, Mia, Eve, Yolanda -- each Outlook search and normalize step tags its message ids with the mailbox (`outlook_jack` / `outlook_mia` / `outlook_eve` / `outlook_yolanda`) because an Outlook message id only works in the mailbox it came from; the Outlook Processor routes by that tag.\n\n**Which mailboxes and which dates:** a NEW client (blank last_synced_at) is searched by its Platform value (both = all 7, outlook = the 4 Outlook, gmail = the 3 Gmail) with NO date filter (Gmail results are paged, up to 500 per page). An EXISTING client (last_synced_at filled) ignores Platform and is searched in all 7: Jack and the 3 Gmail mailboxes after last_synced_at, and the 3 newer Outlook mailboxes from the beginning until the account has been backfilled once (`new_outlook_backfilled` = TRUE, written by Mark Account Processed whenever the Outlook branch ran), after last_synced_at from then on.\n\n**Which accounts a run takes (Select Accounts To Process):** rows with Processed = FALSE, then existing rows (Processed TRUE, last_synced_at filled) that are not yet backfilled, at most `maxAccountsPerRun` (Run Config). Rows without an Email are never processed. Set `onlyClient` in Run Config (name or email contains) and use the manual trigger to test a single client first.\n\n**Existing folders are never moved or duplicated:** the folder search runs in all three Drive parents (preferred parent first, picked from where the messages are) and only creates a folder when none of them has one for that client name.\n\n**No empty folders:** right after `Combine Gmail & Outlook Per Client`, `❓ Any Messages At All?` sends an account with no Gmail messages and no Outlook ids straight to `Mark Account Processed` -- no folder search, no folder / conversation sheet creation, nothing queued. Only accounts that actually have messages go through the folder steps.\n\n**Queue rows:** Gmail rows are written with `source = email` and `Processed = FALSE`; Outlook rows with `Processed = FALSE` and a blank `source`. The Gmail Processor loads `source = email`; the Outlook Processor loads `Processed = FALSE` with a blank `source`, so Gmail rows are skipped. Outlook rows are tagged in `by_mail` (outlook_jack / outlook_mia / outlook_eve / outlook_yolanda).\n\n\n**Marking an account done:** `Mark Account Processed` updates the control-sheet row by `row_number` (not by the Email text, which differs in spacing for multi-email accounts and would not match).\n\n**Outlook search returns dates:** the 4 `Outlook API | Search Messages` nodes use `output = fields` (receivedDateTime, sentDateTime, internetMessageId). The default simple output has no date field, so the `last_synced_at` filter in `Normalize Outlook (...)` could never drop anything and every run re-queued each client's whole Outlook history (the processors then skipped the already-logged ones).",
+        "content": "## Reuse-or-create + watermark + single-path consolidation\n\n**Reuse-or-create:** before, every run unconditionally created a new client root folder, attachments subfolder, and conversation sheet -- even for a client that already had them, duplicating everything and re-logging their entire history the moment `Processed` got reset to false. Now, each of the 3 resources is preceded by a Find -> Pick Exact Match -> If Found trio (same pattern already used in drive_shopify_image_sync.json's 'Find Category Folder'/'Pick Exact Category Match'). Found -> reuse its id, skip creating. Not found -> create exactly as before. Downstream nodes read from a stable '... (Resolved)' node instead of the Create node directly, since the Create node no longer always runs. New accounts with no existing folder are unaffected -- same create + full-history-fetch behavior as before.\n\n**Watermark:** the control sheet needs a `last_synced_at` column (manually add the header -- blank = new account). Gmail search is scoped to `after:<date>` when present; each successful run writes the new `last_synced_at` back alongside `Processed: true`.\n\n**Outlook watermark:** Microsoft Graph won't combine $search (needed for \"from OR to\" matching) with $filter (needed for a date range) in one request, and toRecipients isn't $filter-able at all -- confirmed against Graph's docs. So Outlook still calls the API with the full-history search, but 'Normalize Outlook Messages' filters the results client-side against last_synced_at before anything gets queued.\n\n**Single-path consolidation:** this workflow used to have two nearly-identical parallel paths -- a \"single-provider\" path (triggered when Platform was exactly \"gmail\" or \"outlook\") and a \"merged\" path (triggered otherwise, handling accounts active on both providers). The only reason two paths existed was that the merged path's account-splitting logic did `JSON.parse(Platform)`, which throws on a plain \"gmail\"/\"outlook\" string -- not an actual difference in what needed to happen. That parsing was made tolerant of both a plain string and a JSON array (treating a plain string as a single-element array), so the merged path's already-optional-chained gmail/outlook handling now correctly covers the single-provider case too. The single-provider path (its own copy of the reuse-or-create trio, its own Gmail/Outlook search+normalize, its own queue/mark-processed nodes -- 39 nodes) was deleted; every account now goes through what used to be only the \"merged\" path. 82 nodes -> 43, no loss of behavior.\n\n**Not yet addressed:** per-message/per-attachment dedup for anything that still gets queued despite the watermark (Outlook's full-history refetch, or anything the Gmail date-scoping doesn't catch) -- relies on the Gmail/Outlook Processor Final sub-workflows, not yet implemented. Also, nothing resets `Processed` back to false automatically -- still a manual action; the watermark only matters once someone does that for an account that already has infrastructure.\n\n**Drive scoping audit (no global search):** confirmed every Google Drive operation in this workflow is parent-scoped, none search Drive-wide. Search nodes (`📂 Find Client Root Folder`, `📂 Find Attachments Subfolder`, `📂 Find Conversation Sheet`) all set `filter.folderId`. Create nodes (`Create Client Root Folder`, `Create Attachments Subfolder`) and `Move Sheet to Client Folder` all set an explicit parent `folderId`. The only exception is `Create Conversation Sheet` (Google Sheets node) landing wherever the credential's default location is on creation -- the Sheets API has no create-with-parent option -- but `Move Sheet to Client Folder` relocates it into the resolved client root folder immediately after, in the same execution.\nFolder hierarchy (top -> bottom): `1a6nPIjW5VLARperP9yrSqXJMDmfojqUl` (top-level Axe AI parent -- corrected; superseded 1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr, which was the older/wrong top folder) contains the 3 provider parents used as `folder_id` in 'Combine Gmail & Outlook Per Client' -- gmail-only `1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE`, outlook-only `1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8`, combined `102oeld1yMYGMmWs2Od198HqO1KeVhv_n` -- each of which contains that provider's per-client folders, each of which contains that client's attachments subfolder + conversation sheet. Every search/create already resolves within this tree, so no change was needed to scope things \"inside this folder\" -- it already was.\n\n**Fixed: zero-new-messages stalled the loop.** Root cause identical in shape to the earlier \"empty Platform kills the loop\" bug, just one stage later: `Expand Gmail Message IDs` / `Expand Outlook Message IDs` return 0 items when an account has no new mail on that side, and by default n8n doesn't run a node at all when its only input produced 0 items -- so when BOTH sides are empty (nothing new anywhere for that account this cycle), `Merge Expanded Messages` never fires, which means `Queue Messages` never fires, which means `Mark Account Processed` never fires -- and since `Mark Account Processed` was the only thing looping back into `For Each Account`, that account (and every account still left in the batch) stalled silently, exactly like Michael Latifi's case did earlier. Fixed by turning on \"Always Output Data\" on `Merge Expanded Messages` (so it emits one placeholder item instead of nothing when both sides are truly empty) and adding `❓ Any New Messages?` right after it, gating on `{{ $json.id }}` notEmpty: real messages -> unchanged path through `Queue Messages` -> `Mark Account Processed`; no messages -> straight to `Mark Account Processed`, bypassing `Queue Messages` entirely so the placeholder item never risks writing a blank row into the queue sheet (the same mistake \"Always Output Data\" caused once already, when it was tried on `Queue Messages` directly instead).\n\n**Seven mailboxes (added 2026-10).** Gmail: Emily, Terry, Office. Outlook: Jack, Mia, Eve, Yolanda -- each Outlook search and normalize step tags its message ids with the mailbox (`outlook_jack` / `outlook_mia` / `outlook_eve` / `outlook_yolanda`) because an Outlook message id only works in the mailbox it came from; the Outlook Processor routes by that tag.\n\n**Which mailboxes and which dates:** a NEW client (blank last_synced_at) is searched by its Platform value (both = all 7, outlook = the 4 Outlook, gmail = the 3 Gmail) with NO date filter (Gmail results are paged, up to 500 per page). An EXISTING client (last_synced_at filled) ignores Platform and is searched in all 7: Jack and the 3 Gmail mailboxes after last_synced_at, and the 3 newer Outlook mailboxes from the beginning until the account has been backfilled once (`new_outlook_backfilled` = TRUE, written by Mark Account Processed whenever the Outlook branch ran), after last_synced_at from then on.\n\n**Which accounts a run takes (Select Accounts To Process):** rows with Processed = FALSE, then existing rows (Processed TRUE, last_synced_at filled) that are not yet backfilled, at most `maxAccountsPerRun` (Run Config). Rows without an Email are never processed. Set `onlyClient` in Run Config (name or email contains) and use the manual trigger to test a single client first.\n\n**Existing folders are never moved or duplicated:** the folder search runs in all three Drive parents (preferred parent first, picked from where the messages are) and only creates a folder when none of them has one for that client name.\n\n**No empty folders:** right after `Combine Gmail & Outlook Per Client`, `❓ Any Messages At All?` sends an account with no Gmail messages and no Outlook ids straight to `Mark Account Processed` -- no folder search, no folder / conversation sheet creation, nothing queued. Only accounts that actually have messages go through the folder steps.\n\n**Queue rows:** Gmail rows are written with `source = email` and `Processed = FALSE`; Outlook rows with `Processed = FALSE` and a blank `source`. The Gmail Processor loads `source = email`; the Outlook Processor loads `Processed = FALSE` with a blank `source`, so Gmail rows are skipped. Outlook rows are tagged in `by_mail` (outlook_jack / outlook_mia / outlook_eve / outlook_yolanda).\n\n\n**Marking an account done:** `Mark Account Processed` updates the control-sheet row by `row_number` (not by the Email text, which differs in spacing for multi-email accounts and would not match).\n\n**Outlook search returns dates:** the 4 `Outlook API | Search Messages` nodes use `output = fields` (receivedDateTime, sentDateTime, internetMessageId). The default simple output has no date field, so the `last_synced_at` filter in `Normalize Outlook (...)` could never drop anything and every run re-queued each client's whole Outlook history (the processors then skipped the already-logged ones).\n\n**Etsy conversations (2026-11-18):** clients who first wrote on Etsy had no early messages: Etsy hides the buyer's address, so the address search missed the notices ('Etsy Conversation with <name>' from no-reply@account.etsy.com, in Jack's mailbox). 'Outlook API | Search Etsy Conversations (Jack)' now also searches Jack's mailbox for that phrase with the account's Name, and 'Normalize Outlook (Jack)' merges both result lists (deduplicated by id). Gmail mailboxes are not searched for Etsy notices (Luna: all Etsy mail arrives in Jack's mailbox). The Outlook Processor logs them like any other message: RECEIVED, from no-reply@account.etsy.com.",
         "height": 1744,
         "width": 848
       },
@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        21024,
-        7104
+        21712,
+        7328
       ]
     },
     {
@@ -35,8 +35,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        22320,
-        7648
+        23008,
+        7872
       ],
       "id": "91a63a95-03b2-4ab5-b27f-ac86c324d973",
       "name": "Load Accounts from Control Sheet",
@@ -54,8 +54,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        22784,
-        7648
+        23472,
+        7872
       ],
       "id": "e2a49a55-278d-4b19-9c84-506cf567e081",
       "name": "For Each Account"
@@ -100,8 +100,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        23824,
-        6720
+        24512,
+        6944
       ],
       "id": "fbfeec91-40cc-4cb7-85cc-c13137346289",
       "name": "Gmail API | Search Messages (Emily)",
@@ -119,8 +119,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24048,
-        6720
+        24736,
+        6944
       ],
       "id": "0765536b-2562-4b7e-9b1b-4ebd73bea6b9",
       "name": "Tag Mailbox (Emily)"
@@ -132,8 +132,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24048,
-        6944
+        24736,
+        7168
       ],
       "id": "80b5cab9-8146-4ad9-83be-960871ae8305",
       "name": "Tag Mailbox (Terry)"
@@ -145,8 +145,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24048,
-        7168
+        24736,
+        7392
       ],
       "id": "2f79cf91-e0d6-4949-81a2-faa97ad435f8",
       "name": "Tag Mailbox (Office)"
@@ -158,8 +158,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        23584,
-        6944
+        24272,
+        7168
       ],
       "id": "a615e3da-f9a7-40f9-b3c1-96d014341fff",
       "name": "Build Gmail Search Query"
@@ -171,8 +171,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        23840,
-        7664
+        24528,
+        7888
       ],
       "id": "8cfef8e2-4638-4a3c-999b-748e00dc3405",
       "name": "Build Outlook Search Query"
@@ -184,8 +184,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        24288,
-        6928
+        24976,
+        7152
       ],
       "id": "1985c39e-b69c-49fe-a9a9-212082b8f376",
       "name": "Merge Gmail Mailbox Results"
@@ -231,8 +231,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        23824,
-        6944
+        24512,
+        7168
       ],
       "id": "435d6bf4-8ad1-4d76-9b1b-3561b0cee2f8",
       "name": "Gmail API | Search Messages (Terry)",
@@ -270,8 +270,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        23616,
-        7648
+        24304,
+        7872
       ],
       "id": "9803036d-6ac8-4234-bcd2-b8c1e550fd72",
       "name": "❓ Gmail or Outlook?"
@@ -283,8 +283,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        23072,
-        7664
+        23760,
+        7888
       ],
       "id": "63b9388c-69ab-4a75-baa8-b8575d32d278",
       "name": "Split Multi-Platform Account by Provider"
@@ -296,8 +296,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24528,
-        6944
+        25216,
+        7168
       ],
       "id": "55f76511-dd7d-4b6a-b592-b7a5c7a29e73",
       "name": "Normalize Gmail Messages"
@@ -307,8 +307,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        25392,
-        7680
+        26080,
+        7904
       ],
       "id": "b3b22575-5326-4f71-b33b-791388897b37",
       "name": "Merge Gmail + Outlook Results"
@@ -320,8 +320,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25648,
-        7680
+        26336,
+        7904
       ],
       "id": "d0bf9609-a150-4568-9c5d-e299d7873315",
       "name": "Combine Gmail & Outlook Per Client"
@@ -432,8 +432,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        26512,
-        8752
+        27200,
+        8976
       ],
       "id": "020bfab6-5cc4-4638-9820-051d520ef426",
       "name": "Mark Account Processed",
@@ -505,8 +505,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        25552,
-        8512
+        26240,
+        8736
       ],
       "id": "eab75fc8-864e-47f4-b144-25de047df96b",
       "name": "Route by Resource"
@@ -518,8 +518,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25312,
-        8512
+        26000,
+        8736
       ],
       "id": "bdaa463e-29ce-4505-855c-0291cf84e4ae",
       "name": "Split Combined Result by Provider"
@@ -529,8 +529,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        25824,
-        8736
+        26512,
+        8960
       ],
       "id": "45e91e01-58e7-4dc9-9f42-ce41ce7152e8",
       "name": "Merge Expanded Messages",
@@ -576,8 +576,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        23824,
-        7168
+        24512,
+        7392
       ],
       "id": "98397a1a-b2c0-41cd-9d5d-b985f695a7c6",
       "name": "Gmail API | Search Messages (Office)",
@@ -609,8 +609,8 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        23824,
-        7424
+        24512,
+        7648
       ],
       "id": "2fc4d551-0e19-46a6-b19e-c483f70aa535",
       "name": "Outlook API | Search Messages (Jack)",
@@ -625,13 +625,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Microsoft Graph does not allow combining $search (needed here to match \"from OR to\" across\n// possibly multiple addresses in one query) with $filter (needed for a receivedDateTime range)\n// in the same request, and toRecipients isn't filterable via $filter at all. So the date\n// scoping happens here, client-side, after the search returns.\n// MAILBOX tags every id with the mailbox it came from -- the Outlook Processor uses the tag\n// to fetch the message with the right credential (message ids are only valid in their own mailbox).\nconst MAILBOX = 'outlook_jack';\nconst rowdata = $('Build Outlook Search Query').item.json;\nconst afterText = MAILBOX === 'outlook_jack' ? rowdata.after_jack : rowdata.after_new_mailboxes;\nconst lastSyncedAt = afterText ? new Date(afterText) : null;\nconst isNewEnough = (item) => {\n  if (!lastSyncedAt || isNaN(lastSyncedAt.getTime())) return true;\n  const ts = item.json.receivedDateTime || item.json.sentDateTime;\n  if (!ts) return true;\n  return new Date(ts) >= lastSyncedAt;\n};\n\n// oldest first\nconst messages = [...$input.all()].filter(isNewEnough).reverse();\nconst ids = messages.map(item => item.json.id).filter(id => id);\n\n// Always report that this mailbox WAS searched (even with no ids), so the account can be\n// marked as backfilled; the combine step drops mailboxes without ids from the queue.\nreturn [{ json: {\n  mailbox: MAILBOX,\n  searched: true,\n  ids,\n  row_number: rowdata.row_number,\n  querymail: rowdata.mails,\n  email: rowdata.Email,\n  name: rowdata.Name\n} }];\n"
+        "jsCode": "// Microsoft Graph does not allow combining $search (needed here to match \"from OR to\" across\n// possibly multiple addresses in one query) with $filter (needed for a receivedDateTime range)\n// in the same request, and toRecipients isn't filterable via $filter at all. So the date\n// scoping happens here, client-side, after the search returns.\n// MAILBOX tags every id with the mailbox it came from -- the Outlook Processor uses the tag\n// to fetch the message with the right credential (message ids are only valid in their own mailbox).\nconst MAILBOX = 'outlook_jack';\nconst rowdata = $('Build Outlook Search Query').item.json;\nconst afterText = MAILBOX === 'outlook_jack' ? rowdata.after_jack : rowdata.after_new_mailboxes;\nconst lastSyncedAt = afterText ? new Date(afterText) : null;\nconst isNewEnough = (item) => {\n  if (!lastSyncedAt || isNaN(lastSyncedAt.getTime())) return true;\n  const ts = item.json.receivedDateTime || item.json.sentDateTime;\n  if (!ts) return true;\n  return new Date(ts) >= lastSyncedAt;\n};\n\n// Jack's own search (by the client's e-mail address) PLUS the Etsy conversation notices for this client's name.\n// Etsy hides the buyer's real address: its messages come from no-reply@account.etsy.com and only the NAME is in the\n// subject ('Etsy Conversation with <name>'), so the address search never finds them. Duplicates (same id) are dropped.\nconst jackItems = $('Outlook API | Search Messages (Jack)').all();\nconst seen = new Set();\nconst combined = [...jackItems, ...$input.all()].filter(it => {\n  const id = it.json && it.json.id; if (!id || seen.has(id)) return false; seen.add(id); return true;\n});\nconst when = (it) => new Date(it.json.receivedDateTime || it.json.sentDateTime || 0).getTime();\n// oldest first\nconst messages = combined.filter(isNewEnough).sort((x, y) => when(x) - when(y));\nconst ids = messages.map(item => item.json.id).filter(id => id);\n\n// Always report that this mailbox WAS searched (even with no ids), so the account can be\n// marked as backfilled; the combine step drops mailboxes without ids from the queue.\nreturn [{ json: {\n  mailbox: MAILBOX,\n  searched: true,\n  ids,\n  row_number: rowdata.row_number,\n  querymail: rowdata.mails,\n  email: rowdata.Email,\n  name: rowdata.Name\n} }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24144,
-        7424
+        25008,
+        7648
       ],
       "id": "8957fa53-bd2f-4a30-a20f-0b0bcf3d51d5",
       "name": "Normalize Outlook (Jack)",
@@ -750,8 +750,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        26608,
-        8544
+        27296,
+        8768
       ],
       "id": "31ddf771-303f-4e73-8ebf-e85a009a5022",
       "name": "Queue Messages",
@@ -783,8 +783,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        24976,
-        8144
+        25664,
+        8368
       ],
       "id": "e6249322-0896-4871-9e33-84ff0f50d352",
       "name": "Create Client Root Folder",
@@ -814,8 +814,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25440,
-        8192
+        26128,
+        8416
       ],
       "id": "645c36a7-a2e4-4427-a028-10d6a49a3023",
       "name": "Create Attachments Subfolder",
@@ -848,8 +848,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        24896,
-        8800
+        25584,
+        9024
       ],
       "id": "8a6826b6-7dc4-454d-8699-ae526391ab75",
       "name": "Move Sheet to Client Folder",
@@ -879,8 +879,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        24720,
-        8512
+        25408,
+        8736
       ],
       "id": "397eff5b-50d2-40be-8eae-2128e0ab1bd8",
       "name": "Create Conversation Sheet",
@@ -900,8 +900,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25520,
-        8752
+        26208,
+        8976
       ],
       "id": "5e1dac02-6cb1-453a-8813-243bacc3aa25",
       "name": "Expand Outlook Message IDs",
@@ -914,8 +914,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25968,
-        8496
+        26656,
+        8720
       ],
       "id": "4735a20e-87fa-4a2a-8ec5-90a715e26b6e",
       "name": "Expand Gmail Message IDs",
@@ -938,8 +938,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        26288,
-        7664
+        26976,
+        7888
       ],
       "id": "27df5d0f-49cb-4c66-9816-e22c4df56765",
       "name": "📂 Find Client Root Folder",
@@ -958,8 +958,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26528,
-        7664
+        27216,
+        7888
       ],
       "id": "fcf0fe00-1943-4b38-94fd-92c077208beb",
       "name": "🎯 Pick Exact Client Folder Match"
@@ -993,8 +993,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        24704,
-        8160
+        25392,
+        8384
       ],
       "id": "e6cd38c1-a00f-481c-bb24-1688f40bbcdf",
       "name": "❓ Client Folder Found?"
@@ -1006,8 +1006,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24928,
-        7952
+        25616,
+        8176
       ],
       "id": "c85e7322-b391-4800-ad96-6c799fcf28cf",
       "name": "📁 Client Root Folder (Resolved)"
@@ -1029,8 +1029,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25216,
-        7952
+        25904,
+        8176
       ],
       "id": "b4d2256e-335e-4bc6-afdc-2ae6ec770b87",
       "name": "📂 Find Attachments Subfolder",
@@ -1049,8 +1049,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25424,
-        7952
+        26112,
+        8176
       ],
       "id": "618c9587-4bea-4f1e-b68f-d9271f4ad5cc",
       "name": "🎯 Pick Exact Attachments Match"
@@ -1084,8 +1084,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        25680,
-        7952
+        26368,
+        8176
       ],
       "id": "c7886fb9-63e7-47cb-bf24-2e70a0275cd6",
       "name": "❓ Attachments Subfolder Found?"
@@ -1097,8 +1097,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25968,
-        7968
+        26656,
+        8192
       ],
       "id": "443e3441-3822-47ab-b593-f6fc4765a64a",
       "name": "📁 Attachments Subfolder (Resolved)"
@@ -1120,8 +1120,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25824,
-        8240
+        26512,
+        8464
       ],
       "id": "f3e6d18e-0e90-447c-b45a-7159d3911aa2",
       "name": "📂 Find Conversation Sheet",
@@ -1140,8 +1140,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26032,
-        8240
+        26720,
+        8464
       ],
       "id": "f91d9123-a925-4ada-b843-1f97a10eeae0",
       "name": "🎯 Pick Exact Conversation Sheet Match"
@@ -1175,8 +1175,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        26320,
-        8240
+        27008,
+        8464
       ],
       "id": "56f3ab49-619e-413e-b130-fe89aefe3b5c",
       "name": "❓ Conversation Sheet Found?"
@@ -1188,8 +1188,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25024,
-        8512
+        25712,
+        8736
       ],
       "id": "80152aad-c144-468d-b07c-23dd79f51be7",
       "name": "📄 Conversation Sheet (Resolved)"
@@ -1223,8 +1223,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        23360,
-        7664
+        24048,
+        7888
       ],
       "id": "515a0efe-25eb-44b3-a7af-47100a5cfeb3",
       "name": "❓ Has Valid Platform?"
@@ -1258,8 +1258,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        26128,
-        8736
+        26816,
+        8960
       ],
       "id": "d8599fdf-0a92-4a7c-a394-c32bf85d4a47",
       "name": "❓ Any New Messages?"
@@ -1269,8 +1269,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        26784,
-        8752
+        27472,
+        8976
       ],
       "id": "5926c21a-6ea9-4ae8-b20a-2b5ddc0cb410",
       "name": "Wait",
@@ -1289,8 +1289,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        22144,
-        7872
+        22832,
+        8096
       ],
       "id": "6d0b483a-76c0-4c9e-8322-5bc2e348e90f",
       "name": "scheduleTrigger"
@@ -1318,8 +1318,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        22144,
-        7648
+        22832,
+        7872
       ],
       "id": "1ba8ed50-57ac-4101-ba08-2cab72b80fae",
       "name": "Run Config"
@@ -1329,8 +1329,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        21920,
-        7648
+        22608,
+        7872
       ],
       "id": "f290501c-d420-4074-baa8-d99f3f09834c",
       "name": "▶️ Run now (set Run Config.onlyClient to test one client)"
@@ -1342,8 +1342,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        22528,
-        7648
+        23216,
+        7872
       ],
       "id": "e362beed-d614-453c-9171-df2388493552",
       "name": "Select Accounts To Process"
@@ -1355,8 +1355,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        24816,
-        7664
+        25504,
+        7888
       ],
       "id": "8f4bab08-8030-444c-be7c-0bd4771df7f6",
       "name": "Merge Outlook Mailboxes"
@@ -1368,8 +1368,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25104,
-        7696
+        25792,
+        7920
       ],
       "id": "8a020ce8-9af9-4ebe-b03a-0555afdaf2a7",
       "name": "Combine Outlook Mailboxes",
@@ -1396,8 +1396,8 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24112,
-        7664
+        24800,
+        7888
       ],
       "id": "de9acf50-7c43-4664-8169-39f56522bfbb",
       "name": "Outlook API | Search Messages (Mia)",
@@ -1417,8 +1417,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24384,
-        7664
+        25072,
+        7888
       ],
       "id": "4bd112d9-31a5-4d84-981e-6f50d006b9b6",
       "name": "Normalize Outlook (Mia)",
@@ -1445,8 +1445,8 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        23888,
-        7984
+        24576,
+        8208
       ],
       "id": "29069b21-761d-4553-9904-b45627a48c8d",
       "name": "Outlook API | Search Messages (Eve)",
@@ -1466,8 +1466,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24112,
-        7984
+        24800,
+        8208
       ],
       "id": "fe069f8b-5ffb-4e46-8d08-5105f13de095",
       "name": "Normalize Outlook (Eve)",
@@ -1494,8 +1494,8 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        23824,
-        8208
+        24512,
+        8432
       ],
       "id": "47999d3f-367b-4cbc-8ade-573ddc0cb9e6",
       "name": "Outlook API | Search Messages (Yolanda)",
@@ -1515,8 +1515,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24064,
-        8208
+        24752,
+        8432
       ],
       "id": "6537469e-9889-43ef-bd84-737b43275268",
       "name": "Normalize Outlook (Yolanda)",
@@ -1529,8 +1529,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26080,
-        7664
+        26768,
+        7888
       ],
       "id": "fdb7ea19-b984-41b7-a4da-f3c4c0388467",
       "name": "Candidate Parent Folders"
@@ -1563,11 +1563,46 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        25840,
-        7680
+        26528,
+        7904
       ],
       "id": "c796b040-30dc-43cf-9111-6b9a9c8079d9",
       "name": "❓ Any Messages At All?"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 1000,
+        "filtersUI": {
+          "values": {
+            "filterBy": "search",
+            "search": "={{ ($('Build Outlook Search Query').first().json.Name || '').toString().trim() ? 'Etsy Conversation with ' + $('Build Outlook Search Query').first().json.Name.toString().trim() : 'zzz-no-client-name-zzz' }}"
+          }
+        },
+        "options": {},
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ]
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        24768,
+        7648
+      ],
+      "id": "c92896a9-f6fc-4aec-817f-212e485d1e19",
+      "name": "Outlook API | Search Etsy Conversations (Jack)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      },
+      "executeOnce": true
     }
   ],
   "pinData": {},
@@ -2151,7 +2186,7 @@
       "main": [
         [
           {
-            "node": "Normalize Outlook (Jack)",
+            "node": "Outlook API | Search Etsy Conversations (Jack)",
             "type": "main",
             "index": 0
           }
@@ -2280,6 +2315,17 @@
         [
           {
             "node": "Mark Account Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook API | Search Etsy Conversations (Jack)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Outlook (Jack)",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,264 @@
+{
+  "name": "TEMP Look inside Etsy notices (read only)",
+  "nodes": [
+    {
+      "id": "321a42d7-7f18-481e-a387-fdf3d7915d39",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -260
+      ],
+      "parameters": {
+        "height": 260,
+        "width": 680,
+        "content": "## TEMP - Look inside Etsy notice e-mails (READ ONLY)\n\nFinds the Etsy conversation notices of one client in Jack's mailbox, takes the first, a middle and the last one, and shows for each: the cleaned text, the links inside the e-mail, and the attachment list. Purpose: find out whether the client's real message text and photos are in the e-mail at all, or only on Etsy. Reads one mailbox, changes nothing. Delete when done."
+      }
+    },
+    {
+      "id": "1f48ea70-5cf1-4205-8fb2-db17a17eba2c",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "30f034be-e2e8-4278-9081-fcaf22ddd359",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "search",
+              "type": "string",
+              "value": "Etsy Conversation with Taylor Bonam"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "758db249-f0b5-4a20-9ba4-4e19b4da7c48",
+      "name": "Find Notices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$search",
+              "value": "={{ '\"' + $('Config').first().json.search + '\"' }}"
+            },
+            {
+              "name": "$top",
+              "value": "100"
+            },
+            {
+              "name": "$select",
+              "value": "id,subject,receivedDateTime,hasAttachments"
+            }
+          ]
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "6dcd9062-edca-4acf-9749-8dc78405fe49",
+      "name": "Pick Three",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const list = ($input.first().json.value || []).filter(m => m.id).sort((a, b) => new Date(a.receivedDateTime) - new Date(b.receivedDateTime));\nif (!list.length) return [{ json: { none: true } }];\nconst idx = [...new Set([0, Math.floor(list.length / 2), list.length - 1])];\nreturn idx.map(i => ({ json: { id: list[i].id, receivedDateTime: list[i].receivedDateTime, subject: list[i].subject, hasAttachments: list[i].hasAttachments, totalNotices: list.length } }));"
+      }
+    },
+    {
+      "id": "1e24a136-bc4d-43b5-b525-23fddcc5632a",
+      "name": "Get Body",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "parameters": {
+        "url": "={{ $json.none ? 'https://graph.microsoft.com/v1.0/me' : 'https://graph.microsoft.com/v1.0/me/messages/' + $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "subject,receivedDateTime,hasAttachments,bodyPreview,body"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "346219d5-9101-4c64-85e9-41845833e7e1",
+      "name": "Get Attachments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1100,
+        300
+      ],
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pg1Yh9oUPVFueUUr",
+          "name": "Axe_AI-outlook"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "parameters": {
+        "url": "={{ $('Pick Three').all()[$itemIndex].json.none ? 'https://graph.microsoft.com/v1.0/me' : 'https://graph.microsoft.com/v1.0/me/messages/' + $('Pick Three').all()[$itemIndex].json.id + '/attachments' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "name,contentType,size,isInline"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "08685365-dd83-4302-a523-f9c7de643425",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// For each picked notice: is the client's own text in the e-mail? which links and attachments does it carry?\nconst picks = $('Pick Three').all().map(i => i.json);\nconst bodies = $('Get Body').all().map(i => i.json);\nconst atts = $input.all().map(i => i.json);\nconst strip = (h) => String(h || '')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/&#65279;|&#8203;|&zwnj;|&nbsp;/gi, ' ').replace(/[\\u200b-\\u200f\\u2060\\ufeff\\u034f]/g, ' ')\n  .replace(/<br\\s*\\/?>/gi, '\\n').replace(/<\\/(p|div|tr|h\\d|li)>/gi, '\\n').replace(/<[^>]+>/g, ' ')\n  .replace(/&amp;/g, '&').replace(/[ \\t]+/g, ' ').replace(/\\n\\s*\\n+/g, '\\n').trim();\nconst out = picks.map((p, i) => {\n  if (p.none) return { found: 0, problem: 'no notices found' };\n  const b = bodies[i] || {}; const html = (b.body && b.body.content) || '';\n  const links = [...new Set([...html.matchAll(/href=\"([^\"]+)\"/gi)].map(m => m[1].replace(/&amp;/g, '&')))].filter(u => !/unsubscribe|facebook|instagram|twitter|pinterest|apps\\.apple|play\\.google/i.test(u)).map(u => u.slice(0, 110));\n  const imgs = [...new Set([...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/gi)].map(m => m[1]))].filter(u => !/1x1|pixel|track|spacer/i.test(u)).map(u => u.slice(0, 110));\n  const a = atts[i] || {};\n  return { notice: p.subject, received: p.receivedDateTime, totalNoticesForClient: p.totalNotices, bodyType: b.body && b.body.contentType, htmlLength: html.length,\n    bodyPreview: b.bodyPreview, cleanedText: strip(html).slice(0, 1200), links: links.slice(0, 12), images: imgs.slice(0, 8),\n    attachments: (a.value || []).map(x => ({ name: x.name, type: x.contentType, size: x.size, inline: x.isInline })), attachmentError: a.error ? JSON.stringify(a.error).slice(0, 120) : undefined };\n});\nreturn [{ json: { samples: out } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Find Notices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Notices": {
+      "main": [
+        [
+          {
+            "node": "Pick Three",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Three": {
+      "main": [
+        [
+          {
+            "node": "Get Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Body": {
+      "main": [
+        [
+          {
+            "node": "Get Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attachments": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
