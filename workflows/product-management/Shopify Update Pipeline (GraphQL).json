@@ -29,8 +29,7 @@
         448
       ],
       "id": "4f2a2cd4-c958-4b4e-b8be-ea2722ccb16d",
-      "name": "⏰ Schedule (off until tested)",
-      "disabled": true
+      "name": "⏰ Schedule (every 3 hours)"
     },
     {
       "parameters": {
@@ -334,7 +333,7 @@
           "conditions": [
             {
               "id": "0b70b33b-6cd6-46c8-b4aa-8a977838a0b7",
-              "leftValue": "={{ $execution.mode === 'trigger' ? false : $('⚙️ Settings').first().json.dryRun !== false }}",
+              "leftValue": "={{ $('⏰ Schedule (every 3 hours)').isExecuted ? false : $('⚙️ Settings').first().json.dryRun !== false }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -402,7 +401,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst failed = items.filter(i => i.json && i.json.error);\nconst msg = i => { const e = i.json.error; return String((e && e.message) || e).slice(0, 220); };\nlet scheduled = false; try { scheduled = $execution.mode === 'trigger'; } catch (e) { scheduled = false; }\nif (scheduled && failed.length) throw new Error('Shopify update: ' + failed.length + ' of ' + items.length + ' products failed (they are left unchanged and stay flagged). First errors: ' + failed.slice(0, 5).map(msg).join(' | '));\nreturn [{ json: { dryRun: false, processed: items.length, succeeded: items.length - failed.length, failed: failed.length, failedMessages: failed.slice(0, 40).map(msg), message: failed.length ? 'Some products failed (a failed product is left unchanged). See failedMessages.' : 'Update run finished. Check each product on the website.' } }];"
+        "jsCode": "const items = $input.all();\nconst failed = items.filter(i => i.json && i.json.error);\nconst msg = i => { const e = i.json.error; return String((e && e.message) || e).slice(0, 220); };\nlet scheduled = false; try { scheduled = $('⏰ Schedule (every 3 hours)').isExecuted === true; } catch (e) { scheduled = false; }\nif (scheduled && failed.length) throw new Error('Shopify update: ' + failed.length + ' of ' + items.length + ' products failed (they are left unchanged and stay flagged). First errors: ' + failed.slice(0, 5).map(msg).join(' | '));\nreturn [{ json: { dryRun: false, processed: items.length, succeeded: items.length - failed.length, failed: failed.length, failedMessages: failed.slice(0, 40).map(msg), message: failed.length ? 'Some products failed (a failed product is left unchanged). See failedMessages.' : 'Update run finished. Check each product on the website.' } }];"
       },
       "id": "ae92a405-6a16-42f0-9914-139e3889cd92",
       "name": "Summary",
@@ -415,7 +414,7 @@
     },
     {
       "parameters": {
-        "content": "## Shopify Update Pipeline (GraphQL)\n\nUPDATE ONLY, no mode switch. Picks rows with Ready_to_post = yes, Fields_to_update filled and both Shopify links, and calls 'Update Product (sub-workflow)' for each. It never creates a product and never marks rows false.\n\n**Settings**: dryRun (default true: lists the products and fields that would change), sheets (blank = all tabs, or e.g. Fountain,Moulding).\n\nThe existing 'Shopify Merge product sync Pipeline (GraphQL)' is untouched and keeps running in create mode (allowUpdatesToPublished false). Do not turn that switch on while this workflow is used, or both would update the same rows.\n\nAfter import: open '▶️ Update Product (per item)' and pick the update sub-workflow from the list. The schedule is off.\n\n**Scheduled (2026-11-18):** when the schedule node is enabled it runs every 3 hours (change hoursInterval to 6 for twice a day) and is LIVE; manual runs still follow Settings.dryRun. The sheet works exactly as before: Ready_to_post = yes, Fields_to_update filled, both Shopify links. At most Settings.maxProducts (30) products per run; the rest stay flagged for the next run. If a scheduled run has failed products it raises an error, which triggers the error workflow alert; failed rows stay flagged.",
+        "content": "## Shopify Update Pipeline (GraphQL)\n\nUPDATE ONLY, no mode switch. Picks rows with Ready_to_post = yes, Fields_to_update filled and both Shopify links, and calls 'Update Product (sub-workflow)' for each. It never creates a product and never marks rows false.\n\n**Settings**: dryRun (default true: lists the products and fields that would change), sheets (blank = all tabs, or e.g. Fountain,Moulding).\n\nThe existing 'Shopify Merge product sync Pipeline (GraphQL)' is untouched and keeps running in create mode (allowUpdatesToPublished false). Do not turn that switch on while this workflow is used, or both would update the same rows.\n\nAfter import: open '▶️ Update Product (per item)' and pick the update sub-workflow from the list. The schedule node is enabled (every 3 hours).\n\n**Scheduled (2026-11-18):** the schedule node runs every 3 hours (change hoursInterval to 6 for twice a day) and is LIVE: 'Dry run?' and 'Summary' check whether the schedule node ran in this execution ($('...').isExecuted) -- the earlier check on $execution.mode did not work in n8n and made every scheduled run a dry run (found 2026-11-19). Manual runs still follow Settings.dryRun. The sheet works exactly as before: Ready_to_post = yes, Fields_to_update filled, both Shopify links. At most Settings.maxProducts (30) products per run; the rest stay flagged for the next run. If a scheduled run has failed products it raises an error, which triggers the error workflow alert; failed rows stay flagged.",
         "height": 300,
         "width": 600
       },
@@ -431,17 +430,6 @@
   ],
   "connections": {
     "▶️ Run Update": {
-      "main": [
-        [
-          {
-            "node": "⚙️ Settings",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "⏰ Schedule (off until tested)": {
       "main": [
         [
           {
@@ -643,6 +631,17 @@
         [
           {
             "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ Schedule (every 3 hours)": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Settings",
             "type": "main",
             "index": 0
           }

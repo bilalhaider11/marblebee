@@ -14,10 +14,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -3408,
-        208
+        176,
+        608
       ],
-      "id": "016395df-103e-4b37-a6ca-b906b269a70c",
+      "id": "d97054ca-0a0b-44c0-86d5-bc88e380b758",
       "name": "Schedule Trigger"
     },
     {
@@ -50,10 +50,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -3152,
-        208
+        384,
+        608
       ],
-      "id": "bb446a30-5488-481a-a919-07b68de16228",
+      "id": "2417250a-5914-4cf1-80b6-0333995ca8ce",
       "name": "Load Queued Messages from Queue Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -69,10 +69,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -2896,
-        208
+        848,
+        608
       ],
-      "id": "b7c214e7-15a2-4488-800c-c16422e60cb2",
+      "id": "c10e0fd1-0da5-4003-8679-c8a6fc4dfe30",
       "name": "Loop | Outlook Message IDs"
     },
     {
@@ -82,10 +82,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2000,
-        240
+        1744,
+        640
       ],
-      "id": "ac04b92d-c0e8-4c2e-b385-c38ed65e498c",
+      "id": "0a2f13b2-e531-4b8d-840d-847091c53afa",
       "name": "Normalize | Extract Message Metadata"
     },
     {
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1744,
-        240
+        2000,
+        640
       ],
-      "id": "043f089e-2496-4136-b7e7-211f242617da",
+      "id": "a79e0f25-bb64-418f-a6b6-5a2c5c153ca3",
       "name": "Get Conversation Sheet Tab Name",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -119,49 +119,26 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1488,
-        240
+        2256,
+        640
       ],
-      "id": "5b161ab2-ba7e-4e71-8b7c-3b99ac6cc496",
+      "id": "115ebed4-51cf-4ebc-8536-cafa7875b8c6",
       "name": "Extract Tab Name"
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "={{ $json.sheet_id }}",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "={{ $json.tabName }}",
-          "mode": "name"
-        },
-        "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "fromEmail",
-              "lookupValue": "={{ $json.fromEmail }}"
-            },
-            {
-              "lookupColumn": "toEmail",
-              "lookupValue": "={{ $json.toEmail }}"
-            },
-            {
-              "lookupColumn": "subject",
-              "lookupValue": "={{ $json.subject }}"
-            }
-          ]
-        },
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sheet_id + '/values/' + encodeURIComponent($json.tabName) + '?majorDimension=ROWS' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
         "options": {}
       },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        -1232,
-        240
+        2512,
+        640
       ],
-      "id": "5a81f749-8fe3-443d-8334-5d73cbd031ca",
+      "id": "367f9c53-3254-4dbc-89f6-89877cc6f1ef",
       "name": "Sheets | Find Existing Message Row",
       "alwaysOutputData": true,
       "retryOnFail": true,
@@ -176,15 +153,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// The lookup node above replaces our data with whatever row it found (or\n// {} via Always Output Data if nothing matched, or an {error: ...} shaped\n// item if the sheet is missing a filtered-on column) -- recover the real\n// message data (and its binary attachments) from before the lookup, and\n// just carry forward whether a real row was found.\n//\n// 'row_number' is NOT the found-signal here (this sheet may not even have\n// that column). Use the Sheets node's own always-attached 'row_number'\n// metadata field instead -- present on every real matched row regardless\n// of which actual columns that row has. Matching is done on timestamp +\n// fromEmail + toEmail + subject (see the lookup node) since those columns\n// exist on every row ever logged, old and new, by either provider.\n// Already logged? The lookup above matches on fromEmail + toEmail + subject and returns ALL matching rows (the node's 'Return only First Matching Row' option must stay OFF, its default); the\n// timestamp is compared here as a point in time (epoch seconds), NOT as text. Gmail writes '2026-07-09T15:17:56.000Z' and\n// Outlook '2026-07-09T15:17:56Z': the same e-mail seen from both mailboxes (e.g. Emily's Gmail with Jack in copy in\n// Outlook) was never recognised as logged and got a second row. Rows logged in either format, old or new, now match.\nconst secs = (t) => { const d = new Date(String(t == null ? '' : t).trim()); return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000); };\nconst original = $('Extract Tab Name').item;\nconst mine = secs(original.json.timestamp);\nconst found = mine !== null && $input.all().some(i => i.json && i.json.row_number !== undefined && secs(i.json.timestamp) === mine);\nreturn [{\n  json: { ...original.json, _alreadyLogged: found },\n  binary: original.binary\n}];"
+        "jsCode": "// Already logged? The 'Sheets | Find Existing Message Row' step above reads the WHOLE conversation tab (it used to look up only the\n// columns fromEmail / toEmail / subject, which the oldest rows do not have: rows written in the older layout keep the sender in\n// 'senderEmail' and the recipients in 'receiverEmails', so a copy of such a message from another mailbox was never recognised and\n// was logged a second time). A message counts as already logged when ANY row has the same moment (epoch seconds, so Gmail's\n// '...56.000Z' and Outlook's '...56Z' match), the same subject (re:/fw: prefixes and spacing ignored) and the same sender\n// (fromEmail OR senderEmail; a row with no sender at all matches on moment + subject).\n// If the sheet cannot be read this STOPS with an error instead of logging the message (a failed read must never create a duplicate):\n// run the workflow again, rows already processed are skipped.\nconst secs = (t) => { const d = new Date(String(t == null ? '' : t).trim()); return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000); };\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/\\s+/g, ' ').trim();\nconst subj = (s) => { let x = norm(s), prev; do { prev = x; x = x.replace(/^(re|fw|fwd|aw|wg|sv|vs|rv|tr)\\s*:\\s*/, '').trim(); } while (x !== prev); return x; };\nconst addr = (s) => { const m = String(s == null ? '' : s).match(/[\\w.+'\\-]+@[\\w.\\-]+\\.[a-z]{2,}/i); return m ? m[0].toLowerCase() : ''; };\nconst original = $('Extract Tab Name').item;\nconst mine = secs(original.json.timestamp);\nconst mySubject = subj(original.json.subject);\nconst mySender = addr(original.json.fromEmail);\nconst res = $input.first().json || {};\nif (res.error) throw new Error('Could not read the conversation sheet to check for duplicates (' + JSON.stringify(res.error).slice(0, 200) + '). Nothing was logged for this message; run the workflow again.');\nconst values = Array.isArray(res.values) ? res.values : [];\nlet found = false;\nif (mine !== null && values.length > 1) {\n  const H = values[0].map(h => String(h == null ? '' : h).trim());\n  const iTs = H.indexOf('timestamp'), iSub = H.indexOf('subject'), iFrom = H.indexOf('fromEmail'), iSend = H.indexOf('senderEmail');\n  if (iTs >= 0) {\n    for (let k = 1; k < values.length && !found; k++) {\n      const r = values[k] || [];\n      if (secs(r[iTs]) !== mine) continue;\n      if (iSub >= 0 && subj(r[iSub]) !== mySubject) continue;\n      const rowSender = addr(iFrom >= 0 ? r[iFrom] : '') || addr(iSend >= 0 ? r[iSend] : '');\n      if (rowSender && mySender && rowSender !== mySender) continue;\n      found = true;\n    }\n  }\n}\nreturn [{\n  json: { ...original.json, _alreadyLogged: found },\n  binary: original.binary\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -960,
-        240
+        2784,
+        640
       ],
-      "id": "4be1655e-e88a-416b-84a4-08627cdd1506",
+      "id": "29c304d2-d17d-41b2-8ddf-2930377bc5d7",
       "name": "Restore Message Data After Lookup"
     },
     {
@@ -215,10 +192,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -704,
-        240
+        3040,
+        640
       ],
-      "id": "6760269b-11ac-465c-978d-7e70c2a91be8",
+      "id": "a69d6478-5b5e-4524-819f-429c7c8013e3",
       "name": "Message Already Logged?"
     },
     {
@@ -249,10 +226,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2016,
-        528
+        1728,
+        928
       ],
-      "id": "c5691830-6e86-4dd0-bbb6-09d5f178beb1",
+      "id": "0b06992d-43be-405c-aedf-10eae6435cca",
       "name": "If Has Attachments"
     },
     {
@@ -262,10 +239,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1728,
-        512
+        2016,
+        912
       ],
-      "id": "b4030d01-3de7-4084-b232-49c1187a7b47",
+      "id": "20c575ca-3199-4730-a1aa-d6a3cc4c73f1",
       "name": "Expand | Split Attachments"
     },
     {
@@ -307,10 +284,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -1472,
-        512
+        2272,
+        912
       ],
-      "id": "29e48880-ea6c-400b-8d21-c471f0168eb3",
+      "id": "21383cee-c4b9-478b-8eae-25452dda2615",
       "name": "Drive | Find Existing Attachment",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -328,10 +305,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1216,
-        512
+        2528,
+        912
       ],
-      "id": "05485ea4-ad4d-447f-8119-d03656b0b994",
+      "id": "d4da7ece-67f8-4f67-a13a-f8d769f49fcb",
       "name": "Pick Exact Attachment Match"
     },
     {
@@ -363,10 +340,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -960,
-        512
+        2784,
+        912
       ],
-      "id": "beeb9b5d-4c4f-4617-8827-d4a1ab1f4d4b",
+      "id": "933288ce-9f28-461a-971f-04b41bbfc789",
       "name": "Attachment Already Uploaded?"
     },
     {
@@ -390,10 +367,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -704,
-        496
+        3040,
+        896
       ],
-      "id": "ff9d72df-1956-4143-a6e8-f6e5705d5df5",
+      "id": "98e48b4c-2366-4927-8b77-7943811ea051",
       "name": "Drive | Upload Attachment",
       "alwaysOutputData": false,
       "retryOnFail": true,
@@ -412,10 +389,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1792,
-        912
+        1952,
+        1312
       ],
-      "id": "6b4a7faa-7143-445b-a6d3-f91704b334d8",
+      "id": "39c42f8b-7c48-4f6e-a595-d6dd9a668b06",
       "name": "Existing Attachment (Resolved)"
     },
     {
@@ -425,10 +402,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1392,
-        912
+        2352,
+        1312
       ],
-      "id": "95d5fe88-1857-4100-8870-00ba781b88bb",
+      "id": "a6e63937-b120-4e11-a06d-3d175eaeb709",
       "name": "Merge | Add Drive Links"
     },
     {
@@ -630,10 +607,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -1136,
-        912
+        2608,
+        1312
       ],
-      "id": "d3a08499-4026-4f1f-bc90-e0121d75a656",
+      "id": "a9f32908-5982-444d-a77c-b15137062891",
       "name": "Sheets | Log Message Row",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -779,10 +756,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        -752,
-        912
+        2992,
+        1312
       ],
-      "id": "e0cc0cf7-0a42-4029-96ec-3aad239f84c6",
+      "id": "6b09fae5-dbc0-4fa3-b903-a7aa92de145c",
       "name": "Sheets | Mark Queue Row Processed",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -822,10 +799,10 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        -2288,
-        -64
+        1456,
+        336
       ],
-      "id": "4956cc9b-1e55-46fa-9a46-13f2beab954a",
+      "id": "7cd66189-ae9d-4567-8b00-48f9690fb2b9",
       "name": "Outlook | Fetch Message + Attachments (Jack)",
       "webhookId": "c5db3d28-ec38-44cf-b0ad-e8e417fa67d4",
       "credentials": {
@@ -864,10 +841,10 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        -2304,
-        192
+        1440,
+        592
       ],
-      "id": "d88624d1-fb5c-4fca-943d-e26c7d8ad18f",
+      "id": "53275c23-949d-44a4-9ab0-3da0377abbe1",
       "name": "Outlook | Fetch Message + Attachments (Mia)",
       "webhookId": "93537950-ccf5-458d-a10e-83e7ec35630c",
       "credentials": {
@@ -906,10 +883,10 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        -2304,
-        432
+        1440,
+        832
       ],
-      "id": "bfeb3141-79ea-4290-90ab-226ac2121af1",
+      "id": "a7bafedf-2ed7-46b2-8c93-1e735cbb787c",
       "name": "Outlook | Fetch Message + Attachments (Eve)",
       "webhookId": "52404b82-81a4-459f-aedc-4685dc5560fd",
       "credentials": {
@@ -948,10 +925,10 @@
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        -2304,
-        672
+        1440,
+        1072
       ],
-      "id": "810ff622-b650-49c3-8cd5-03f5c15659e7",
+      "id": "f48d381e-4544-489d-9771-c98f5089d896",
       "name": "Outlook | Fetch Message + Attachments (Yolanda)",
       "webhookId": "1033ca5f-48f9-44bc-a055-c246292621fa",
       "credentials": {
@@ -1080,11 +1057,24 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -2656,
-        176
+        1088,
+        576
       ],
-      "id": "2cc963d7-9b3a-4e0f-84d2-b4c2f508c85e",
+      "id": "040324ae-bade-4a89-a2f1-1745e4f0047d",
       "name": "Route by Mailbox"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Memory guard: each run handles at most MAX_ROWS waiting queue rows. A run that loads thousands of rows and keeps every message\n// (and its attachments) in memory is stopped by n8n without an error. Start the workflow again for the next rows; rows already\n// processed are marked TRUE and skipped. Change MAX_ROWS to make runs shorter or longer.\nconst MAX_ROWS = 150;\nreturn $input.all().slice(0, MAX_ROWS);"
+      },
+      "id": "df416ce5-97a5-48f6-87d3-ed5a0a8f9a3b",
+      "name": "Limit Rows Per Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        608
+      ]
     }
   ],
   "pinData": {},
@@ -1104,7 +1094,7 @@
       "main": [
         [
           {
-            "node": "Loop | Outlook Message IDs",
+            "node": "Limit Rows Per Run",
             "type": "main",
             "index": 0
           }
@@ -1402,6 +1392,17 @@
           }
         ]
       ]
+    },
+    "Limit Rows Per Run": {
+      "main": [
+        [
+          {
+            "node": "Loop | Outlook Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1409,7 +1410,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "bb2fde87-a123-469b-b9fb-0c1a89148cb1",
+  "versionId": "6d6357ee-3e61-46c5-9e81-538e32f69769",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },

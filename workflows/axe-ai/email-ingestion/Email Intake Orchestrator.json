@@ -3,17 +3,17 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Reuse-or-create + watermark + single-path consolidation\n\n**Reuse-or-create:** before, every run unconditionally created a new client root folder, attachments subfolder, and conversation sheet -- even for a client that already had them, duplicating everything and re-logging their entire history the moment `Processed` got reset to false. Now, each of the 3 resources is preceded by a Find -> Pick Exact Match -> If Found trio (same pattern already used in drive_shopify_image_sync.json's 'Find Category Folder'/'Pick Exact Category Match'). Found -> reuse its id, skip creating. Not found -> create exactly as before. Downstream nodes read from a stable '... (Resolved)' node instead of the Create node directly, since the Create node no longer always runs. New accounts with no existing folder are unaffected -- same create + full-history-fetch behavior as before.\n\n**Watermark:** the control sheet needs a `last_synced_at` column (manually add the header -- blank = new account). Gmail search is scoped to `after:<date>` when present; each successful run writes the new `last_synced_at` back alongside `Processed: true`.\n\n**Outlook watermark:** Microsoft Graph won't combine $search (needed for \"from OR to\" matching) with $filter (needed for a date range) in one request, and toRecipients isn't $filter-able at all -- confirmed against Graph's docs. So Outlook still calls the API with the full-history search, but 'Normalize Outlook Messages' filters the results client-side against last_synced_at before anything gets queued.\n\n**Single-path consolidation:** this workflow used to have two nearly-identical parallel paths -- a \"single-provider\" path (triggered when Platform was exactly \"gmail\" or \"outlook\") and a \"merged\" path (triggered otherwise, handling accounts active on both providers). The only reason two paths existed was that the merged path's account-splitting logic did `JSON.parse(Platform)`, which throws on a plain \"gmail\"/\"outlook\" string -- not an actual difference in what needed to happen. That parsing was made tolerant of both a plain string and a JSON array (treating a plain string as a single-element array), so the merged path's already-optional-chained gmail/outlook handling now correctly covers the single-provider case too. The single-provider path (its own copy of the reuse-or-create trio, its own Gmail/Outlook search+normalize, its own queue/mark-processed nodes -- 39 nodes) was deleted; every account now goes through what used to be only the \"merged\" path. 82 nodes -> 43, no loss of behavior.\n\n**Not yet addressed:** per-message/per-attachment dedup for anything that still gets queued despite the watermark (Outlook's full-history refetch, or anything the Gmail date-scoping doesn't catch) -- relies on the Gmail/Outlook Processor Final sub-workflows, not yet implemented. Also, nothing resets `Processed` back to false automatically -- still a manual action; the watermark only matters once someone does that for an account that already has infrastructure.\n\n**Drive scoping audit (no global search):** confirmed every Google Drive operation in this workflow is parent-scoped, none search Drive-wide. Search nodes (`📂 Find Client Root Folder`, `📂 Find Attachments Subfolder`, `📂 Find Conversation Sheet`) all set `filter.folderId`. Create nodes (`Create Client Root Folder`, `Create Attachments Subfolder`) and `Move Sheet to Client Folder` all set an explicit parent `folderId`. The only exception is `Create Conversation Sheet` (Google Sheets node) landing wherever the credential's default location is on creation -- the Sheets API has no create-with-parent option -- but `Move Sheet to Client Folder` relocates it into the resolved client root folder immediately after, in the same execution.\nFolder hierarchy (top -> bottom): `1a6nPIjW5VLARperP9yrSqXJMDmfojqUl` (top-level Axe AI parent -- corrected; superseded 1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr, which was the older/wrong top folder) contains the 3 provider parents used as `folder_id` in 'Combine Gmail & Outlook Per Client' -- gmail-only `1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE`, outlook-only `1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8`, combined `102oeld1yMYGMmWs2Od198HqO1KeVhv_n` -- each of which contains that provider's per-client folders, each of which contains that client's attachments subfolder + conversation sheet. Every search/create already resolves within this tree, so no change was needed to scope things \"inside this folder\" -- it already was.\n\n**Fixed: zero-new-messages stalled the loop.** Root cause identical in shape to the earlier \"empty Platform kills the loop\" bug, just one stage later: `Expand Gmail Message IDs` / `Expand Outlook Message IDs` return 0 items when an account has no new mail on that side, and by default n8n doesn't run a node at all when its only input produced 0 items -- so when BOTH sides are empty (nothing new anywhere for that account this cycle), `Merge Expanded Messages` never fires, which means `Queue Messages` never fires, which means `Mark Account Processed` never fires -- and since `Mark Account Processed` was the only thing looping back into `For Each Account`, that account (and every account still left in the batch) stalled silently, exactly like Michael Latifi's case did earlier. Fixed by turning on \"Always Output Data\" on `Merge Expanded Messages` (so it emits one placeholder item instead of nothing when both sides are truly empty) and adding `❓ Any New Messages?` right after it, gating on `{{ $json.id }}` notEmpty: real messages -> unchanged path through `Queue Messages` -> `Mark Account Processed`; no messages -> straight to `Mark Account Processed`, bypassing `Queue Messages` entirely so the placeholder item never risks writing a blank row into the queue sheet (the same mistake \"Always Output Data\" caused once already, when it was tried on `Queue Messages` directly instead).\n\n**Seven mailboxes (added 2026-10).** Gmail: Emily, Terry, Office. Outlook: Jack, Mia, Eve, Yolanda -- each Outlook search and normalize step tags its message ids with the mailbox (`outlook_jack` / `outlook_mia` / `outlook_eve` / `outlook_yolanda`) because an Outlook message id only works in the mailbox it came from; the Outlook Processor routes by that tag.\n\n**Which mailboxes and which dates:** a NEW client (blank last_synced_at) is searched by its Platform value (both = all 7, outlook = the 4 Outlook, gmail = the 3 Gmail) with NO date filter (Gmail results are paged, up to 500 per page). An EXISTING client (last_synced_at filled) ignores Platform and is searched in all 7: Jack and the 3 Gmail mailboxes after last_synced_at, and the 3 newer Outlook mailboxes from the beginning until the account has been backfilled once (`new_outlook_backfilled` = TRUE, written by Mark Account Processed whenever the Outlook branch ran), after last_synced_at from then on.\n\n**Which accounts a run takes (Select Accounts To Process):** rows with Processed = FALSE, then existing rows (Processed TRUE, last_synced_at filled) that are not yet backfilled, at most `maxAccountsPerRun` (Run Config). Rows without an Email are never processed. Set `onlyClient` in Run Config (name or email contains) and use the manual trigger to test a single client first.\n\n**Existing folders are never moved or duplicated:** the folder search runs in all three Drive parents (preferred parent first, picked from where the messages are) and only creates a folder when none of them has one for that client name.\n\n**No empty folders:** right after `Combine Gmail & Outlook Per Client`, `❓ Any Messages At All?` sends an account with no Gmail messages and no Outlook ids straight to `Mark Account Processed` -- no folder search, no folder / conversation sheet creation, nothing queued. Only accounts that actually have messages go through the folder steps.\n\n**Queue rows:** Gmail rows are written with `source = email` and `Processed = FALSE`; Outlook rows with `Processed = FALSE` and a blank `source`. The Gmail Processor loads `source = email`; the Outlook Processor loads `Processed = FALSE` with a blank `source`, so Gmail rows are skipped. Outlook rows are tagged in `by_mail` (outlook_jack / outlook_mia / outlook_eve / outlook_yolanda).\n\n\n**Marking an account done:** `Mark Account Processed` updates the control-sheet row by `row_number` (not by the Email text, which differs in spacing for multi-email accounts and would not match).\n\n**Outlook search returns dates:** the 4 `Outlook API | Search Messages` nodes use `output = fields` (receivedDateTime, sentDateTime, internetMessageId). The default simple output has no date field, so the `last_synced_at` filter in `Normalize Outlook (...)` could never drop anything and every run re-queued each client's whole Outlook history (the processors then skipped the already-logged ones).\n\n**Etsy conversations (2026-11-18):** clients who first wrote on Etsy had no early messages: Etsy hides the buyer's address, so the address search missed the notices ('Etsy Conversation with <name>' from no-reply@account.etsy.com, in Jack's mailbox). 'Outlook API | Search Etsy Conversations (Jack)' now also searches Jack's mailbox for that phrase with the account's Name, and 'Normalize Outlook (Jack)' merges both result lists (deduplicated by id). Gmail mailboxes are not searched for Etsy notices (Luna: all Etsy mail arrives in Jack's mailbox). The Outlook Processor logs them like any other message: RECEIVED, from no-reply@account.etsy.com.",
-        "height": 1744,
+        "content": "## Reuse-or-create + watermark + single-path consolidation\n\n**Reuse-or-create:** before, every run unconditionally created a new client root folder, attachments subfolder, and conversation sheet -- even for a client that already had them, duplicating everything and re-logging their entire history the moment `Processed` got reset to false. Now, each of the 3 resources is preceded by a Find -> Pick Exact Match -> If Found trio (same pattern already used in drive_shopify_image_sync.json's 'Find Category Folder'/'Pick Exact Category Match'). Found -> reuse its id, skip creating. Not found -> create exactly as before. Downstream nodes read from a stable '... (Resolved)' node instead of the Create node directly, since the Create node no longer always runs. New accounts with no existing folder are unaffected -- same create + full-history-fetch behavior as before.\n\n**Watermark:** the control sheet needs a `last_synced_at` column (manually add the header -- blank = new account). Gmail search is scoped to `after:<date>` when present; each successful run writes the new `last_synced_at` back alongside `Processed: true`.\n\n**Outlook watermark:** Microsoft Graph won't combine $search (needed for \"from OR to\" matching) with $filter (needed for a date range) in one request, and toRecipients isn't $filter-able at all -- confirmed against Graph's docs. So Outlook still calls the API with the full-history search, but 'Normalize Outlook Messages' filters the results client-side against last_synced_at before anything gets queued.\n\n**Single-path consolidation:** this workflow used to have two nearly-identical parallel paths -- a \"single-provider\" path (triggered when Platform was exactly \"gmail\" or \"outlook\") and a \"merged\" path (triggered otherwise, handling accounts active on both providers). The only reason two paths existed was that the merged path's account-splitting logic did `JSON.parse(Platform)`, which throws on a plain \"gmail\"/\"outlook\" string -- not an actual difference in what needed to happen. That parsing was made tolerant of both a plain string and a JSON array (treating a plain string as a single-element array), so the merged path's already-optional-chained gmail/outlook handling now correctly covers the single-provider case too. The single-provider path (its own copy of the reuse-or-create trio, its own Gmail/Outlook search+normalize, its own queue/mark-processed nodes -- 39 nodes) was deleted; every account now goes through what used to be only the \"merged\" path. 82 nodes -> 43, no loss of behavior.\n\n**Not yet addressed:** per-message/per-attachment dedup for anything that still gets queued despite the watermark (Outlook's full-history refetch, or anything the Gmail date-scoping doesn't catch) -- relies on the Gmail/Outlook Processor Final sub-workflows, not yet implemented. Also, nothing resets `Processed` back to false automatically -- still a manual action; the watermark only matters once someone does that for an account that already has infrastructure.\n\n**Drive scoping audit (no global search):** confirmed every Google Drive operation in this workflow is parent-scoped, none search Drive-wide. Search nodes (`📂 Find Client Root Folder`, `📂 Find Attachments Subfolder`, `📂 Find Conversation Sheet`) all set `filter.folderId`. Create nodes (`Create Client Root Folder`, `Create Attachments Subfolder`) and `Move Sheet to Client Folder` all set an explicit parent `folderId`. The only exception is `Create Conversation Sheet` (Google Sheets node) landing wherever the credential's default location is on creation -- the Sheets API has no create-with-parent option -- but `Move Sheet to Client Folder` relocates it into the resolved client root folder immediately after, in the same execution.\nFolder hierarchy (top -> bottom): `1a6nPIjW5VLARperP9yrSqXJMDmfojqUl` (top-level Axe AI parent -- corrected; superseded 1y59d2aX1VjhHGX3L0hDUhpeO0PqbzxWr, which was the older/wrong top folder) contains the 3 provider parents used as `folder_id` in 'Combine Gmail & Outlook Per Client' -- gmail-only `1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE`, outlook-only `1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8`, combined `102oeld1yMYGMmWs2Od198HqO1KeVhv_n` -- each of which contains that provider's per-client folders, each of which contains that client's attachments subfolder + conversation sheet. Every search/create already resolves within this tree, so no change was needed to scope things \"inside this folder\" -- it already was.\n\n**Fixed: zero-new-messages stalled the loop.** Root cause identical in shape to the earlier \"empty Platform kills the loop\" bug, just one stage later: `Expand Gmail Message IDs` / `Expand Outlook Message IDs` return 0 items when an account has no new mail on that side, and by default n8n doesn't run a node at all when its only input produced 0 items -- so when BOTH sides are empty (nothing new anywhere for that account this cycle), `Merge Expanded Messages` never fires, which means `Queue Messages` never fires, which means `Mark Account Processed` never fires -- and since `Mark Account Processed` was the only thing looping back into `For Each Account`, that account (and every account still left in the batch) stalled silently, exactly like Michael Latifi's case did earlier. Fixed by turning on \"Always Output Data\" on `Merge Expanded Messages` (so it emits one placeholder item instead of nothing when both sides are truly empty) and adding `❓ Any New Messages?` right after it, gating on `{{ $json.id }}` notEmpty: real messages -> unchanged path through `Queue Messages` -> `Mark Account Processed`; no messages -> straight to `Mark Account Processed`, bypassing `Queue Messages` entirely so the placeholder item never risks writing a blank row into the queue sheet (the same mistake \"Always Output Data\" caused once already, when it was tried on `Queue Messages` directly instead).\n\n**Seven mailboxes (added 2026-10).** Gmail: Emily, Terry, Office. Outlook: Jack, Mia, Eve, Yolanda -- each Outlook search and normalize step tags its message ids with the mailbox (`outlook_jack` / `outlook_mia` / `outlook_eve` / `outlook_yolanda`) because an Outlook message id only works in the mailbox it came from; the Outlook Processor routes by that tag.\n\n**Which mailboxes and which dates:** a NEW client (blank last_synced_at) is searched by its Platform value (both = all 7, outlook = the 4 Outlook, gmail = the 3 Gmail) with NO date filter (Gmail results are paged, up to 500 per page). An EXISTING client (last_synced_at filled) ignores Platform and is searched in all 7: Jack and the 3 Gmail mailboxes after last_synced_at, and the 3 newer Outlook mailboxes from the beginning until the account has been backfilled once (`new_outlook_backfilled` = TRUE, written by Mark Account Processed whenever the Outlook branch ran), after last_synced_at from then on.\n\n**Which accounts a run takes (Select Accounts To Process):** rows with Processed = FALSE, then existing rows (Processed TRUE, last_synced_at filled) that are not yet backfilled, at most `maxAccountsPerRun` (Run Config). Rows without an Email are never processed. Set `onlyClient` in Run Config (name or email contains) and use the manual trigger to test a single client first.\n\n**Existing folders are never moved or duplicated:** the folder search runs in all three Drive parents (preferred parent first, picked from where the messages are) and only creates a folder when none of them has one for that client name.\n\n**No empty folders:** right after `Combine Gmail & Outlook Per Client`, `❓ Any Messages At All?` sends an account with no Gmail messages and no Outlook ids straight to `Mark Account Processed` -- no folder search, no folder / conversation sheet creation, nothing queued. Only accounts that actually have messages go through the folder steps.\n\n**Queue rows:** Gmail rows are written with `source = email` and `Processed = FALSE`; Outlook rows with `Processed = FALSE` and a blank `source`. The Gmail Processor loads `source = email`; the Outlook Processor loads `Processed = FALSE` with a blank `source`, so Gmail rows are skipped. Outlook rows are tagged in `by_mail` (outlook_jack / outlook_mia / outlook_eve / outlook_yolanda).\n\n\n**Marking an account done:** `Mark Account Processed` updates the control-sheet row by `row_number` (not by the Email text, which differs in spacing for multi-email accounts and would not match).\n\n**Outlook search returns dates:** the 4 `Outlook API | Search Messages` nodes use `output = fields` (receivedDateTime, sentDateTime, internetMessageId). The default simple output has no date field, so the `last_synced_at` filter in `Normalize Outlook (...)` could never drop anything and every run re-queued each client's whole Outlook history (the processors then skipped the already-logged ones).\n\n**Etsy conversations (2026-11-18):** clients who first wrote on Etsy had no early messages: Etsy hides the buyer's address, so the address search missed the notices ('Etsy Conversation with <name>' from no-reply@account.etsy.com, in Jack's mailbox). 'Outlook API | Search Etsy Conversations (Jack)' now also searches Jack's mailbox for that phrase with the account's Name, and 'Normalize Outlook (Jack)' merges both result lists (deduplicated by id). Gmail mailboxes are not searched for Etsy notices (Luna: all Etsy mail arrives in Jack's mailbox). The Outlook Processor logs them like any other message: RECEIVED, from no-reply@account.etsy.com.\n\n**Refresh of existing clients (2026-11-18):** until now a client that had been processed once was never read again (the control sheet showed last_synced_at = 2026-10-15 for 593 of 594 clients), so all e-mails after that date were missing. 'Select Accounts To Process' now also picks existing clients (Processed TRUE, backfill done) whose last_synced_at is older than Run Config.refreshDays (default 0 = off, because this workflow is run by hand; set e.g. 3 for a catch-up run), oldest first, inside the maxAccountsPerRun limit. They are searched only after last_synced_at, so a refresh is cheap; the processors skip messages that are already logged. Etsy notices older than a client's last_synced_at are NOT added by a refresh: for those clients reset the row (Processed FALSE, last_synced_at cleared).",
+        "height": 2096,
         "width": 848
       },
-      "id": "28bff1af-9ac1-4da4-95de-24229e3dff9e",
+      "id": "b256d394-5fea-4827-9165-341406581dba",
       "name": "README - Reuse-or-Create + Watermark + Consolidation",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        21712,
-        7328
+        31120,
+        14560
       ]
     },
     {
@@ -35,10 +35,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        23008,
-        7872
+        32576,
+        15344
       ],
-      "id": "91a63a95-03b2-4ab5-b27f-ac86c324d973",
+      "id": "95cac0db-15e1-4a8f-b441-afb1b2b836e1",
       "name": "Load Accounts from Control Sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -54,10 +54,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        23472,
-        7872
+        33040,
+        15344
       ],
-      "id": "e2a49a55-278d-4b19-9c84-506cf567e081",
+      "id": "41f3542f-de81-4528-a25d-cc199bf1bf1f",
       "name": "For Each Account"
     },
     {
@@ -70,7 +70,7 @@
           "parameters": [
             {
               "name": "q",
-              "value": "={{ $json.googleQuery }}"
+              "value": "={{ $('Run Config').first().json.fullGmailHistory ? $json.googleQueryFull : $json.googleQuery }}"
             },
             {
               "name": "maxResults",
@@ -100,10 +100,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        24512,
-        6944
+        33616,
+        13920
       ],
-      "id": "fbfeec91-40cc-4cb7-85cc-c13137346289",
+      "id": "cb2422db-3fa6-4339-9aeb-83fcec8119b6",
       "name": "Gmail API | Search Messages (Emily)",
       "credentials": {
         "gmailOAuth2": {
@@ -119,10 +119,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24736,
-        6944
+        33840,
+        13920
       ],
-      "id": "0765536b-2562-4b7e-9b1b-4ebd73bea6b9",
+      "id": "c8cfab90-88d4-4fc4-a40a-9581a54d6b5c",
       "name": "Tag Mailbox (Emily)"
     },
     {
@@ -132,10 +132,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24736,
-        7168
+        33952,
+        14144
       ],
-      "id": "80b5cab9-8146-4ad9-83be-960871ae8305",
+      "id": "acc18381-7b58-4f7b-be36-0ff557fd88be",
       "name": "Tag Mailbox (Terry)"
     },
     {
@@ -145,49 +145,49 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24736,
-        7392
+        34816,
+        13984
       ],
-      "id": "2f79cf91-e0d6-4949-81a2-faa97ad435f8",
+      "id": "896a10ac-83db-46ea-b555-a50d75a21e51",
       "name": "Tag Mailbox (Office)"
     },
     {
       "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  let googleQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    googleQuery += i !== 0 ? ' OR ' : ''\n    googleQuery += `from:${email} OR to:${ email }`\n\n  })\n\n  // Only search messages since the last successful sync for this account --\n  // avoids re-fetching (and the sub-workflow re-logging) a client's entire\n  // mailbox history on every run once they already have a conversation\n  // sheet. A brand-new account has no last_synced_at yet, so it still gets\n  // the full history, same as before this existed.\n  const lastSyncedAt = item.json.last_synced_at;\n  if (lastSyncedAt) {\n    const d = new Date(lastSyncedAt);\n    if (!isNaN(d.getTime())) {\n      const gmailDate = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;\n      googleQuery += ` after:${gmailDate}`;\n    }\n  }\n  item.json.googleQuery = googleQuery;\n}\n\nreturn $input.all();"
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  let googleQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    googleQuery += i !== 0 ? ' OR ' : ''\n    googleQuery += `from:${email} OR to:${ email }`\n\n  })\n\n  // Only search messages since the last successful sync for this account --\n  // avoids re-fetching (and the sub-workflow re-logging) a client's entire\n  // mailbox history on every run once they already have a conversation\n  // sheet. A brand-new account has no last_synced_at yet, so it still gets\n  // the full history, same as before this existed.\n  // the same search WITHOUT the date limit, used for the two newest Gmail mailboxes (marblebee2020, marblebeefr) when Run Config.newGmailFullHistory is on\n  item.json.googleQueryFull = googleQuery;\n  const lastSyncedAt = item.json.last_synced_at;\n  if (lastSyncedAt) {\n    const d = new Date(lastSyncedAt);\n    if (!isNaN(d.getTime())) {\n      const gmailDate = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;\n      googleQuery += ` after:${gmailDate}`;\n    }\n  }\n  item.json.googleQuery = googleQuery;\n}\n\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24272,
-        7168
+        33872,
+        14528
       ],
-      "id": "a615e3da-f9a7-40f9-b3c1-96d014341fff",
+      "id": "e706f69c-f599-42e8-a0f1-776c7ae610b6",
       "name": "Build Gmail Search Query"
     },
     {
       "parameters": {
-        "jsCode": "// Loop over input items and build the Outlook search text plus the per-mailbox date rules.\n//  * Jack (the original Outlook mailbox): only messages after last_synced_at (as before).\n//  * Mia / Eve / Yolanda (added later): the FULL history until a client has been backfilled\n//    once (new_outlook_backfilled = TRUE); after that only messages after last_synced_at.\nfor (const item of $input.all()) {\n  let outlookQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    outlookQuery += i !== 0 ? ' OR ' : ''\n    outlookQuery += `${email}`\n  })\n  item.json.outlookQuery = outlookQuery;\n  const last = String(item.json.last_synced_at || '').trim();\n  const backfilled = String(item.json.new_outlook_backfilled || '').trim().toLowerCase() === 'true';\n  item.json.after_jack = last;\n  item.json.after_new_mailboxes = backfilled ? last : '';\n}\n\nreturn $input.all();\n"
+        "jsCode": "// Loop over input items and build the Outlook search text plus the per-mailbox date rules.\n//  * Jack (the original Outlook mailbox): only messages after last_synced_at (as before).\n//  * Mia / Eve / Yolanda (added later): the FULL history until a client has been backfilled\n//    once (new_outlook_backfilled = TRUE); after that only messages after last_synced_at.\nfor (const item of $input.all()) {\n  let outlookQuery = '';\n  item.json.Email.split(',').forEach((email, i) => {\n    outlookQuery += i !== 0 ? ' OR ' : ''\n    outlookQuery += `${email}`\n  })\n  item.json.outlookQuery = outlookQuery;\n  const last = String(item.json.last_synced_at || '').trim();\n  const backfilled = String(item.json.new_outlook_backfilled || '').trim().toLowerCase() === 'true';\n  // Run Config.fullOutlookHistory = true: read the WHOLE Outlook history (all 4 mailboxes), ignoring last_synced_at -- for catch-up of named clients (onlyRows)\n  const fullOutlook = (() => { try { return $('Run Config').first().json.fullOutlookHistory === true; } catch (e) { return false; } })();\n  item.json.after_jack = fullOutlook ? '' : last;\n  item.json.after_new_mailboxes = (fullOutlook || !backfilled) ? '' : last;\n}\n\nreturn $input.all();\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24528,
-        7888
+        34192,
+        15360
       ],
-      "id": "8cfef8e2-4638-4a3c-999b-748e00dc3405",
+      "id": "66b24703-2a9d-42d6-b36e-68b72b0cc2dc",
       "name": "Build Outlook Search Query"
     },
     {
       "parameters": {
-        "numberInputs": 3
+        "numberInputs": 5
       },
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        24976,
-        7152
+        34848,
+        14448
       ],
-      "id": "1985c39e-b69c-49fe-a9a9-212082b8f376",
+      "id": "7bcaa67e-4af5-45df-a7b4-cefbc9007068",
       "name": "Merge Gmail Mailbox Results"
     },
     {
@@ -201,7 +201,7 @@
           "parameters": [
             {
               "name": "q",
-              "value": "={{ $json.googleQuery }}"
+              "value": "={{ $('Run Config').first().json.fullGmailHistory ? $json.googleQueryFull : $json.googleQuery }}"
             },
             {
               "name": "maxResults",
@@ -231,10 +231,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        24512,
-        7168
+        33728,
+        14144
       ],
-      "id": "435d6bf4-8ad1-4d76-9b1b-3561b0cee2f8",
+      "id": "0836d707-0cae-4803-98f6-557d50172483",
       "name": "Gmail API | Search Messages (Terry)",
       "credentials": {
         "gmailOAuth2": {
@@ -270,10 +270,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        24304,
-        7872
+        33936,
+        15344
       ],
-      "id": "9803036d-6ac8-4234-bcd2-b8c1e550fd72",
+      "id": "d834f2a0-4abf-49a1-8b70-df85bf0f64c9",
       "name": "❓ Gmail or Outlook?"
     },
     {
@@ -283,10 +283,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        23760,
-        7888
+        33328,
+        15360
       ],
-      "id": "63b9388c-69ab-4a75-baa8-b8575d32d278",
+      "id": "0f602559-9bb3-4d00-81b9-9633534b8afc",
       "name": "Split Multi-Platform Account by Provider"
     },
     {
@@ -296,10 +296,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25216,
-        7168
+        35216,
+        14512
       ],
-      "id": "55f76511-dd7d-4b6a-b592-b7a5c7a29e73",
+      "id": "ec164c12-6ac4-4d16-9951-0c443248743f",
       "name": "Normalize Gmail Messages"
     },
     {
@@ -307,10 +307,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        26080,
-        7904
+        35696,
+        15360
       ],
-      "id": "b3b22575-5326-4f71-b33b-791388897b37",
+      "id": "830324c1-8805-4aa9-8517-9eab1c8ab03b",
       "name": "Merge Gmail + Outlook Results"
     },
     {
@@ -320,10 +320,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26336,
-        7904
+        35952,
+        15360
       ],
-      "id": "d0bf9609-a150-4568-9c5d-e299d7873315",
+      "id": "6ec4e972-e6f2-4dd4-9757-7e40392389c8",
       "name": "Combine Gmail & Outlook Per Client"
     },
     {
@@ -432,10 +432,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        27200,
-        8976
+        36816,
+        16432
       ],
-      "id": "020bfab6-5cc4-4638-9820-051d520ef426",
+      "id": "5bac6536-db63-4037-879b-c6b98b2449c4",
       "name": "Mark Account Processed",
       "retryOnFail": true,
       "credentials": {
@@ -505,10 +505,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        26240,
-        8736
+        35856,
+        16192
       ],
-      "id": "eab75fc8-864e-47f4-b144-25de047df96b",
+      "id": "98d072d6-fd84-4cb2-86d7-f4151fb8c1a2",
       "name": "Route by Resource"
     },
     {
@@ -518,10 +518,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26000,
-        8736
+        35616,
+        16192
       ],
-      "id": "bdaa463e-29ce-4505-855c-0291cf84e4ae",
+      "id": "ceec9399-9c14-49d7-baca-0c381f2f34fe",
       "name": "Split Combined Result by Provider"
     },
     {
@@ -529,10 +529,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        26512,
-        8960
+        36128,
+        16416
       ],
-      "id": "45e91e01-58e7-4dc9-9f42-ce41ce7152e8",
+      "id": "dcf778ae-0569-484e-a967-96b9f20a55ee",
       "name": "Merge Expanded Messages",
       "alwaysOutputData": true
     },
@@ -546,7 +546,7 @@
           "parameters": [
             {
               "name": "q",
-              "value": "={{ $json.googleQuery }}"
+              "value": "={{ $('Run Config').first().json.fullGmailHistory ? $json.googleQueryFull : $json.googleQuery }}"
             },
             {
               "name": "maxResults",
@@ -576,10 +576,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        24512,
-        7392
+        34592,
+        13984
       ],
-      "id": "98397a1a-b2c0-41cd-9d5d-b985f695a7c6",
+      "id": "69136866-d817-47ba-b3b1-25aa57320f13",
       "name": "Gmail API | Search Messages (Office)",
       "credentials": {
         "gmailOAuth2": {
@@ -592,27 +592,27 @@
       "parameters": {
         "operation": "getAll",
         "limit": 1000,
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ],
         "filtersUI": {
           "values": {
             "filterBy": "search",
             "search": "={{ $('Build Outlook Search Query').item.json.outlookQuery }}"
           }
         },
-        "options": {},
-        "output": "fields",
-        "fields": [
-          "receivedDateTime",
-          "sentDateTime",
-          "internetMessageId"
-        ]
+        "options": {}
       },
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24512,
-        7648
+        34160,
+        15104
       ],
-      "id": "2fc4d551-0e19-46a6-b19e-c483f70aa535",
+      "id": "723f3604-6380-453e-9a6b-223ce589788b",
       "name": "Outlook API | Search Messages (Jack)",
       "webhookId": "d626b425-8dc0-4a90-8942-8efd9ec72be2",
       "alwaysOutputData": true,
@@ -630,10 +630,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25008,
-        7648
+        34624,
+        15104
       ],
-      "id": "8957fa53-bd2f-4a30-a20f-0b0bcf3d51d5",
+      "id": "2a74a1fa-17c6-4f98-b957-99a86e7b869f",
       "name": "Normalize Outlook (Jack)",
       "alwaysOutputData": true
     },
@@ -750,10 +750,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        27296,
-        8768
+        36912,
+        16224
       ],
-      "id": "31ddf771-303f-4e73-8ebf-e85a009a5022",
+      "id": "6428424d-a225-49f5-9d37-89b0015d069d",
       "name": "Queue Messages",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -783,10 +783,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25664,
-        8368
+        35280,
+        15824
       ],
-      "id": "e6249322-0896-4871-9e33-84ff0f50d352",
+      "id": "e22a7599-cb47-4f7b-a98c-7f1a24c69a3b",
       "name": "Create Client Root Folder",
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -814,10 +814,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        26128,
-        8416
+        35744,
+        15872
       ],
-      "id": "645c36a7-a2e4-4427-a028-10d6a49a3023",
+      "id": "73b892d2-1534-44f2-b44e-e713a12c6d38",
       "name": "Create Attachments Subfolder",
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -848,10 +848,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25584,
-        9024
+        35200,
+        16480
       ],
-      "id": "8a6826b6-7dc4-454d-8699-ae526391ab75",
+      "id": "1f84d560-f9c6-4967-9902-cbe4c807ec67",
       "name": "Move Sheet to Client Folder",
       "alwaysOutputData": false,
       "retryOnFail": true,
@@ -879,10 +879,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        25408,
-        8736
+        35024,
+        16192
       ],
-      "id": "397eff5b-50d2-40be-8eae-2128e0ab1bd8",
+      "id": "d37eb7fc-14a3-4134-92d7-aafa81d852ab",
       "name": "Create Conversation Sheet",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -895,29 +895,29 @@
     },
     {
       "parameters": {
-        "jsCode": "const first = $input.first().json;\n// every id carries the mailbox it was found in (outlook_jack / outlook_mia / outlook_eve /\n// outlook_yolanda); older callers that only send ids are treated as the original mailbox\nconst entries = first.entries || (first.ids || []).map(id => ({ id, by_mail: 'outlook_jack' }));\n\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\nconst row_number = first.row_number;\n\nreturn entries.map((e, i) => ({\n  json: {\n    id: e.id,\n    row_number,\n    by_mail: e.by_mail,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index: i,\n    // existing Processed column (no separate lowercase 'processed' column); source stays blank for\n    // Outlook rows -- the Outlook Processor recognises its rows by by_mail (outlook_*)\n    Processed: false\n  }\n}));\n"
+        "jsCode": "// Skip what is already in the queue sheet (any status): the same message of the same mailbox for the same client sheet is never queued twice.\n// Without this every re-read of a client re-queued its whole history and the queue sheet kept growing (28,000 rows on 2026-11-19).\n// Run Config.skipAlreadyQueued = false switches it off. If the queue could not be read, nothing is skipped.\n// 'outlook' (older queue rows) and 'outlook_jack' are the same mailbox (Jack): without this every old Outlook row was queued again as outlook_jack.\nconst canonBy = (b) => { b = String(b == null ? '' : b).trim(); return b.toLowerCase() === 'outlook' ? 'outlook_jack' : b; };\nconst alreadyQueued = (() => {\n  const seen = new Set();\n  try {\n    if ($('Run Config').first().json.skipAlreadyQueued === false) return seen;\n    const vals = ($('Read Queue Keys').first().json.values) || [];\n    const H = (vals[0] || []).map(h => String(h || '').trim());\n    const iId = H.indexOf('id'), iBy = H.indexOf('by_mail'), iSh = H.indexOf('sheet_id');\n    if (iId < 0 || iBy < 0 || iSh < 0) return seen;\n    for (let k = 1; k < vals.length; k++) { const r = vals[k]; if (r && r[iId]) seen.add(String(r[iSh]) + '|' + canonBy(r[iBy]) + '|' + String(r[iId])); }\n  } catch (e) {}\n  return seen;\n})();\nconst first = $input.first().json;\n// every id carries the mailbox it was found in (outlook_jack / outlook_mia / outlook_eve /\n// outlook_yolanda); older callers that only send ids are treated as the original mailbox\nconst entries = first.entries || (first.ids || []).map(id => ({ id, by_mail: 'outlook_jack' }));\n\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\nconst row_number = first.row_number;\n\nreturn entries.map((e, i) => ({\n  json: {\n    id: e.id,\n    row_number,\n    by_mail: e.by_mail,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index: i,\n    // existing Processed column (no separate lowercase 'processed' column); source stays blank for\n    // Outlook rows -- the Outlook Processor recognises its rows by by_mail (outlook_*)\n    Processed: false\n  }\n})).filter(it => !alreadyQueued.has(String(it.json.sheet_id) + '|' + canonBy(it.json.by_mail) + '|' + String(it.json.id)));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26208,
-        8976
+        35824,
+        16432
       ],
-      "id": "5e1dac02-6cb1-453a-8813-243bacc3aa25",
+      "id": "e15c9afa-d088-488f-8d58-49ca9acfd46d",
       "name": "Expand Outlook Message IDs",
       "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "// Get messages array from previous node\nconst messagesArr = $input.first().json.messages\nconst row_number = $input.first().json.row_number\n// Get parent info\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\n// Map over messages array\nreturn messagesArr.map((msg, index) => ({\n  json: {\n    id: msg.id,\n    row_number:row_number,\n    threadId: msg.threadId,  // include threadId if needed\n    by_mail: msg.from_email,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index,\n    source: 'email',\n    Processed:false\n  }\n}));\n"
+        "jsCode": "// Skip what is already in the queue sheet (any status): the same message of the same mailbox for the same client sheet is never queued twice.\n// Without this every re-read of a client re-queued its whole history and the queue sheet kept growing (28,000 rows on 2026-11-19).\n// Run Config.skipAlreadyQueued = false switches it off. If the queue could not be read, nothing is skipped.\n// 'outlook' (older queue rows) and 'outlook_jack' are the same mailbox (Jack): without this every old Outlook row was queued again as outlook_jack.\nconst canonBy = (b) => { b = String(b == null ? '' : b).trim(); return b.toLowerCase() === 'outlook' ? 'outlook_jack' : b; };\nconst alreadyQueued = (() => {\n  const seen = new Set();\n  try {\n    if ($('Run Config').first().json.skipAlreadyQueued === false) return seen;\n    const vals = ($('Read Queue Keys').first().json.values) || [];\n    const H = (vals[0] || []).map(h => String(h || '').trim());\n    const iId = H.indexOf('id'), iBy = H.indexOf('by_mail'), iSh = H.indexOf('sheet_id');\n    if (iId < 0 || iBy < 0 || iSh < 0) return seen;\n    for (let k = 1; k < vals.length; k++) { const r = vals[k]; if (r && r[iId]) seen.add(String(r[iSh]) + '|' + canonBy(r[iBy]) + '|' + String(r[iId])); }\n  } catch (e) {}\n  return seen;\n})();\n// Get messages array from previous node\nconst messagesArr = $input.first().json.messages\nconst row_number = $input.first().json.row_number\n// Get parent info\nconst sheet_id = $('📄 Conversation Sheet (Resolved)').item.json.spreadsheetId;\nconst mainf4_id = $('📁 Client Root Folder (Resolved)').item.json.id;\nconst subf5_id = $('📁 Attachments Subfolder (Resolved)').item.json.id;\n\n// Map over messages array\nreturn messagesArr.map((msg, index) => ({\n  json: {\n    id: msg.id,\n    row_number:row_number,\n    threadId: msg.threadId,  // include threadId if needed\n    by_mail: msg.from_email,\n    sheet_id,\n    mainf4_id,\n    subf5_id,\n    index,\n    source: 'email',\n    Processed:false\n  }\n})).filter(it => !alreadyQueued.has(String(it.json.sheet_id) + '|' + canonBy(it.json.by_mail) + '|' + String(it.json.id)));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26656,
-        8720
+        36272,
+        16176
       ],
-      "id": "4735a20e-87fa-4a2a-8ec5-90a715e26b6e",
+      "id": "b8b4415d-115a-48fc-a8e8-d19e0ac86d7c",
       "name": "Expand Gmail Message IDs",
       "alwaysOutputData": true
     },
@@ -938,10 +938,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        26976,
-        7888
+        36592,
+        15344
       ],
-      "id": "27df5d0f-49cb-4c66-9816-e22c4df56765",
+      "id": "7f54a744-b2c0-4fc6-b289-af74a4e835b4",
       "name": "📂 Find Client Root Folder",
       "alwaysOutputData": true,
       "credentials": {
@@ -958,10 +958,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        27216,
-        7888
+        36832,
+        15344
       ],
-      "id": "fcf0fe00-1943-4b38-94fd-92c077208beb",
+      "id": "599e8040-52b1-405a-8928-4f36a5b93af8",
       "name": "🎯 Pick Exact Client Folder Match"
     },
     {
@@ -993,10 +993,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        25392,
-        8384
+        35008,
+        15840
       ],
-      "id": "e6cd38c1-a00f-481c-bb24-1688f40bbcdf",
+      "id": "578ff4bd-a48a-4aad-b03e-f7769e1bed52",
       "name": "❓ Client Folder Found?"
     },
     {
@@ -1006,10 +1006,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25616,
-        8176
+        35232,
+        15632
       ],
-      "id": "c85e7322-b391-4800-ad96-6c799fcf28cf",
+      "id": "c1b8bff4-5801-4074-838e-0d141948e16e",
       "name": "📁 Client Root Folder (Resolved)"
     },
     {
@@ -1029,10 +1029,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        25904,
-        8176
+        35520,
+        15632
       ],
-      "id": "b4d2256e-335e-4bc6-afdc-2ae6ec770b87",
+      "id": "7c532c83-e50f-4d7e-8101-6d39f760794c",
       "name": "📂 Find Attachments Subfolder",
       "alwaysOutputData": true,
       "credentials": {
@@ -1049,10 +1049,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26112,
-        8176
+        35728,
+        15632
       ],
-      "id": "618c9587-4bea-4f1e-b68f-d9271f4ad5cc",
+      "id": "1e78f9d9-b596-499f-9c53-2013a47fa50b",
       "name": "🎯 Pick Exact Attachments Match"
     },
     {
@@ -1084,10 +1084,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        26368,
-        8176
+        35984,
+        15632
       ],
-      "id": "c7886fb9-63e7-47cb-bf24-2e70a0275cd6",
+      "id": "8c431234-2bda-4bd5-a1d8-cd7116f6c7cd",
       "name": "❓ Attachments Subfolder Found?"
     },
     {
@@ -1097,10 +1097,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26656,
-        8192
+        36272,
+        15648
       ],
-      "id": "443e3441-3822-47ab-b593-f6fc4765a64a",
+      "id": "3107c30c-c58b-4b3e-b933-6502588fa70a",
       "name": "📁 Attachments Subfolder (Resolved)"
     },
     {
@@ -1120,10 +1120,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        26512,
-        8464
+        36128,
+        15920
       ],
-      "id": "f3e6d18e-0e90-447c-b45a-7159d3911aa2",
+      "id": "8eda7806-191e-474c-a089-4b888d3c103c",
       "name": "📂 Find Conversation Sheet",
       "alwaysOutputData": true,
       "credentials": {
@@ -1140,10 +1140,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26720,
-        8464
+        36336,
+        15920
       ],
-      "id": "f91d9123-a925-4ada-b843-1f97a10eeae0",
+      "id": "a77cafee-5f81-40ac-a27a-832329dc3ca9",
       "name": "🎯 Pick Exact Conversation Sheet Match"
     },
     {
@@ -1175,10 +1175,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        27008,
-        8464
+        36624,
+        15920
       ],
-      "id": "56f3ab49-619e-413e-b130-fe89aefe3b5c",
+      "id": "72ba5991-eb6e-4ed9-a3b0-4221f5e23a4f",
       "name": "❓ Conversation Sheet Found?"
     },
     {
@@ -1188,10 +1188,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25712,
-        8736
+        35328,
+        16192
       ],
-      "id": "80152aad-c144-468d-b07c-23dd79f51be7",
+      "id": "1e984d7d-cbc1-4f8a-95aa-bfae4d88644f",
       "name": "📄 Conversation Sheet (Resolved)"
     },
     {
@@ -1223,10 +1223,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        24048,
-        7888
+        33616,
+        15360
       ],
-      "id": "515a0efe-25eb-44b3-a7af-47100a5cfeb3",
+      "id": "8da56edc-50a5-4072-b66e-7e9d092b8939",
       "name": "❓ Has Valid Platform?"
     },
     {
@@ -1258,10 +1258,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        26816,
-        8960
+        36432,
+        16416
       ],
-      "id": "d8599fdf-0a92-4a7c-a394-c32bf85d4a47",
+      "id": "5eae09a3-eeea-4b2e-9677-e4625c62f701",
       "name": "❓ Any New Messages?"
     },
     {
@@ -1269,10 +1269,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        27472,
-        8976
+        37088,
+        16432
       ],
-      "id": "5926c21a-6ea9-4ae8-b20a-2b5ddc0cb410",
+      "id": "612bb7ea-ad1c-48e0-a43b-7db16eca8162",
       "name": "Wait",
       "webhookId": "b7bd2394-0a2c-4323-a29e-8a6f7465c345"
     },
@@ -1289,10 +1289,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        22832,
-        8096
+        32400,
+        15568
       ],
-      "id": "6d0b483a-76c0-4c9e-8322-5bc2e348e90f",
+      "id": "90f08c00-10cd-406c-9bf5-719ff11e09c0",
       "name": "scheduleTrigger"
     },
     {
@@ -1310,6 +1310,42 @@
               "name": "maxAccountsPerRun",
               "type": "number",
               "value": 20
+            },
+            {
+              "id": "b1f0c3aa-5d41-4c71-9a0e-refreshdays",
+              "name": "refreshDays",
+              "type": "number",
+              "value": 0
+            },
+            {
+              "id": "c0a1-onlyrows",
+              "name": "onlyRows",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "c0a2-newgmailfull",
+              "name": "newGmailFullHistory",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c0a3-fullgmail",
+              "name": "fullGmailHistory",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c0a4-fulloutlook",
+              "name": "fullOutlookHistory",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "c0a5-skipqueued",
+              "name": "skipAlreadyQueued",
+              "type": "boolean",
+              "value": true
             }
           ]
         },
@@ -1318,10 +1354,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        22832,
-        7872
+        32400,
+        15344
       ],
-      "id": "1ba8ed50-57ac-4101-ba08-2cab72b80fae",
+      "id": "c6b1a352-1731-4c45-95b9-b0a21abf991e",
       "name": "Run Config"
     },
     {
@@ -1329,23 +1365,23 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        22608,
-        7872
+        32176,
+        15344
       ],
-      "id": "f290501c-d420-4074-baa8-d99f3f09834c",
+      "id": "1737c87a-5d2c-4e0b-92c1-96adc8f5cbe2",
       "name": "▶️ Run now (set Run Config.onlyClient to test one client)"
     },
     {
       "parameters": {
-        "jsCode": "// Which control-sheet rows this run works on.\n//  * new rows / reset rows: Processed = FALSE (the normal case, as before)\n//  * existing rows still owed the one-time pull of the 3 new Outlook mailboxes:\n//    Processed = TRUE, last_synced_at filled, new_outlook_backfilled not TRUE\n// Rows without an Email (name-only rows) are never processed. `onlyClient` limits the\n// run to one client (name or email contains the text) for a safe first test, and\n// `maxAccountsPerRun` keeps one run from trying to do hundreds of clients.\nconst cfg = $('Run Config').first().json;\nconst only = String(cfg.onlyClient || '').trim().toLowerCase();\nconst max = Math.max(1, Number(cfg.maxAccountsPerRun) || 20);\nconst val = (v) => String(v ?? '').trim().toLowerCase();\nconst rows = $input.all().filter(i => {\n  const j = i.json;\n  if (!val(j.Email)) return false;\n  if (only && !(val(j.Name).includes(only) || val(j.Email).includes(only))) return false;\n  return true;\n});\n// A row with no Platform and no last_synced_at cannot be processed (the Platform check skips it and\n// nothing ever marks it done), e.g. clients flagged \"no conversation found\". Leaving them in would\n// keep them at the front of the queue and use up the run's slots forever.\nconst processable = (j) => val(j.Platform) !== '' || val(j.last_synced_at) !== '';\nconst pending = rows.filter(i => val(i.json.Processed) === 'false' && processable(i.json));\nconst backfill = rows.filter(i => val(i.json.Processed) === 'true' && val(i.json.last_synced_at) !== '' && val(i.json.new_outlook_backfilled) !== 'true');\nreturn [...pending, ...backfill].slice(0, max);\n"
+        "jsCode": "// Which control-sheet rows this run works on.\n//  * new rows / reset rows: Processed = FALSE (the normal case, as before)\n//  * existing rows still owed the one-time pull of the 3 new Outlook mailboxes:\n//    Processed = TRUE, last_synced_at filled, new_outlook_backfilled not TRUE\n// Rows without an Email (name-only rows) are never processed. `onlyClient` limits the\n// run to one client (name or email contains the text) for a safe first test, and\n// `maxAccountsPerRun` keeps one run from trying to do hundreds of clients.\nconst cfg = $('Run Config').first().json;\nconst only = String(cfg.onlyClient || '').trim().toLowerCase();\nconst max = Math.max(1, Number(cfg.maxAccountsPerRun) || 20);\nconst val = (v) => String(v ?? '').trim().toLowerCase();\n// onlyRows: exact control-sheet row numbers (comma separated, e.g. \"4,5,7\"). When set, ONLY these rows are taken, whatever their\n// Processed / last_synced_at state (a controlled catch-up of named clients). They still need an Email.\nconst onlyRows = new Set(String(cfg.onlyRows || '').split(',').map(s => Number(s.trim())).filter(Boolean));\nif (onlyRows.size) {\n  return $input.all().filter(i => onlyRows.has(Number(i.json.row_number)) && val(i.json.Email)).slice(0, max);\n}\nconst rows = $input.all().filter(i => {\n  const j = i.json;\n  if (!val(j.Email)) return false;\n  if (only && !(val(j.Name).includes(only) || val(j.Email).includes(only))) return false;\n  return true;\n});\n// A row with no Platform and no last_synced_at cannot be processed (the Platform check skips it and\n// nothing ever marks it done), e.g. clients flagged \"no conversation found\". Leaving them in would\n// keep them at the front of the queue and use up the run's slots forever.\nconst processable = (j) => val(j.Platform) !== '' || val(j.last_synced_at) !== '';\nconst pending = rows.filter(i => val(i.json.Processed) === 'false' && processable(i.json));\nconst backfill = rows.filter(i => val(i.json.Processed) === 'true' && val(i.json.last_synced_at) !== '' && val(i.json.new_outlook_backfilled) !== 'true');\n// REFRESH of existing clients (added 2026-11): a client that was processed once was never read again (nothing resets\n// Processed), so every e-mail after its last sync was missing from its conversation sheet. Now an existing client\n// (Processed TRUE, last_synced_at filled, backfill done) whose last_synced_at is older than Run Config.refreshDays is\n// read again, oldest first, within the same maxAccountsPerRun. Only messages after last_synced_at are searched (watermark),\n// and the processors skip anything already logged. refreshDays = 0 (the default) switches the refresh off: the workflow is run by\n// hand, so set it (e.g. 3) only for a catch-up run and raise maxAccountsPerRun if needed.\nconst refreshDays = Number(cfg.refreshDays);\nconst days = Number.isFinite(refreshDays) ? refreshDays : 0;\nlet refresh = [];\nif (days > 0) {\n  const cutoff = Date.now() - days * 86400000;\n  const when = (j) => { const t = Date.parse(String(j.last_synced_at || '').trim()); return isNaN(t) ? null : t; };\n  refresh = rows\n    .filter(i => val(i.json.Processed) === 'true' && val(i.json.new_outlook_backfilled) === 'true' && processable(i.json) && when(i.json) !== null && when(i.json) < cutoff)\n    .sort((x, y) => when(x.json) - when(y.json));\n}\nreturn [...pending, ...backfill, ...refresh].slice(0, max);\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        23216,
-        7872
+        32784,
+        15344
       ],
-      "id": "e362beed-d614-453c-9171-df2388493552",
+      "id": "645e5ec6-c6f2-40f0-b98f-9b750f689489",
       "name": "Select Accounts To Process"
     },
     {
@@ -1355,10 +1391,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        25504,
-        7888
+        35008,
+        15344
       ],
-      "id": "8f4bab08-8030-444c-be7c-0bd4771df7f6",
+      "id": "63d91cbb-1cb8-4ad7-a135-30151713e43c",
       "name": "Merge Outlook Mailboxes"
     },
     {
@@ -1368,10 +1404,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25792,
-        7920
+        35408,
+        15376
       ],
-      "id": "8a020ce8-9af9-4ebe-b03a-0555afdaf2a7",
+      "id": "1929b43b-c2e1-466c-aeb8-f7284ac7687f",
       "name": "Combine Outlook Mailboxes",
       "alwaysOutputData": true
     },
@@ -1379,27 +1415,27 @@
       "parameters": {
         "operation": "getAll",
         "limit": 1000,
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ],
         "filtersUI": {
           "values": {
             "filterBy": "search",
             "search": "={{ $('Build Outlook Search Query').item.json.outlookQuery }}"
           }
         },
-        "options": {},
-        "output": "fields",
-        "fields": [
-          "receivedDateTime",
-          "sentDateTime",
-          "internetMessageId"
-        ]
+        "options": {}
       },
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24800,
-        7888
+        34416,
+        15360
       ],
-      "id": "de9acf50-7c43-4664-8169-39f56522bfbb",
+      "id": "8a6550d4-25ce-434a-8302-4498e22634a6",
       "name": "Outlook API | Search Messages (Mia)",
       "alwaysOutputData": true,
       "webhookId": "e1a608c1-27a5-4a4b-a563-0d900ca8715e",
@@ -1417,10 +1453,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        25072,
-        7888
+        34672,
+        15360
       ],
-      "id": "4bd112d9-31a5-4d84-981e-6f50d006b9b6",
+      "id": "34659c04-ea8c-44fc-ae40-dcd0a6829c70",
       "name": "Normalize Outlook (Mia)",
       "alwaysOutputData": true
     },
@@ -1428,27 +1464,27 @@
       "parameters": {
         "operation": "getAll",
         "limit": 1000,
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ],
         "filtersUI": {
           "values": {
             "filterBy": "search",
             "search": "={{ $('Build Outlook Search Query').item.json.outlookQuery }}"
           }
         },
-        "options": {},
-        "output": "fields",
-        "fields": [
-          "receivedDateTime",
-          "sentDateTime",
-          "internetMessageId"
-        ]
+        "options": {}
       },
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24576,
-        8208
+        34448,
+        15568
       ],
-      "id": "29069b21-761d-4553-9904-b45627a48c8d",
+      "id": "7b03515f-9f1b-4a7c-a0f0-def7903a091d",
       "name": "Outlook API | Search Messages (Eve)",
       "alwaysOutputData": true,
       "webhookId": "ee5a00ba-a697-4e93-8cfc-c94081746673",
@@ -1466,10 +1502,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24800,
-        8208
+        34672,
+        15568
       ],
-      "id": "fe069f8b-5ffb-4e46-8d08-5105f13de095",
+      "id": "9fadd4b2-d684-4055-9969-29902708757d",
       "name": "Normalize Outlook (Eve)",
       "alwaysOutputData": true
     },
@@ -1477,27 +1513,27 @@
       "parameters": {
         "operation": "getAll",
         "limit": 1000,
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ],
         "filtersUI": {
           "values": {
             "filterBy": "search",
             "search": "={{ $('Build Outlook Search Query').item.json.outlookQuery }}"
           }
         },
-        "options": {},
-        "output": "fields",
-        "fields": [
-          "receivedDateTime",
-          "sentDateTime",
-          "internetMessageId"
-        ]
+        "options": {}
       },
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24512,
-        8432
+        34448,
+        15808
       ],
-      "id": "47999d3f-367b-4cbc-8ade-573ddc0cb9e6",
+      "id": "e6273bf5-2b9e-4fd2-9600-01a3168e72db",
       "name": "Outlook API | Search Messages (Yolanda)",
       "alwaysOutputData": true,
       "webhookId": "12e77564-27ac-46b4-b2af-9b30cef808df",
@@ -1515,10 +1551,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        24752,
-        8432
+        34688,
+        15808
       ],
-      "id": "6537469e-9889-43ef-bd84-737b43275268",
+      "id": "e687beb9-f5ec-4e7c-8519-47d6bb0dde6f",
       "name": "Normalize Outlook (Yolanda)",
       "alwaysOutputData": true
     },
@@ -1529,10 +1565,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        26768,
-        7888
+        36384,
+        15344
       ],
-      "id": "fdb7ea19-b984-41b7-a4da-f3c4c0388467",
+      "id": "b4be551b-30b2-4326-836d-54a6024a52f7",
       "name": "Candidate Parent Folders"
     },
     {
@@ -1563,46 +1599,203 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        26528,
-        7904
+        36144,
+        15360
       ],
-      "id": "c796b040-30dc-43cf-9111-6b9a9c8079d9",
+      "id": "1bcad991-b9f5-42c3-80d4-3ae3d2ae58f7",
       "name": "❓ Any Messages At All?"
     },
     {
       "parameters": {
         "operation": "getAll",
         "limit": 1000,
+        "output": "fields",
+        "fields": [
+          "receivedDateTime",
+          "sentDateTime",
+          "internetMessageId"
+        ],
         "filtersUI": {
           "values": {
             "filterBy": "search",
             "search": "={{ ($('Build Outlook Search Query').first().json.Name || '').toString().trim() ? 'Etsy Conversation with ' + $('Build Outlook Search Query').first().json.Name.toString().trim() : 'zzz-no-client-name-zzz' }}"
           }
         },
-        "options": {},
-        "output": "fields",
-        "fields": [
-          "receivedDateTime",
-          "sentDateTime",
-          "internetMessageId"
-        ]
+        "options": {}
       },
       "type": "n8n-nodes-base.microsoftOutlook",
       "typeVersion": 2,
       "position": [
-        24768,
-        7648
+        34384,
+        15104
       ],
-      "id": "c92896a9-f6fc-4aec-817f-212e485d1e19",
+      "id": "7c8e6b1b-438a-47cc-a156-c6315284688a",
       "name": "Outlook API | Search Etsy Conversations (Jack)",
       "alwaysOutputData": true,
+      "executeOnce": true,
+      "webhookId": "7ffd15f5-0a3b-49c9-aade-8d8e96b80522",
       "credentials": {
         "microsoftOutlookOAuth2Api": {
           "id": "Pg1Yh9oUPVFueUUr",
           "name": "Axe_AI-outlook"
         }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ ($('Run Config').first().json.fullGmailHistory || $('Run Config').first().json.newGmailFullHistory) ? $json.googleQueryFull : $json.googleQuery }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 60
+            }
+          }
+        }
       },
-      "executeOnce": true
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        34288,
+        14528
+      ],
+      "id": "1af43e73-fb9d-45af-ab2b-47f3c2b3aec5",
+      "name": "Gmail API | Search Messages (Eve 2020)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UgtEnaBRXQ7AEbjW",
+          "name": "Eve_Gmail_2020"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst Email = $('Build Gmail Search Query').item.json.Email\nconst Name = $('Build Gmail Search Query').item.json.Name\nfor (const item of $input.all()) {\n  item.json.by_mail = \"eve_2020\";\n  item.json.to_mail = Email;\n  item.json.Name = Name;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        34512,
+        14528
+      ],
+      "id": "fdf76bc2-c0d4-4c35-83fa-879e03913ca7",
+      "name": "Tag Mailbox (Eve 2020)"
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ ($('Run Config').first().json.fullGmailHistory || $('Run Config').first().json.newGmailFullHistory) ? $json.googleQueryFull : $json.googleQuery }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 60
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        34192,
+        14848
+      ],
+      "id": "2f029712-ebc7-4a41-9824-01a9160de6bf",
+      "name": "Gmail API | Search Messages (Mia FR)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gsoMhNbRCcmABz6D",
+          "name": "Mia-Gmail-marblebeefr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst Email = $('Build Gmail Search Query').item.json.Email\nconst Name = $('Build Gmail Search Query').item.json.Name\nfor (const item of $input.all()) {\n  item.json.by_mail = \"mia_fr\";\n  item.json.to_mail = Email;\n  item.json.Name = Name;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        34432,
+        14848
+      ],
+      "id": "bada557c-2933-4c0f-94d1-ca0ef7bc2182",
+      "name": "Tag Mailbox (Mia FR)"
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1PGRInnJSlURBjaGdNF1Pygqmxi-RM56TVEweE0eYmgI/values/Sheet1!A:I?majorDimension=ROWS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "ad38b98e-6083-4581-a0b8-d3cab55a169a",
+      "name": "Read Queue Keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        32368,
+        15168
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -1689,6 +1882,16 @@
           },
           {
             "node": "Gmail API | Search Messages (Office)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail API | Search Messages (Eve 2020)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail API | Search Messages (Mia FR)",
             "type": "main",
             "index": 0
           }
@@ -2164,7 +2367,7 @@
       "main": [
         [
           {
-            "node": "Load Accounts from Control Sheet",
+            "node": "Read Queue Keys",
             "type": "main",
             "index": 0
           }
@@ -2331,6 +2534,61 @@
           }
         ]
       ]
+    },
+    "Gmail API | Search Messages (Eve 2020)": {
+      "main": [
+        [
+          {
+            "node": "Tag Mailbox (Eve 2020)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Mailbox (Eve 2020)": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail Mailbox Results",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Gmail API | Search Messages (Mia FR)": {
+      "main": [
+        [
+          {
+            "node": "Tag Mailbox (Mia FR)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Mailbox (Mia FR)": {
+      "main": [
+        [
+          {
+            "node": "Merge Gmail Mailbox Results",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Read Queue Keys": {
+      "main": [
+        [
+          {
+            "node": "Load Accounts from Control Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -2338,7 +2596,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "1cb2051d-b183-4e49-b6f2-0c19c5fb82a3",
+  "versionId": "ac751cea-5d79-4260-b128-ea62bb11e729",
   "meta": {
     "instanceId": "40fd0e0584e84b721baf5ba64df17877ecda841680e3a8ad833622b608040b14"
   },
