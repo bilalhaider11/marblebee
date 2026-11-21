@@ -1,0 +1,556 @@
+{
+  "name": "AXE AI | Conversation Sheet Cleanup (duplicates, junk, sort)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Conversation Sheet Cleanup (duplicates, junk, sort)\n\nManual workflow, run on demand (e.g. after a big re-read of clients). NOT scheduled: never run it while the Orchestrator or the processors are running.\n\nGoes through the 'conversation' sheet of every client folder, or only the clients named in Config.onlyClients (comma separated, matched against the client folder name; startAt / maxSheets are then ignored).\n\nConfig: dryRun = true (default) only reports, set false for the real run. maxSheets / startAt = batches (memory): e.g. maxSheets 50, startAt 0, 50, 100 ... The 'Totals' output shows sheetsInTotal, which batch was done and the startAt of the next one ('none' = last batch), plus sheetsLosingMoreThan25Percent and the biggest cleanups. Use the same dryRun for every batch. sortToo = sort every sheet by timestamp.\n\nPer sheet: (1) rows with the same moment + subject + sender are duplicates (old and new column layout compared); a row is only removed when it is CERTAINLY a copy (same message id, or overlapping recipients and identical / beginning-of text) and none of its attachment links would be lost; the row with the most links is kept and links only the removed row had are copied over. Look-alikes are left alone and listed (reviewGroups). (2) '&#65279;' codes and zero-width characters are removed from the message text. (3) the sheet is sorted by timestamp.\n\nA sheet that cannot be read (Google 'Service unavailable') is listed under notes: run it again with onlyClients. Undo = Google Sheets version history of the client sheet.\n\nUsed 2026-11-21 on all 510 sheets (about 4,800 duplicate rows removed); re-run as dry run to audit.",
+        "height": 300,
+        "width": 620
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "98d3b3a4-8f55-454c-b2d4-66f9e9d669d5",
+      "name": "README"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "id": "fc1de08f-2b57-47f5-b099-63eeaaf1fc1a",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "360dfb43-08db-42fe-89b7-97f086585d1d",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "380b6b7f-74b0-489d-9ebc-df167761b53c",
+              "name": "onlyClients",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "8b3bdb19-4c44-4129-97a9-c78b5079352b",
+              "name": "sortToo",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "50064339-10d7-44e8-ae91-d0a47bbaab08",
+              "name": "startAt",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "1b983422-3a3f-424f-b78a-d9ad2afb703b",
+              "name": "maxSheets",
+              "value": 50,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "id": "c5b56195-3b36-4961-b16b-1c3699c434aa",
+      "name": "Config"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { parentFolderId: '1-1EdTSWeoFPnbRa_hKdYsX4aMnqiQSSE', provider: 'gmail-only' } },\n  { json: { parentFolderId: '1L5xu6tTaS6yZXbHpTrpE4IQ1xjV8G_J8', provider: 'outlook-only' } },\n  { json: { parentFolderId: '102oeld1yMYGMmWs2Od198HqO1KeVhv_n', provider: 'combined' } },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "52838147-02b1-42d5-b1fd-d9e0ebacc159",
+      "name": "Provider Parent Folders"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.parentFolderId }}",
+            "mode": "id"
+          }
+        },
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ],
+      "id": "ab2871eb-7520-407e-b2b0-7fd699b27685",
+      "name": "List Client Folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only client folders (and, when Config.onlyClients is filled, only those whose folder name contains one of the names).\nconst cfg = $('Config').first().json;\nconst only = String(cfg.onlyClients || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);\nreturn $input.all().filter(i => i.json.mimeType === 'application/vnd.google-apps.folder')\n  .filter(i => !only.length || only.some(n => String(i.json.name || '').toLowerCase().includes(n)));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "id": "3a31439d-bde9-43d6-a2cb-94d28412c28a",
+      "name": "Keep Folders Only"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "conversation",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        300
+      ],
+      "id": "9c945924-812d-4764-ac28-071d75461ee6",
+      "name": "Find Conversation Sheet",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "tOQXFHJn56EOZ0gS",
+          "name": "Axe_AI_Google_Drive"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Exact match on the name 'conversation'; remembers which client folder (name) each sheet belongs to.\nconst folderName = {};\nfor (const f of $('Keep Folders Only').all()) folderName[f.json.id] = f.json.name;\nconst seen = new Set();\nconst out = [];\nfor (const item of $input.all()) {\n  const name = (item.json.name || '').toString().trim().toLowerCase();\n  if (name !== 'conversation' || !item.json.id || seen.has(item.json.id)) continue;\n  seen.add(item.json.id);\n  const parent = Array.isArray(item.json.parents) ? item.json.parents[0] : '';\n  out.push({ json: { id: item.json.id, client: folderName[parent] || '(unknown client)' } });\n}\n// BATCHES: a run over all ~600 sheets at once can run out of memory and stop without an error. Config.startAt / maxSheets pick a slice of the\n// (stable, sorted by sheet id) list: startAt 0 + maxSheets 40 = sheets 1-40, startAt 40 = sheets 41-80, and so on. maxSheets 0 = all sheets.\nconst cfg = $('Config').first().json;\nout.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);\nconst total = out.length;\n// When Config.onlyClients is filled the list is just those clients, so startAt / maxSheets are ignored.\nconst onlyNames = String(cfg.onlyClients || '').split(',').map(s => s.trim()).filter(Boolean);\nconst start = onlyNames.length ? 0 : Math.max(0, Number(cfg.startAt) || 0);\nconst max = onlyNames.length ? 0 : (Number(cfg.maxSheets) || 0);\nconst slice = max > 0 ? out.slice(start, start + max) : out.slice(start);\nreturn slice.map(x => ({ json: { ...x.json, totalSheetsFound: total, batchFrom: start + 1, batchTo: start + slice.length } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "id": "16ba82c0-ef7a-4a92-86f9-9c246a146c0c",
+      "name": "Pick Exact Conversation Sheet Match"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.id + '?fields=sheets.properties' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1100
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1540,
+        300
+      ],
+      "id": "0dabd5ee-24b1-4cc1-9e80-00046183fef5",
+      "name": "Get Sheet Properties",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = $('Pick Exact Conversation Sheet Match').item.json;\nconst props = $json.sheets?.[0]?.properties;\nif (!props?.title || props.sheetId === undefined) {\n  return { json: { spreadsheetId: pick.id, client: pick.client, totalSheetsFound: pick.totalSheetsFound, batchFrom: pick.batchFrom, batchTo: pick.batchTo, error: 'Could not resolve tab name / sheetId' } };\n}\nreturn { json: { spreadsheetId: pick.id, client: pick.client, totalSheetsFound: pick.totalSheetsFound, batchFrom: pick.batchFrom, batchTo: pick.batchTo, tabName: props.title, tabSheetId: props.sheetId } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "id": "a1992f56-d1ea-4a07-b029-e3abdd9b81d1",
+      "name": "Extract Tab Info"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.error ? 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.spreadsheetId + '?fields=spreadsheetId' : 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.spreadsheetId + '/values/' + encodeURIComponent($json.tabName) + '?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1100
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1980,
+        300
+      ],
+      "id": "729ea832-e30a-46d5-82a2-424ea0a7c164",
+      "name": "Read Whole Tab",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Cleanup plan for ONE conversation sheet.\n// 1) Duplicates: rows with the same moment (epoch seconds), the same subject (re:/fw: ignored) and the same sender (fromEmail OR the older\n//    senderEmail column; a row without a sender joins the only sender present). The row with the MOST attachment links is kept (the first one on a tie);\n//    links that only a removed row has are copied into an empty link cell of the kept row.\n//    A row is only removed when it is CERTAINLY a copy of the kept row: same moment + subject + sender (above) AND either the same message id, or\n//    (the recipients overlap or one side has none) AND (the message texts are identical, or both have at least 20 letters/digits and one is the beginning of the other,\n//    letters/digits only - Gmail and Outlook cut the quoted part at slightly different places). Everything else is NOT removed and is listed under\n//    reviewGroups (rows that look alike but cannot be proven to be the same message).\n// 2) Junk: '&#65279;' style codes and invisible characters are removed from the message text.\n// 3) Sort: the whole sheet is sorted by the timestamp column (done by the 'Apply' step, not here).\nconst info = $('Extract Tab Info').item.json;\nconst base = { spreadsheetId: info.spreadsheetId, client: info.client, tabName: info.tabName, tabSheetId: info.tabSheetId, totalSheetsFound: info.totalSheetsFound, batchFrom: info.batchFrom, batchTo: info.batchTo };\nconst res = $input.item.json || {};\nif (info.error) return { json: { ...base, changed: false, note: info.error } };\nif (res.error) return { json: { ...base, changed: false, note: 'read error: ' + JSON.stringify(res.error).slice(0, 200) } };\nconst values = Array.isArray(res.values) ? res.values : [];\nif (values.length < 2) return { json: { ...base, rows: Math.max(0, values.length - 1), changed: false, note: 'empty sheet' } };\n\nconst secs = (t) => { const d = new Date(String(t == null ? '' : t).trim()); return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000); };\nconst norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/\\s+/g, ' ').trim();\nconst subj = (s) => { let x = norm(s), prev; do { prev = x; x = x.replace(/^(re|fw|fwd|aw|wg|sv|vs|rv|tr)\\s*:\\s*/, '').trim(); } while (x !== prev); return x; };\nconst addr = (s) => { const m = String(s == null ? '' : s).match(/[\\w.+'\\-]+@[\\w.\\-]+\\.[a-z]{2,}/i); return m ? m[0].toLowerCase() : ''; };\nconst txt = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst addrs = (s) => (String(s == null ? '' : s).toLowerCase().match(/[\\w.+'\\-]+@[\\w.\\-]+\\.[a-z]{2,}/g) || []);\nconst colLetter = (i) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };\nconst JUNK1 = /&#(65279|8203|8204|8205|847);?|&zwnj;|&nbsp;/gi;\nconst JUNK2 = /[​-‏⁠﻿͏]/g;\n\nconst H = values[0].map(h => String(h == null ? '' : h).trim());\nconst iTs = H.indexOf('timestamp'), iSub = H.indexOf('subject'), iFrom = H.indexOf('fromEmail'), iSend = H.indexOf('senderEmail'), iMsg = H.indexOf('message'), iId = H.indexOf('id'), iTo = H.indexOf('toEmail'), iRecv = H.indexOf('receiverEmails');\nconst linkCols = []; H.forEach((h, i) => { if (/^(attachment|webViewLink)\\d+$/i.test(h)) linkCols.push(i); });\nif (iTs < 0) return { json: { ...base, rows: values.length - 1, changed: false, note: 'no timestamp column' } };\n\nconst rows = [];\nfor (let k = 1; k < values.length; k++) {\n  const r = values[k] || [];\n  const links = linkCols.map(c => String(r[c] == null ? '' : r[c]).trim()).filter(Boolean);\n  rows.push({ row: k + 1, r, secs: secs(r[iTs]), subject: subj(iSub >= 0 ? r[iSub] : ''), sender: addr(iFrom >= 0 ? r[iFrom] : '') || addr(iSend >= 0 ? r[iSend] : ''), text: txt(iMsg >= 0 ? r[iMsg] : ''), mid: String(iId >= 0 && r[iId] != null ? r[iId] : '').trim(), to: new Set([...addrs(iTo >= 0 ? r[iTo] : ''), ...addrs(iRecv >= 0 ? r[iRecv] : '')]), links });\n}\nconst bySecSubj = new Map();\nfor (const x of rows) { if (x.secs === null) continue; const key = x.secs + '|' + x.subject; if (!bySecSubj.has(key)) bySecSubj.set(key, []); bySecSubj.get(key).push(x); }\n\nconst deleteRows = [], updates = [], dupSamples = [], reviewGroups = [];\nlet dupGroups = 0, linksMerged = 0, linksNotMerged = 0, reviewRows = 0;\nconst removed = new Set();\nfor (const [key, grp] of bySecSubj) {\n  if (grp.length < 2) continue;\n  const senders = [...new Set(grp.map(x => x.sender).filter(Boolean))];\n  const clusters = senders.length ? senders.map(s => grp.filter(x => x.sender === s || (!x.sender && senders.length === 1))) : [grp];\n  for (const cl of clusters) {\n    if (cl.length < 2) continue;\n    const keep = cl.slice().sort((a, b) => (b.links.length - a.links.length) || (a.row - b.row))[0];\n    const have = new Set(keep.links);\n    const compat = (a, b) => {\n      if (a.mid && b.mid && a.mid === b.mid) return true;\n      const toOk = !a.to.size || !b.to.size || [...a.to].some(e => b.to.has(e));\n      if (!toOk) return false;\n      if (a.text.length >= 5 && a.text === b.text) return true;   // identical (short) texts: same moment + subject + sender + recipients + identical text\n      if (a.text.length < 20 || b.text.length < 20) return false;\n      return a.text.startsWith(b.text) || b.text.startsWith(a.text);\n    };\n    let removedHere = 0;\n    for (const x of cl) {\n      if (x === keep) continue;\n      if (!compat(keep, x)) { reviewRows++; if (reviewGroups.length < 12) reviewGroups.push({ keptRow: keep.row, notRemovedRow: x.row, subject: key.split('|').slice(1).join('|').slice(0, 60), why: (!x.to.size || !keep.to.size || [...x.to].some(e => keep.to.has(e))) ? 'texts differ or too short' : 'different recipients' }); continue; }\n      // links only this row has must fit into free link cells of the kept row; if they do not fit the row is NOT removed (nothing may be lost)\n      const planned = [];\n      let fits = true;\n      for (const l of x.links) {\n        if (have.has(l)) continue;\n        const free = linkCols.find(c => !String(keep.r[c] == null ? '' : keep.r[c]).trim() && !updates.some(u => u.row === keep.row && u.col === c) && !planned.some(p => p.col === c));\n        if (free === undefined) { fits = false; break; }\n        planned.push({ col: free, value: l });\n      }\n      if (!fits) { linksNotMerged++; reviewRows++; if (reviewGroups.length < 12) reviewGroups.push({ keptRow: keep.row, notRemovedRow: x.row, subject: key.split('|').slice(1).join('|').slice(0, 60), why: 'its attachment link(s) would be lost (no free link column on the kept row)' }); continue; }\n      removedHere++;\n      deleteRows.push(x.row); removed.add(x.row);\n      for (const p of planned) { updates.push({ row: keep.row, col: p.col, value: p.value, why: 'link from removed row ' + x.row }); have.add(p.value); linksMerged++; }\n    }\n    if (removedHere) dupGroups++;\n    if (removedHere && dupSamples.length < 6) dupSamples.push({ kept: keep.row + ' (' + keep.links.length + ' links)', removed: cl.filter(x => x !== keep && removed.has(x.row)).map(x => x.row + ' (' + x.links.length + ' links)'), subject: key.split('|').slice(1).join('|').slice(0, 60) });\n  }\n}\nlet junkCells = 0; const junkSamples = [];\nif (iMsg >= 0) {\n  for (const x of rows) {\n    if (removed.has(x.row)) continue;\n    const m = x.r[iMsg];\n    if (m == null || m === '') continue;\n    const s = String(m);\n    if (!(JUNK1.test(s) || JUNK2.test(s))) { JUNK1.lastIndex = 0; JUNK2.lastIndex = 0; continue; }\n    JUNK1.lastIndex = 0; JUNK2.lastIndex = 0;\n    const c = s.replace(JUNK1, ' ').replace(JUNK2, ' ').replace(/\\s+/g, ' ').trim();\n    if (c !== s) { updates.push({ row: x.row, col: iMsg, value: c, why: 'junk' }); junkCells++; if (junkSamples.length < 4) junkSamples.push(x.row + ': ' + s.slice(0, 50) + ' -> ' + c.slice(0, 50)); }\n  }\n}\ndeleteRows.sort((a, b) => a - b);\nreturn { json: {\n  ...base,\n  rows: rows.length,\n  changed: deleteRows.length > 0 || updates.length > 0,\n  duplicateGroups: dupGroups,\n  rowsToDelete: deleteRows.length,\n  linksCopiedToKeptRows: linksMerged,\n  rowsKeptBecauseLinksWouldBeLost: linksNotMerged,\n  junkCellsToClean: junkCells,\n  rowsLeftAloneForReview: reviewRows,\n  timestampColumnIndex: iTs,\n  dupSamples, junkSamples, reviewGroups,\n  _deleteRows: deleteRows,\n  _updates: updates.map(u => ({ range: colLetter(u.col) + u.row, value: u.value }))\n} };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "id": "d33905a2-2ff3-4eb8-9abd-75ebf9091641",
+      "name": "Analyze Sheet"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Totals over all sheets looked at in this run (works for the dry run and for the real run).\nconst all = $input.all().map(i => i.json);\nconst f = all[0] || {};\nconst t = { dryRun: $('Config').first().json.dryRun !== false, sheetsInTotal: f.totalSheetsFound, thisBatch: f.batchFrom ? ('sheets ' + f.batchFrom + ' to ' + f.batchTo) : 'all', nextBatchStartAt: f.batchTo !== undefined && f.batchTo < f.totalSheetsFound ? f.batchTo : 'none - this was the last batch', sheetsLookedAt: all.length, sheetsWithChanges: 0, rowsRead: 0, rowsToDelete: 0, duplicateGroups: 0, junkCellsToClean: 0, linksCopiedToKeptRows: 0, rowsKeptBecauseLinksWouldBeLost: 0, rowsLeftAloneForReview: 0 };\nconst notes = [], withChanges = [];\nfor (const x of all) {\n  t.rowsRead += x.rows || 0; t.rowsToDelete += x.rowsToDelete || 0; t.duplicateGroups += x.duplicateGroups || 0; t.junkCellsToClean += x.junkCellsToClean || 0;\n  t.linksCopiedToKeptRows += x.linksCopiedToKeptRows || 0; t.rowsKeptBecauseLinksWouldBeLost += x.rowsKeptBecauseLinksWouldBeLost || 0; t.rowsLeftAloneForReview += x.rowsLeftAloneForReview || 0;\n  if (x.changed || (x.rowsLeftAloneForReview || 0) > 0) { if (x.changed) t.sheetsWithChanges++; withChanges.push({ client: x.client, sheet: 'https://docs.google.com/spreadsheets/d/' + x.spreadsheetId, rows: x.rows, delete: x.rowsToDelete, junk: x.junkCellsToClean, copiedLinks: x.linksCopiedToKeptRows, review: x.rowsLeftAloneForReview, dupSamples: x.dupSamples, junkSamples: x.junkSamples, reviewGroups: x.reviewGroups }); }\n  if (x.note) notes.push({ client: x.client, sheet: x.spreadsheetId, note: x.note });\n}\n// Biggest cleanups first (the old order hid the sheets with most deletions), plus a compact line for EVERY sheet that loses 25% or more of its rows.\nconst share = all.filter(x => (x.rowsToDelete || 0) > 0 && (x.rows || 0) > 0 && x.rowsToDelete / x.rows >= 0.25).map(x => ({ client: x.client, sheet: 'https://docs.google.com/spreadsheets/d/' + x.spreadsheetId, rows: x.rows, delete: x.rowsToDelete, percent: Math.round(100 * x.rowsToDelete / x.rows) })).sort((p, q) => q.percent - p.percent);\nwithChanges.sort((p, q) => (q.delete || 0) - (p.delete || 0));\nreturn [{ json: { ...t, notes, sheetsLosingMoreThan25Percent: share, sheets: withChanges.slice(0, 40), moreSheetsNotShown: Math.max(0, withChanges.length - 40) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        200
+      ],
+      "id": "5b89f684-2eaa-4e2d-a76a-f8f1dff54b87",
+      "name": "Totals"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4eb60b47-71a2-4d29-8365-f94483f9067c",
+              "leftValue": "={{ $('Config').first().json.dryRun !== false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2420,
+        420
+      ],
+      "id": "982f0d49-6cf5-4777-8672-65748b2f4549",
+      "name": "Dry run?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sheets API requests per sheet, in this order: (1) set cells (link copies, junk cleanup) with the ORIGINAL row numbers, (2) delete the duplicate rows\n// bottom-up, (3) sort by timestamp (if Config.sortToo).\nconst cfg = $('Config').first().json;\nconst out = [];\nfor (const it of $input.all()) {\n  const s = it.json;\n  const sid = s.spreadsheetId;\n  const q = \"'\" + String(s.tabName).replace(/'/g, \"''\") + \"'\";\n  const upd = s._updates || [];\n  for (let i = 0; i < upd.length; i += 400) {\n    out.push({ json: { kind: 'update', sid, label: s.client + ': set cells', body: { valueInputOption: 'RAW', data: upd.slice(i, i + 400).map(u => ({ range: q + '!' + u.range, values: [[u.value]] })) } } });\n  }\n  const rows = (s._deleteRows || []).slice().sort((a, b) => b - a);\n  const ranges = [];\n  for (const r of rows) { const last = ranges[ranges.length - 1]; if (last && last.start === r + 1) last.start = r; else ranges.push({ start: r, end: r }); }\n  for (let i = 0; i < ranges.length; i += 300) {\n    out.push({ json: { kind: 'delete', sid, label: s.client + ': delete rows', body: { requests: ranges.slice(i, i + 300).map(g => ({ deleteDimension: { range: { sheetId: s.tabSheetId, dimension: 'ROWS', startIndex: g.start - 1, endIndex: g.end } } })) } } });\n  }\n  if (cfg.sortToo !== false && s.timestampColumnIndex !== undefined) {\n    out.push({ json: { kind: 'sort', sid, label: s.client + ': sort', body: { requests: [{ sortRange: { range: { sheetId: s.tabSheetId, startRowIndex: 1, startColumnIndex: 0 }, sortSpecs: [{ dimensionIndex: s.timestampColumnIndex, sortOrder: 'ASCENDING' }] } }] } } });\n  }\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        520
+      ],
+      "id": "a2442598-a5d2-4a39-856b-a761bf9f35f5",
+      "name": "Build Requests"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.kind === 'update' ? 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sid + '/values:batchUpdate' : 'https://sheets.googleapis.com/v4/spreadsheets/' + $json.sid + ':batchUpdate' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1100
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2860,
+        520
+      ],
+      "id": "e3b054fa-33bb-4734-b8ba-b180d642a4ff",
+      "name": "Apply",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rKfNzy77xzsMahH6",
+          "name": "Template_control"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all().map(i => i.json);\nconst failed = all.filter(x => x.error).length;\nreturn [{ json: { requestsSent: all.length, requestsFailed: failed, note: failed ? 'Some requests failed: open the Apply node output and check the error items; run again for those clients (onlyClients).' : 'All requests succeeded.' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        520
+      ],
+      "id": "c564ce4c-ee0b-4ed4-8064-1d13d00bd9cc",
+      "name": "Apply Report"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Provider Parent Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provider Parent Folders": {
+      "main": [
+        [
+          {
+            "node": "List Client Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Client Folders": {
+      "main": [
+        [
+          {
+            "node": "Keep Folders Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Folders Only": {
+      "main": [
+        [
+          {
+            "node": "Find Conversation Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Conversation Sheet": {
+      "main": [
+        [
+          {
+            "node": "Pick Exact Conversation Sheet Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Exact Conversation Sheet Match": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Properties": {
+      "main": [
+        [
+          {
+            "node": "Extract Tab Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Tab Info": {
+      "main": [
+        [
+          {
+            "node": "Read Whole Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Whole Tab": {
+      "main": [
+        [
+          {
+            "node": "Analyze Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Sheet": {
+      "main": [
+        [
+          {
+            "node": "Totals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Dry run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Requests": {
+      "main": [
+        [
+          {
+            "node": "Apply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply": {
+      "main": [
+        [
+          {
+            "node": "Apply Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry run?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Build Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
